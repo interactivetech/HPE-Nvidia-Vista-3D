@@ -14,6 +14,14 @@ NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'nifti')
 
 st.set_page_config(layout="wide")
 
+st.markdown("""<style>
+.main .block-container {
+    max-width: unset !important;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+</style>""", unsafe_allow_html=True)
+
 
 
 # Sidebar for controls

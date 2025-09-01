@@ -102,11 +102,13 @@ def create_affine_from_dicom(dicom_files):
             y_direction = orientation[3:6]
             # Z direction is cross product of x and y
             z_direction = np.cross(x_direction, y_direction)
+            print(f"   DEBUG: ImageOrientationPatient: {orientation}") # ADD THIS LINE
         else:
             # Default orientation: axial slices
             x_direction = [1, 0, 0]
             y_direction = [0, 1, 0]
             z_direction = [0, 0, 1]
+            print("   DEBUG: ImageOrientationPatient not found, using default axial.") # ADD THIS LINE
         
         # Get position information from first slice
         if hasattr(ds, 'ImagePositionPatient') and ds.ImagePositionPatient:

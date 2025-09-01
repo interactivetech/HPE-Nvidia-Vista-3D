@@ -1,19 +1,9 @@
-#!/usr/bin/env python3
-"""
-HTTPS Image Server with self-signed certificates.
-Serves files from the outputs directory over HTTPS.
-"""
-
 import os
-import sys
 import ssl
-import socket
 import argparse
 import ipaddress
-import posixpath
 from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -21,37 +11,21 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption
 import datetime
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware # Added
+import uvicorn
 
 from dotenv import load_dotenv
+
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent
 
 # Load environment variables
 load_dotenv()
 
-class ImageServerHandler(SimpleHTTPRequestHandler):
-    """Custom HTTP request handler for the image server."""
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(project_root), **kwargs)
-    
-    def end_headers(self):
-        # Add CORS headers for cross-origin requests
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        super().end_headers()
-    
-    def do_OPTIONS(self):
-        # Handle preflight CORS requests
-        self.send_response(200)
-        self.end_headers()
-    
-    def log_message(self, format, *args):
-        # Custom logging format
-        print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {format % args}")
-
+# --- Certificate Generation Functions ---
 def generate_self_signed_cert(cert_file: Path, key_file: Path, hostname: str = "localhost"):
     """Generate a self-signed SSL certificate and private key."""
     
@@ -118,9 +92,29 @@ def get_server_config():
     
     return host, port
 
-def main():
-    """Main function to start the HTTPS image server."""
-    
+# --- FastAPI Application ---
+app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:8501", # Streamlit's default port
+    "https://localhost",
+    "https://localhost:8501",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files from project root
+app.mount("/", StaticFiles(directory=str(project_root)), name="static")
+
+# --- Main execution block for Uvicorn ---
+if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="HTTPS Image Server")
     parser.add_argument("--host", help="Host to bind to (default: from IMAGE_SERVER env var)")
@@ -147,30 +141,20 @@ def main():
         print("Self-signed certificate not found. Generating new one...")
         generate_self_signed_cert(Path(cert_file), Path(key_file), host)
     
-    # Create HTTPS server
-    server = HTTPServer((host, port), ImageServerHandler)
-    
-    # Configure SSL context
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(cert_file, key_file)
-    server.socket = context.wrap_socket(server.socket, server_side=True)
-    
-    print(f"Starting HTTPS Image Server...")
+    # Run Uvicorn with SSL
+    print(f"Starting HTTPS Image Server with FastAPI/Uvicorn...")
     print(f"  URL: https://{host}:{port}")
-    print(f"  Document Root: {project_root.absolute()}")
+    print(f"  Serving from: {project_root.absolute()}")
     print(f"  Certificate: {cert_file}")
     print(f"  Private Key: {key_file}")
     print(f"  Press Ctrl+C to stop the server")
     print("-" * 60)
-    
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down server...")
-        server.shutdown()
-        server.server_close()
-        print("Server stopped.")
 
-if __name__ == "__main__":
-    main()
-
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        ssl_keyfile=str(key_file),
+        ssl_certfile=str(cert_file),
+        log_level="info"
+    )
