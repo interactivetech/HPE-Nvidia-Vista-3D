@@ -1,0 +1,397 @@
+"timestamp": "2025-08-31 18:50:24,232", "level": "INFO", "message": "Starting nimlib 0.3.7"
+"timestamp": "2025-08-31 18:50:24,232", "level": "INFO", "message": "NIM VERSION:"
+1.0.0
+"timestamp": "2025-08-31 18:50:24,232", "level": "INFO", "message": "NIM LICENSE:"
+GOVERNING TERMS: The NIM container is governed by the NVIDIA Software License 
+Agreement (found at https://www.nvidia.com/en-us/agreements/enterprise-
+software/nvidia-software-license-agreement/) the Product-Specific Terms for 
+NVIDIA AI Products (found at https://www.nvidia.com/en-us/agreements/
+enterprise-software/product-specific-terms-for-ai-products/), and the use of
+this model is governed by the AI Foundation Models Community License Agreement
+(found at https://docs.nvidia.com/ai-foundation-models-community-license.pdf).
+"timestamp": "2025-08-31 18:50:24,234", "level": "INFO", "message": "Matched profile_id in manifest from env NIM_MODEL_PROFILE to: 56df3d486bbd1c8ac4a1de4d613d4037927bd462d751bf4fe9cbeb8d14890cb8"
+"timestamp": "2025-08-31 18:50:24,234", "level": "INFO", "message": "Using the profile selected by the profile selector: 56df3d486bbd1c8ac4a1de4d613d4037927bd462d751bf4fe9cbeb8d14890cb8"
+"timestamp": "2025-08-31 18:50:24,234", "level": "INFO", "message": "Using the workspace specified during init: /opt/nim/workspace"
+"timestamp": "2025-08-31 18:50:24,234", "level": "INFO", "message": "Downloading manifest profile: 56df3d486bbd1c8ac4a1de4d613d4037927bd462d751bf4fe9cbeb8d14890cb8"
+"timestamp": "2025-08-31 18:51:25,661", "level": "INFO", "message": "Creating workspace at /opt/nim/workspace"
+"timestamp": "2025-08-31 18:51:25,662", "level": "INFO", "message": "Materializing workspace to: /opt/nim/workspace"
+"timestamp": "2025-08-31 18:51:25,721", "level": "INFO", "message": "Starting Triton server: /usr/local/lib/python3.10/dist-packages/nimlib/triton_start.sh -m /opt/nim/workspace/models -p 8080 -l 0"
+"timestamp": "2025-08-31 18:51:30,325", "level": "INFO", "message": "Starting NIM inference server"
+2025-08-31 18:51:30,326 - INFO - Setting logging properties based on config: /opt/nim/workspace/models/vista3d/bundle/configs/logging.conf.
+2025-08-31 18:51:31,345 - py.warnings - WARNING - You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+
+2025-08-31 18:51:31,843 - root - INFO - Restored all variables from /opt/nim/workspace/models/vista3d/bundle/models/model.pt
+2025-08-31 18:51:31,851 - INFO - Loading TensorRT engine: /opt/nim/workspace/models/vista3d/bundle/models/model.pt.image_encoder.encoder.plan
+[W] 'colored' module is not installed, will not use colors when logging. To enable colors, please install the 'colored' module: python3 -m pip install colored
+[I] Loading bytes from /opt/nim/workspace/models/vista3d/bundle/models/model.pt.image_encoder.encoder.plan
+Adding casts around norms...
+Swapped 26 modules
+2025-08-31 18:51:31,852 - INFO - Exporting to /tmp/tmptt6_sve6/model.onnx:
+	output_names=[]
+	export args: {'dynamic_axes': {}}
+2025-08-31 18:51:31,905 - py.warnings - WARNING - Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+
+2025-08-31 18:51:31,906 - py.warnings - WARNING - Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+
+2025-08-31 18:51:32,078 - py.warnings - WARNING - ONNX export mode is set to TrainingMode.EVAL, but operator 'instance_norm' is set to train=True. Exporting with train=True.
+
+"timestamp": "2025-08-31 18:51:37,653", "level": "INFO", "message": "2025-08-31 18:51:37,632 - INFO - --- input summary of monai.bundle.scripts.run ---"
+2025-08-31 18:51:37,653 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,632 - INFO - --- input summary of monai.bundle.scripts.run ---
+"timestamp": "2025-08-31 18:51:37,653", "level": "INFO", "message": "2025-08-31 18:51:37,632 - INFO - > config_file: ['/opt/nim/workspace/models/vista3d/bundle/configs/inference.json',"
+2025-08-31 18:51:37,653 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,632 - INFO - > config_file: ['/opt/nim/workspace/models/vista3d/bundle/configs/inference.json',
+"timestamp": "2025-08-31 18:51:37,653", "level": "INFO", "message": "'/opt/nim/workspace/models/vista3d/bundle/configs/inference_trt.json']"
+2025-08-31 18:51:37,653 - nimlib.nimutils - INFO - '/opt/nim/workspace/models/vista3d/bundle/configs/inference_trt.json']
+"timestamp": "2025-08-31 18:51:37,653", "level": "INFO", "message": "2025-08-31 18:51:37,632 - INFO - > workflow_type: 'infer'"
+2025-08-31 18:51:37,653 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,632 - INFO - > workflow_type: 'infer'
+"timestamp": "2025-08-31 18:51:37,654", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > bundle_root: '/opt/nim/workspace/models/vista3d/bundle'"
+2025-08-31 18:51:37,654 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > bundle_root: '/opt/nim/workspace/models/vista3d/bundle'
+"timestamp": "2025-08-31 18:51:37,654", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > logging_file: '/opt/nim/workspace/models/vista3d/bundle/configs/logging.conf'"
+2025-08-31 18:51:37,654 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > logging_file: '/opt/nim/workspace/models/vista3d/bundle/configs/logging.conf'
+"timestamp": "2025-08-31 18:51:37,654", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > meta_file: '/opt/nim/workspace/models/vista3d/bundle/configs/metadata.json'"
+2025-08-31 18:51:37,654 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > meta_file: '/opt/nim/workspace/models/vista3d/bundle/configs/metadata.json'
+"timestamp": "2025-08-31 18:51:37,654", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > image_key: 'image'"
+2025-08-31 18:51:37,654 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > image_key: 'image'
+"timestamp": "2025-08-31 18:51:37,679", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > output_dtype: 'uint8'"
+2025-08-31 18:51:37,679 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > output_dtype: 'uint8'
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > separate_folder: False"
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > separate_folder: False
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > output_dir: 'temp_a8f8081a-3bd2-4862-90b1-a0b1fbe5838b'"
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > output_dir: 'temp_a8f8081a-3bd2-4862-90b1-a0b1fbe5838b'
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > dataset#data: [{}]"
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > dataset#data: [{}]
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - > device: device(type='cuda', index=0)"
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - > device: device(type='cuda', index=0)
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - ---"
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - ---
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": ""
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": ""
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 
+"timestamp": "2025-08-31 18:51:37,705", "level": "INFO", "message": "2025-08-31 18:51:37,633 - INFO - Setting logging properties based on config: /opt/nim/workspace/models/vista3d/bundle/configs/logging.conf."
+2025-08-31 18:51:37,705 - nimlib.nimutils - INFO - 2025-08-31 18:51:37,633 - INFO - Setting logging properties based on config: /opt/nim/workspace/models/vista3d/bundle/configs/logging.conf.
+[I] Folding Constants | Pass 1
+[I]     Total Nodes | Original:   148, After Folding:   148 |     0 Nodes Folded
+2025-08-31 18:51:38,224 - INFO - Export to ONNX successful.
+2025-08-31 18:51:38,224 - INFO - Building TensorRT engine for /tmp/tmptt6_sve6/model.onnx: /opt/nim/workspace/models/vista3d/bundle/models/model.pt.image_encoder.encoder.plan
+"timestamp": "2025-08-31 18:51:40,051", "level": "INFO", "message": "2025-08-31 18:51:38,723 - py.warnings - WARNING - You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature."
+2025-08-31 18:51:40,051 - nimlib.nimutils - INFO - 2025-08-31 18:51:38,723 - py.warnings - WARNING - You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+"timestamp": "2025-08-31 18:51:40,051", "level": "INFO", "message": ""
+2025-08-31 18:51:40,051 - nimlib.nimutils - INFO - 
+"timestamp": "2025-08-31 18:51:40,051", "level": "INFO", "message": "2025-08-31 18:51:39,215 - root - INFO - Restored all variables from /opt/nim/workspace/models/vista3d/bundle/models/model.pt"
+2025-08-31 18:51:40,051 - nimlib.nimutils - INFO - 2025-08-31 18:51:39,215 - root - INFO - Restored all variables from /opt/nim/workspace/models/vista3d/bundle/models/model.pt
+[I] Configuring with profiles:[
+        Profile 0:
+            {x [min=[1, 1, 128, 128, 128], opt=[1, 1, 128, 128, 128], max=[1, 1, 128, 128, 128]]}
+    ]
+2025-08-31 18:51:40,686 - py.warnings - WARNING - Use Deprecated in TensorRT 10.1. Superseded by explicit quantization. instead.
+
+[W] profileSharing0806 is on by default in TensorRT 10.0. This flag is deprecated and has no effect.
+[I] Building engine with configuration:
+    Flags                  | [FP16, TF32, OBEY_PRECISION_CONSTRAINTS]
+    Engine Capability      | EngineCapability.STANDARD
+    Memory Pools           | [WORKSPACE: 45484.50 MiB, TACTIC_DRAM: 45484.50 MiB, TACTIC_SHARED_MEMORY: 1024.00 MiB]
+    Tactic Sources         | [EDGE_MASK_CONVOLUTIONS, JIT_CONVOLUTIONS]
+    Profiling Verbosity    | ProfilingVerbosity.DETAILED
+    Preview Features       | [PROFILE_SHARING_0806]
+[I] Finished engine building in 81.147 seconds
+2025-08-31 18:53:02,436 - py.warnings - WARNING - unclosed file <_io.BufferedWriter name='/opt/nim/workspace/models/vista3d/bundle/models/model.pt.image_encoder.encoder.plan'>
+
+2025-08-31 18:53:02,443 - INFO - Loading TensorRT engine: /opt/nim/workspace/models/vista3d/bundle/models/model.pt.image_encoder.encoder.plan
+[I] Loading bytes from /opt/nim/workspace/models/vista3d/bundle/models/model.pt.image_encoder.encoder.plan
+"timestamp": "2025-08-31 18:53:02,689", "level": "WARNING", "message": "OTel configuration file was not found at expected path: /etc/nim/config/otel.yaml"
+2025-08-31 18:53:02,689 - nimlib.nim_inference_api_builder.otel - WARNING - OTel configuration file was not found at expected path: /etc/nim/config/otel.yaml
+"timestamp": "2025-08-31 18:53:02,695", "level": "INFO", "message": "Serving endpoints:
+  0.0.0.0:8000/v1/vista3d/inference (POST)
+  0.0.0.0:8000/v1/vista3d/info (GET)
+  0.0.0.0:8000/v1/health/live (GET)
+  0.0.0.0:8000/v1/health/ready (GET)
+  0.0.0.0:8000/v1/metrics (GET)
+  0.0.0.0:8000/v1/license (GET)
+  0.0.0.0:8000/v1/metadata (GET)
+  0.0.0.0:8000/v1/manifest (GET)"
+2025-08-31 18:53:02,695 - nimlib.nim_inference_api_builder.api - INFO - Serving endpoints:
+  0.0.0.0:8000/v1/vista3d/inference (POST)
+  0.0.0.0:8000/v1/vista3d/info (GET)
+  0.0.0.0:8000/v1/health/live (GET)
+  0.0.0.0:8000/v1/health/ready (GET)
+  0.0.0.0:8000/v1/metrics (GET)
+  0.0.0.0:8000/v1/license (GET)
+  0.0.0.0:8000/v1/metadata (GET)
+  0.0.0.0:8000/v1/manifest (GET)
+"timestamp": "2025-08-31 18:53:02,695", "level": "INFO", "message": "{'message': 'Starting HTTP Inference server', 'port': 8000, 'workers_count': 1, 'host': '0.0.0.0', 'log_level': 'info'}"
+2025-08-31 18:53:02,695 - nimlib.nim_inference_api_builder.api - INFO - {'message': 'Starting HTTP Inference server', 'port': 8000, 'workers_count': 1, 'host': '0.0.0.0', 'log_level': 'info'}
+2025-08-31 18:53:02,700 - uvicorn.error - INFO - Started server process [39]
+2025-08-31 18:53:02,700 - uvicorn.error - INFO - Waiting for application startup.
+2025-08-31 18:53:02,700 - uvicorn.error - INFO - Application startup complete.
+2025-08-31 18:53:02,700 - uvicorn.error - INFO - Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2025-08-31 18:54:39,610 - uvicorn.access - INFO - 172.17.0.1:42142 - "GET / HTTP/1.1" 404
+2025-08-31 18:54:42,454 - uvicorn.access - INFO - 172.17.0.1:58338 - "GET /health HTTP/1.1" 404
+2025-08-31 18:54:47,142 - uvicorn.access - INFO - 172.17.0.1:58354 - "GET / HTTP/1.1" 404
+"timestamp": "2025-08-31 18:55:13,149", "level": "INFO", "message": "Health Live method called"
+2025-08-31 18:55:13,149 - nimlib.nim_inference_api_builder.api - INFO - Health Live method called
+2025-08-31 18:55:13,150 - uvicorn.access - INFO - 172.17.0.1:56318 - "GET /v1/health/live HTTP/1.1" 200
+"timestamp": "2025-08-31 18:55:15,297", "level": "INFO", "message": "Health Live method called"
+2025-08-31 18:55:15,297 - nimlib.nim_inference_api_builder.api - INFO - Health Live method called
+2025-08-31 18:55:15,297 - uvicorn.access - INFO - 172.17.0.1:56326 - "GET /v1/health/live HTTP/1.1" 200
+"timestamp": "2025-08-31 18:55:17,997", "level": "INFO", "message": "Health Live method called"
+2025-08-31 18:55:17,997 - nimlib.nim_inference_api_builder.api - INFO - Health Live method called
+2025-08-31 18:55:17,997 - uvicorn.access - INFO - 172.17.0.1:56340 - "GET /v1/health/live HTTP/1.1" 200
+"timestamp": "2025-08-31 18:55:21,806", "level": "INFO", "message": "Health Live method called"
+2025-08-31 18:55:21,806 - nimlib.nim_inference_api_builder.api - INFO - Health Live method called
+2025-08-31 18:55:21,806 - uvicorn.access - INFO - 172.17.0.1:60526 - "GET /v1/health/live HTTP/1.1" 200
+2025-09-01 01:55:53,959 - uvicorn.error - WARNING - Invalid HTTP request received.
+2025-09-01 01:56:18,135 - uvicorn.error - WARNING - Invalid HTTP request received.
+"timestamp": "2025-09-01 02:04:42,917", "level": "INFO", "message": "inference called"
+2025-09-01 02:04:42,917 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:04:42,917 - py.warnings - WARNING - Pydantic serializer warnings:
+  Expected `Prompts` but got `dict` with value `{}` - serialized value may not be as expected
+
+2025-09-01 02:04:42,922 - uvicorn.access - INFO - 172.17.0.1:59620 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:04:50,892", "level": "INFO", "message": "inference called"
+2025-09-01 02:04:50,892 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:04:50,894 - uvicorn.access - INFO - 172.17.0.1:59632 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:05:27,282", "level": "INFO", "message": "inference called"
+2025-09-01 02:05:27,282 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:05:27,284 - uvicorn.access - INFO - 172.17.0.1:46972 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:05:34,925", "level": "INFO", "message": "inference called"
+2025-09-01 02:05:34,925 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:05:34,927 - uvicorn.access - INFO - 172.17.0.1:48768 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:06:27,870", "level": "INFO", "message": "inference called"
+2025-09-01 02:06:27,870 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:06:27,872 - uvicorn.access - INFO - 172.17.0.1:33154 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:06:31,452", "level": "INFO", "message": "inference called"
+2025-09-01 02:06:31,452 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:06:31,454 - uvicorn.access - INFO - 172.17.0.1:60388 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:10:18,421", "level": "INFO", "message": "inference called"
+2025-09-01 02:10:18,421 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:10:18,423 - uvicorn.access - INFO - 172.17.0.1:52216 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:11:45,712", "level": "INFO", "message": "inference called"
+2025-09-01 02:11:45,712 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:11:45,717 - uvicorn.access - INFO - 172.17.0.1:59780 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:11:47,726", "level": "INFO", "message": "inference called"
+2025-09-01 02:11:47,726 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:11:47,729 - uvicorn.access - INFO - 172.17.0.1:59796 - "POST /v1/vista3d/inference HTTP/1.1" 400
+2025-09-01 02:11:58,960 - uvicorn.access - INFO - 172.17.0.1:58044 - "GET / HTTP/1.1" 404
+2025-09-01 02:11:59,115 - uvicorn.access - INFO - 172.17.0.1:58044 - "GET /favicon.ico HTTP/1.1" 404
+"timestamp": "2025-09-01 02:12:51,701", "level": "INFO", "message": "inference called"
+2025-09-01 02:12:51,701 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:12:51,703 - uvicorn.access - INFO - 172.17.0.1:45352 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:13:05,826", "level": "INFO", "message": "inference called"
+2025-09-01 02:13:05,826 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:13:05,829 - uvicorn.access - INFO - 172.17.0.1:44966 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,467", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,467 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,470 - uvicorn.access - INFO - 172.17.0.1:41462 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,472", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,472 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,474 - uvicorn.access - INFO - 172.17.0.1:41464 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,476", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,476 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,477 - uvicorn.access - INFO - 172.17.0.1:41474 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,479", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,479 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,482 - uvicorn.access - INFO - 172.17.0.1:41476 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,484", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,484 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,485 - uvicorn.access - INFO - 172.17.0.1:41492 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,487", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,487 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,488 - uvicorn.access - INFO - 172.17.0.1:41496 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,490", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,490 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,491 - uvicorn.access - INFO - 172.17.0.1:41512 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,493", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,493 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,495 - uvicorn.access - INFO - 172.17.0.1:41522 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,496", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,496 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,497 - uvicorn.access - INFO - 172.17.0.1:41534 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,499", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,499 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,501 - uvicorn.access - INFO - 172.17.0.1:41536 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,502", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,502 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,504 - uvicorn.access - INFO - 172.17.0.1:41542 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,506", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,506 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,507 - uvicorn.access - INFO - 172.17.0.1:41556 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,509", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,509 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,510 - uvicorn.access - INFO - 172.17.0.1:41566 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,512", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,512 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,513 - uvicorn.access - INFO - 172.17.0.1:41574 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,514", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,514 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,516 - uvicorn.access - INFO - 172.17.0.1:41586 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,517", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,517 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,519 - uvicorn.access - INFO - 172.17.0.1:41594 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,520", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,520 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,521 - uvicorn.access - INFO - 172.17.0.1:41610 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,523", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,523 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,524 - uvicorn.access - INFO - 172.17.0.1:41626 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,525", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,525 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,527 - uvicorn.access - INFO - 172.17.0.1:41632 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,528", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,528 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,529 - uvicorn.access - INFO - 172.17.0.1:41646 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,531", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,531 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,532 - uvicorn.access - INFO - 172.17.0.1:41662 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,534", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,534 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,535 - uvicorn.access - INFO - 172.17.0.1:41676 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,536", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,536 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,538 - uvicorn.access - INFO - 172.17.0.1:41688 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,540", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,540 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,541 - uvicorn.access - INFO - 172.17.0.1:41698 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,542", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,542 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,543 - uvicorn.access - INFO - 172.17.0.1:41704 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,545", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,545 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,546 - uvicorn.access - INFO - 172.17.0.1:41718 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,547", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,547 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,548 - uvicorn.access - INFO - 172.17.0.1:41730 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,550", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,550 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,551 - uvicorn.access - INFO - 172.17.0.1:41738 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,553", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,553 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,554 - uvicorn.access - INFO - 172.17.0.1:41748 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,555", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,555 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,556 - uvicorn.access - INFO - 172.17.0.1:41752 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,558", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,558 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,559 - uvicorn.access - INFO - 172.17.0.1:41766 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,561", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,561 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,562 - uvicorn.access - INFO - 172.17.0.1:41776 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,563", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,563 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,564 - uvicorn.access - INFO - 172.17.0.1:41778 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,566", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,566 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,567 - uvicorn.access - INFO - 172.17.0.1:41780 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,568", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,568 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,570 - uvicorn.access - INFO - 172.17.0.1:41796 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:18:59,571", "level": "INFO", "message": "inference called"
+2025-09-01 02:18:59,571 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:18:59,572 - uvicorn.access - INFO - 172.17.0.1:41810 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:18,982", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:18,982 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:18,984 - uvicorn.access - INFO - 172.17.0.1:50128 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:18,987", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:18,987 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:18,988 - uvicorn.access - INFO - 172.17.0.1:50144 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:18,990", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:18,990 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:18,992 - uvicorn.access - INFO - 172.17.0.1:50146 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:18,994", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:18,994 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:18,995 - uvicorn.access - INFO - 172.17.0.1:50150 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:18,997", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:18,997 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:18,999 - uvicorn.access - INFO - 172.17.0.1:50154 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,001", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,001 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,002 - uvicorn.access - INFO - 172.17.0.1:50160 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,005", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,005 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,007 - uvicorn.access - INFO - 172.17.0.1:50176 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,009", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,009 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,010 - uvicorn.access - INFO - 172.17.0.1:50184 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,012", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,012 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,014 - uvicorn.access - INFO - 172.17.0.1:50194 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,016", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,016 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,017 - uvicorn.access - INFO - 172.17.0.1:50198 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,020", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,020 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,021 - uvicorn.access - INFO - 172.17.0.1:50206 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,023", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,023 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,024 - uvicorn.access - INFO - 172.17.0.1:50218 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,025", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,025 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,027 - uvicorn.access - INFO - 172.17.0.1:50222 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,028", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,028 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,030 - uvicorn.access - INFO - 172.17.0.1:50232 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,032", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,032 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,033 - uvicorn.access - INFO - 172.17.0.1:50238 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,035", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,035 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,036 - uvicorn.access - INFO - 172.17.0.1:50254 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,038", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,038 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,039 - uvicorn.access - INFO - 172.17.0.1:50268 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,041", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,041 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,042 - uvicorn.access - INFO - 172.17.0.1:50270 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,044", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,044 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,046 - uvicorn.access - INFO - 172.17.0.1:50278 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,047", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,047 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,049 - uvicorn.access - INFO - 172.17.0.1:50290 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,051", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,051 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,053 - uvicorn.access - INFO - 172.17.0.1:50302 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,054", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,054 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,056 - uvicorn.access - INFO - 172.17.0.1:50310 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,058", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,058 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,059 - uvicorn.access - INFO - 172.17.0.1:50326 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,061", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,061 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,062 - uvicorn.access - INFO - 172.17.0.1:50340 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,064", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,064 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,065 - uvicorn.access - INFO - 172.17.0.1:50348 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,067", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,067 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,068 - uvicorn.access - INFO - 172.17.0.1:50356 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,070", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,070 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,072 - uvicorn.access - INFO - 172.17.0.1:50368 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,073", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,073 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,075 - uvicorn.access - INFO - 172.17.0.1:50374 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,077", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,077 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,078 - uvicorn.access - INFO - 172.17.0.1:50382 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,080", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,080 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,082 - uvicorn.access - INFO - 172.17.0.1:50396 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,084", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,084 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,085 - uvicorn.access - INFO - 172.17.0.1:50408 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,087", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,087 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,088 - uvicorn.access - INFO - 172.17.0.1:50420 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,089", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,089 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,091 - uvicorn.access - INFO - 172.17.0.1:50432 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,092", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,092 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,094 - uvicorn.access - INFO - 172.17.0.1:50442 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,096", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,096 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,097 - uvicorn.access - INFO - 172.17.0.1:50452 - "POST /v1/vista3d/inference HTTP/1.1" 400
+"timestamp": "2025-09-01 02:19:19,098", "level": "INFO", "message": "inference called"
+2025-09-01 02:19:19,098 - nimlib.nim_inference_api_builder.api - INFO - inference called
+2025-09-01 02:19:19,100 - uvicorn.access - INFO - 172.17.0.1:50460 - "POST /v1/vista3d/inference HTTP/1.1" 400

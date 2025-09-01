@@ -41,7 +41,7 @@ class Vista3DServicesTester:
     
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self.project_root = Path(__file__).parent
+        self.project_root = Path(__file__).parent.parent
         self.outputs_dir = self.project_root / "outputs"
         self.certs_dir = self.outputs_dir / "certs"
         self.nifti_dir = self.outputs_dir / "nifti"
@@ -202,7 +202,7 @@ class Vista3DServicesTester:
         try:
             # Test HTTPS connectivity (ignore SSL certificate warnings)
             response = requests.get(
-                f"{self.image_server_url}/",
+                f"{self.image_server_url}/pyproject.toml",
                 timeout=10,
                 verify=False,
                 headers={'User-Agent': 'Vista3D-Tester/1.0'}
@@ -248,7 +248,7 @@ class Vista3DServicesTester:
             
             # Test if the file can be accessed via the image server
             response = requests.get(
-                f"{self.image_server_url}/test_file.txt",
+                f"{self.image_server_url}/outputs/test_file.txt",
                 timeout=10,
                 verify=False,
                 headers={'User-Agent': 'Vista3D-Tester/1.0'}
@@ -289,7 +289,7 @@ class Vista3DServicesTester:
             
             # Test the Docker-accessible URL
             response = requests.get(
-                f"{docker_host_url}/",
+                f"{docker_host_url}/pyproject.toml",
                 timeout=10,
                 verify=False,
                 headers={'User-Agent': 'Vista3D-Tester/1.0'}
