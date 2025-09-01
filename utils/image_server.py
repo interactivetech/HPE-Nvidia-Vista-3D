@@ -34,29 +34,7 @@ class ImageServerHandler(SimpleHTTPRequestHandler):
     """Custom HTTP request handler for the image server."""
     
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-    
-    def translate_path(self, path):
-        """Override to set the document root to the outputs directory."""
-        # Get the document root from the server
-        if hasattr(self.server, 'document_root'):
-            doc_root = self.server.document_root
-        else:
-            doc_root = str(project_root / "outputs")
-        
-        # Clean the path and join with document root
-        path = path.split('?', 1)[0]
-        path = path.split('#', 1)[0]
-        path = posixpath.normpath(unquote(path))
-        words = path.split('/')
-        words = filter(None, words)
-        path = doc_root
-        for word in words:
-            if os.path.dirname(word) or word in (os.curdir, os.pardir):
-                # Ignore absolute paths and parent directory references
-                continue
-            path = os.path.join(path, word)
-        return path
+        super().__init__(*args, directory=str(project_root), **kwargs)
     
     def end_headers(self):
         # Add CORS headers for cross-origin requests
@@ -149,7 +127,6 @@ def main():
     parser.add_argument("--port", type=int, help="Port to bind to (default: from IMAGE_SERVER env var)")
     parser.add_argument("--cert", help="Path to SSL certificate file")
     parser.add_argument("--key", help="Path to SSL private key file")
-    parser.add_argument("--outputs-dir", help="Directory to serve (default: ./outputs)")
     
     args = parser.parse_args()
     
@@ -157,31 +134,21 @@ def main():
     default_host, default_port = get_server_config()
     host = args.host or default_host
     port = args.port or default_port
-    outputs_dir = args.outputs_dir or str(project_root / "outputs")
-    
-    # Ensure outputs directory exists
-    outputs_path = Path(outputs_dir)
-    if not outputs_path.exists():
-        print(f"Error: Outputs directory '{outputs_path}' does not exist!")
-        sys.exit(1)
     
     # Set up SSL certificate and key paths
-    cert_dir = outputs_path / "certs"
+    cert_dir = project_root / "outputs" / "certs"
     cert_dir.mkdir(exist_ok=True)
     
     cert_file = args.cert or cert_dir / "server.crt"
     key_file = args.key or cert_dir / "server.key"
     
     # Generate self-signed certificate if it doesn't exist
-    if not cert_file.exists() or not key_file.exists():
+    if not Path(cert_file).exists() or not Path(key_file).exists():
         print("Self-signed certificate not found. Generating new one...")
-        generate_self_signed_cert(cert_file, key_file, host)
+        generate_self_signed_cert(Path(cert_file), Path(key_file), host)
     
     # Create HTTPS server
     server = HTTPServer((host, port), ImageServerHandler)
-    
-    # Set the document root for the server
-    server.document_root = str(outputs_path.absolute())
     
     # Configure SSL context
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -190,7 +157,7 @@ def main():
     
     print(f"Starting HTTPS Image Server...")
     print(f"  URL: https://{host}:{port}")
-    print(f"  Document Root: {outputs_path.absolute()}")
+    print(f"  Document Root: {project_root.absolute()}")
     print(f"  Certificate: {cert_file}")
     print(f"  Private Key: {key_file}")
     print(f"  Press Ctrl+C to stop the server")
@@ -206,3 +173,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

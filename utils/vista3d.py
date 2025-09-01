@@ -17,12 +17,23 @@ from typing import Optional, Dict, Any
 import signal
 import atexit
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Fallback if python-dotenv is not available
+    pass
+
 # Configure logging
+project_root = Path(__file__).resolve().parent.parent
+log_dir = project_root / 'outputs' / 'logs'
+log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('start_vista.log'),
+        logging.FileHandler(log_dir / 'start_vista.log'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -34,67 +45,77 @@ class Vista3DManager:
     def __init__(self):
         self.script_dir = Path(__file__).parent
         self.project_root = self.script_dir.parent
-        self.container_name = "vista3d"
+        self.container_name = os.getenv('VISTA3D_CONTAINER_NAME', 'vista3d')
         
-        # Environment variables
+        # Environment variables - load from .env file or use defaults
         self.env_vars = {
-            'NGC_API_KEY': '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',
-            'NGC_ORG_ID': '0509588398571510',
-            'LOCAL_NIM_CACHE': '~/.cache/nim',
-            'IGNORE_SSL_ERRORS': 'True',
-            'IMAGE_URI_ALLOW_REDIRECTS': 'True',
-            'IMAGE_URI_HTTPS_ONLY': 'False',
-            'ALLOW_LOCAL_FILES': 'True',
-            'ENABLE_CONTAINER_PATHS': 'True',
-            'ENABLE_FILE_ACCESS': 'True',
-            'ALLOW_ABSOLUTE_PATHS': 'True',
-            'ALLOW_RELATIVE_PATHS': 'True',
-            'WORKSPACE_IMAGES_PATH': '/workspace/outputs/nifti_data',
-            'WORKSPACE_OUTPUTS_PATH': '/workspace/outputs',
-            'WORKSPACE_ROOT': '/workspace',
-            'ALLOW_FILE_PROTOCOL': 'True',
-            'ALLOW_LOCAL_PATHS': 'True',
-            'DISABLE_URL_VALIDATION': 'False',
-            'ALLOW_ABSOLUTE_FILE_PATHS': 'True',
-            'ALLOW_RELATIVE_FILE_PATHS': 'True',
-            'FILE_ACCESS_MODE': 'local',
-            'LOCAL_FILE_ACCESS': 'True',
+            'NGC_API_KEY': os.getenv('NGC_API_KEY'),
+            'NGC_ORG_ID': os.getenv('NGC_ORG_ID'),
+            'LOCAL_NIM_CACHE': os.getenv('LOCAL_NIM_CACHE', '~/.cache/nim'),
+            'IGNORE_SSL_ERRORS': os.getenv('IGNORE_SSL_ERRORS', 'True'),
+            'IMAGE_URI_ALLOW_REDIRECTS': os.getenv('IMAGE_URI_ALLOW_REDIRECTS', 'True'),
+            'IMAGE_URI_HTTPS_ONLY': os.getenv('IMAGE_URI_HTTPS_ONLY', 'False'),
+            'ALLOW_LOCAL_FILES': os.getenv('ALLOW_LOCAL_FILES', 'True'),
+            'ENABLE_CONTAINER_PATHS': os.getenv('ENABLE_CONTAINER_PATHS', 'True'),
+            'ENABLE_FILE_ACCESS': os.getenv('ENABLE_FILE_ACCESS', 'True'),
+            'ALLOW_ABSOLUTE_PATHS': os.getenv('ALLOW_ABSOLUTE_PATHS', 'True'),
+            'ALLOW_RELATIVE_PATHS': os.getenv('ALLOW_RELATIVE_PATHS', 'True'),
+            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/outputs/nifti_data'),
+            'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/outputs'),
+            'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
+            'ALLOW_FILE_PROTOCOL': os.getenv('ALLOW_FILE_PROTOCOL', 'True'),
+            'ALLOW_LOCAL_PATHS': os.getenv('ALLOW_LOCAL_PATHS', 'True'),
+            'DISABLE_URL_VALIDATION': os.getenv('DISABLE_URL_VALIDATION', 'False'),
+            'ALLOW_ABSOLUTE_FILE_PATHS': os.getenv('ALLOW_ABSOLUTE_FILE_PATHS', 'True'),
+            'ALLOW_RELATIVE_FILE_PATHS': os.getenv('ALLOW_RELATIVE_FILE_PATHS', 'True'),
+            'FILE_ACCESS_MODE': os.getenv('FILE_ACCESS_MODE', 'local'),
+            'LOCAL_FILE_ACCESS': os.getenv('LOCAL_FILE_ACCESS', 'True'),
             # Configure external image server access
-            'EXTERNAL_IMAGE_SERVER': 'https://host.docker.internal:8888',
-            'EXTERNAL_IMAGE_SERVER_HOST': 'host.docker.internal',
-            'EXTERNAL_IMAGE_SERVER_PORT': '8888',
-            'CUDA_VISIBLE_DEVICES': '1',
-            'NVIDIA_VISIBLE_DEVICES': '1',
-            'NVIDIA_DRIVER_CAPABILITIES': 'compute,utility',
-            'CUDA_LAUNCH_BLOCKING': '1',
+            'EXTERNAL_IMAGE_SERVER': os.getenv('EXTERNAL_IMAGE_SERVER', 'https://host.docker.internal:8888'),
+            'EXTERNAL_IMAGE_SERVER_HOST': os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'host.docker.internal'),
+            'EXTERNAL_IMAGE_SERVER_PORT': os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888'),
+            'CUDA_VISIBLE_DEVICES': os.getenv('CUDA_VISIBLE_DEVICES', '1'),
+            'NVIDIA_VISIBLE_DEVICES': os.getenv('NVIDIA_VISIBLE_DEVICES', '1'),
+            'NVIDIA_DRIVER_CAPABILITIES': os.getenv('NVIDIA_DRIVER_CAPABILITIES', 'compute,utility'),
+            'CUDA_LAUNCH_BLOCKING': os.getenv('CUDA_LAUNCH_BLOCKING', '1'),
             'TORCH_USE_CUDA_DSA': '1'
         }
         
-        # Paths
-        self.local_outputs_path = Path("/home/hpadmin/HPE-Vista3d/outputs")
-        self.container_outputs_path = "/workspace/outputs"
+        # Paths - load from environment variables or use defaults
+        project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
+        self.local_outputs_path = Path(project_root) / "outputs"
+        self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/outputs")
         self.local_images_path = self.local_outputs_path / "nifti_data"
-        self.container_images_path = "/workspace/outputs/nifti_data"
+        self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/outputs/nifti_data")
         
-        # Domain whitelist - updated to include external image server
+        # Parse IMAGE_SERVER URL to get components
+        image_server_url = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
+        parsed_url = urllib.parse.urlparse(image_server_url)
+        image_server_host = parsed_url.hostname or 'localhost'
+        image_server_port = parsed_url.port or 8888
+        image_server_protocol = parsed_url.scheme or 'https'
+        
+        # Build external image server URLs
+        external_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}"
+        external_server_http = f"http://{image_server_host}:{image_server_port}"
+        
         self.domain_whitelist = [
-            "https://*", "https://127.0.0.1:8888", "https://localhost:8888",
-            "https://*:*", "http://localhost:8888", "http://127.0.0.1:8888",
-            "https://172.17.0.1:8888", "http://172.17.0.1:8888",
-            # External image server access
-            "https://host.docker.internal:8888", "http://host.docker.internal:8888",
+            # External image server access (configurable)
+            f"{external_server_url}", f"{external_server_http}",
+            f"{image_server_protocol}://{image_server_host}:*", f"http://{image_server_host}:*",
+            # Docker host access
             "https://host.docker.internal:*", "http://host.docker.internal:*",
             # Local file access
             "file://*", "file:///*", "file:///home/*", "file:///Users/*",
             "file:///workspace/*", "file:///workspace/outputs/*",
             "file:///workspace/outputs/nifti_data/*", "/workspace/outputs/*",
             "/workspace/outputs/nifti_data/*", "/workspace/outputs/nifti_data",
+            # Container paths
             "/*", "/workspace/*", "/workspace/outputs/.*", "/workspace/outputs/**",
             "/workspace/**", "/workspace/outputs", "/workspace", "/home/*",
             "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
-            "/home/hpadmin/*", "/home/hpadmin/HPE-Vista3d/*",
-            "/home/hpadmin/HPE-Vista3d/outputs/*",
-            "/home/hpadmin/HPE-Vista3d/outputs/nifti_data/*"
+            # Project-specific paths (configurable)
+            f"{project_root}/*", f"{project_root}/outputs/*", f"{project_root}/outputs/nifti_data/*"
         ]
         
         # Supported image extensions
@@ -191,7 +212,12 @@ class Vista3DManager:
         
         try:
             # Test local access first
-            response = requests.get("https://localhost:8888/", verify=False, timeout=10)
+            image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
+            image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
+            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+            image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
+            
+            response = requests.get(image_server_url, verify=False, timeout=10)
             if response.status_code == 200:
                 logger.info("✅ External image server is accessible locally")
                 return True
@@ -273,12 +299,13 @@ class Vista3DManager:
         volumes += f" -v {self.project_root}:{self.project_root}:ro"
         
         # Docker run command with host networking access
+        vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         docker_cmd = f"""
             docker run --gpus all --rm -d --name {self.container_name} \
             --runtime=nvidia \
             --shm-size=8G \
             --add-host=host.docker.internal:host-gateway \
-            -p 8000:8000 \
+            -p {vista3d_port}:8000 \
             {volumes} \
             {env_vars} \
             nvcr.io/nim/nvidia/vista3d:1.0.0
@@ -312,11 +339,12 @@ class Vista3DManager:
         logger.info("Testing Vista-3D configuration...")
         
         # Test 1: Local file path access
+        vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         logger.info("Test 1: Testing local file path access...")
         test_data = {"image": "/workspace/outputs/nifti_data/test.nii.gz"}
         try:
             response = requests.post(
-                "http://localhost:8000/v1/vista3d/inference",
+                f"http://localhost:{vista3d_port}/v1/vista3d/inference",
                 json=test_data,
                 timeout=10
             )
@@ -329,7 +357,7 @@ class Vista3DManager:
         test_data = {"image": "file:///workspace/outputs/nifti_data/test.nii.gz"}
         try:
             response = requests.post(
-                "http://localhost:8000/v1/vista3d/inference",
+                f"http://localhost:{vista3d_port}/v1/vista3d/inference",
                 json=test_data,
                 timeout=10
             )
@@ -340,7 +368,12 @@ class Vista3DManager:
         # Test 3: External image server access
         logger.info("Test 3: Testing external image server access...")
         try:
-            response = requests.get("https://localhost:8888/", verify=False, timeout=10)
+            image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
+            image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
+            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+            image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
+            
+            response = requests.get(image_server_url, verify=False, timeout=10)
             logger.info(f"External image server response: {response.status_code}")
         except requests.RequestException as e:
             logger.warning(f"Test 3 failed: {e}")
@@ -425,13 +458,16 @@ import logging
 import requests
 import subprocess
 from pathlib import Path
+import os
 
 # Configure logging
+log_dir = Path(__file__).resolve().parent.parent / 'outputs' / 'logs'
+log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('image_server_monitor.log'),
+        logging.FileHandler(log_dir / 'image_server_monitor.log'),
         logging.StreamHandler()
     ]
 )
@@ -465,8 +501,13 @@ def restart_image_server():
 def check_server_response():
     """Check if external image server is responding to requests"""
     try:
+        image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
+        image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
+        image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+        image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
+        
         response = requests.get(
-            "https://localhost:8888/",
+            image_server_url,
             verify=False,
             timeout=10
         )
@@ -537,7 +578,12 @@ if __name__ == "__main__":
         
         # Check if server is responding
         try:
-            response = requests.get("https://localhost:8888/", verify=False, timeout=10)
+            image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
+            image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
+            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+            image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
+            
+            response = requests.get(image_server_url, verify=False, timeout=10)
             if response.status_code == 200:
                 logger.info("✅ External image server is healthy and responding")
                 return True
@@ -577,8 +623,10 @@ if __name__ == "__main__":
         
         # Success message
         logger.info("==========================================")
-        logger.info("Vista-3D is now running on port 8000")
-        logger.info("External image server is running on port 8888")
+        vista3d_port = os.getenv('VISTA3D_PORT', '8000')
+        image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
+        logger.info(f"Vista-3D is now running on port {vista3d_port}")
+        logger.info(f"External image server is running on port {image_server_port}")
         logger.info("==========================================")
         
         logger.info("\nUseful commands:")
@@ -587,7 +635,7 @@ if __name__ == "__main__":
         logger.info("  Stop container: docker stop vista3d")
         logger.info("  Access container shell: docker exec -it vista3d bash")
         logger.info("  Test Vista-3D endpoint: curl http://localhost:8000/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
-        logger.info("  Test external image server: curl -k https://localhost:8888/")
+        logger.info(f"  Test external image server: curl -k https://localhost:{image_server_port}/")
         logger.info("  Start external image server manually: python3 utils/image_server.py")
         
         return True
