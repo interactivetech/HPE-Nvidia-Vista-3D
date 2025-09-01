@@ -10,7 +10,7 @@ load_dotenv()
 # Get config from environment
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 PROJECT_ROOT = os.getenv('PROJECT_ROOT', '.') # Default to current directory
-NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'nifti')
+NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'segments')
 
 st.set_page_config(layout="wide")
 
@@ -18,7 +18,7 @@ st.set_page_config(layout="wide")
 with st.sidebar:
     st.header("Controls")
     
-    source_folder = 'nifti'
+    source_folder = 'segments'
 
     # Get patient folders from local filesystem
     patient_folders = []

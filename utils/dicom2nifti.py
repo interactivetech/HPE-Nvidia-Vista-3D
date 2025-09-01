@@ -132,27 +132,39 @@ def create_affine_from_dicom(dicom_files):
         # Create enhanced affine matrix
         affine = np.eye(4)
         
-        # Set the direction vectors (normalized)
-        x_direction = np.array(x_direction) / np.linalg.norm(x_direction)
-        y_direction = np.array(y_direction) / np.linalg.norm(y_direction)
-        z_direction = np.array(z_direction) / np.linalg.norm(z_direction)
+        if len(dicom_files) == 1:
+            # For single slices, use a simpler affine to avoid singularity issues
+            affine[0, 0] = pixel_spacing[0]
+            affine[1, 1] = pixel_spacing[1]
+            affine[2, 2] = slice_thickness if slice_thickness > 0 else 1.0 # Ensure non-zero
+            affine[:3, 3] = first_position
+            print("   DEBUG: Using simplified affine for single slice.")
+        else:
         
-        # Apply spacing and orientation
-        affine[0, :3] = x_direction * pixel_spacing[0]
-        affine[1, :3] = y_direction * pixel_spacing[1]
-        affine[2, :3] = z_direction * slice_thickness
+        # Set the direction vectors (normalized)
+            x_direction = np.array(x_direction) / np.linalg.norm(x_direction)
+            y_direction = np.array(y_direction) / np.linalg.norm(y_direction)
+            z_direction = np.cross(x_direction, y_direction)
+            z_direction = z_direction / np.linalg.norm(z_direction) # Normalize z_direction
+            
+            # Apply spacing and orientation
+            affine[0, :3] = x_direction * pixel_spacing[0]
+            affine[1, :3] = y_direction * pixel_spacing[1]
+            affine[2, :3] = z_direction * slice_thickness
         
         # Set the origin (first slice position)
         affine[:3, 3] = first_position
         
-        # Validate affine matrix
+        # Validate affine matrix (this check is still useful for multi-slice volumes)
+        print(f"   DEBUG: Affine before final validation:\n{affine}")
         if np.linalg.det(affine[:3, :3]) == 0:
-            print("⚠️  Warning: Invalid affine matrix detected, using fallback")
+            print("⚠️  Warning: Invalid affine matrix detected, using fallback (should not happen with simplified affine)")
             affine = np.eye(4)
             affine[0, 0] = pixel_spacing[0]
             affine[1, 1] = pixel_spacing[1]
-            affine[2, 2] = slice_thickness
+            affine[2, 2] = slice_thickness if slice_thickness > 0 else 1.0
             affine[:3, 3] = first_position
+            print(f"   DEBUG: Affine after fallback:\n{affine}")
         
         print(f"📐 Enhanced affine matrix created:")
         print(f"   Spacing: {pixel_spacing[0]:.3f} x {pixel_spacing[1]:.3f} x {slice_thickness:.3f} mm")
@@ -639,6 +651,16 @@ def convert_dicom_to_nifti(force_overwrite=False):
                     # Process each series separately
                     series_count = 0
                     for series_key, series_files in series_groups.items():
+                        # Filter out single-slice and scout images
+                        if len(series_files) <= 1:
+                            print(f"\n  Skipping series {series_count + 1}/{len(series_groups)}: {series_key} (single slice)")
+                            series_count += 1
+                            continue
+                        if "scout" in series_key.lower():
+                            print(f"\n  Skipping series {series_count + 1}/{len(series_groups)}: {series_key} (scout image)")
+                            series_count += 1
+                            continue
+
                         try:
                             print(f"\n  Processing series {series_count + 1}/{len(series_groups)}: {series_key}")
                             

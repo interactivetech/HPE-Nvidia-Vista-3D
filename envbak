@@ -1,0 +1,33 @@
+NGC_API_KEY='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'
+NGC_ORG_ID='0509588398571510'
+
+PROJECT_ROOT="/home/hpadmin/NV"
+
+# DICOM folder location (relative to PROJECT_ROOT or absolute path)
+DICOM_FOLDER="dicom"
+# Extermal HTTPS Image Server
+IMAGE_SERVER="https://localhost:8888"
+
+# Vessels of interest for segmentation analysis or "all"
+VESSELS_OF_INTEREST="aorta,left iliac artery,right iliac artery"
+#VESSELS_OF_INTEREST="all"
+
+# Container and Local File Configuration
+LOCAL_IMAGES_PATH="outputs/nifti"
+CONTAINER_IMAGES_PATH="/workspace/images"
+ALLOW_LOCAL_FILES=True
+ENABLE_CONTAINER_PATHS=True
+WORKSPACE_IMAGES_PATH="/workspace/images"
+
+# External Image Server Configuration
+# IMAGE_SERVER already contains protocol://host:port format
+
+# Vista3D Container Configuration
+VISTA3D_CONTAINER_NAME="vista3d"
+VISTA3D_PORT="8000"
+CONTAINER_OUTPUTS_PATH="/workspace/outputs"
+CONTAINER_IMAGES_DATA_PATH="/workspace/outputs/nifti"
+
+# Vista-3D Domain Whitelist (for container paths)
+DOMAIN_WHITELIST='["https://*","https://127.0.0.1:8888","https://localhost:8888","https://*:*","http://localhost:8888","http://127.0.0.1:8888","https://172.17.0.1:8888","http://172.17.0.1:8888","file://*","/workspace/images/*","/workspace/images","/*","file:///*","/workspace/*"]'
+

@@ -169,7 +169,7 @@ EXTERNAL_IMAGE_SERVER_PORT=8888
 ALLOW_LOCAL_FILES=True
 ENABLE_FILE_ACCESS=True
 ALLOW_FILE_PROTOCOL=True
-WORKSPACE_IMAGES_PATH=/workspace/outputs/nifti_data
+WORKSPACE_IMAGES_PATH=/workspace/outputs/nifti
 ```
 
 #### Security Settings
@@ -250,7 +250,7 @@ utils/
 └── monitor_image_server.py # Monitoring script (generated)
 
 outputs/
-├── nifti_data/            # Medical image files
+├── nifti/            # Medical image files
 └── certs/                 # SSL certificates
 
 logs/

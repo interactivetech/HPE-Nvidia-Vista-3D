@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import signal
 import atexit
+import urllib.parse
 
 # Load environment variables from .env file
 try:
@@ -60,7 +61,7 @@ class Vista3DManager:
             'ENABLE_FILE_ACCESS': os.getenv('ENABLE_FILE_ACCESS', 'True'),
             'ALLOW_ABSOLUTE_PATHS': os.getenv('ALLOW_ABSOLUTE_PATHS', 'True'),
             'ALLOW_RELATIVE_PATHS': os.getenv('ALLOW_RELATIVE_PATHS', 'True'),
-            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/outputs/nifti_data'),
+            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/outputs/nifti'),
             'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/outputs'),
             'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
             'ALLOW_FILE_PROTOCOL': os.getenv('ALLOW_FILE_PROTOCOL', 'True'),
@@ -85,8 +86,8 @@ class Vista3DManager:
         project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
         self.local_outputs_path = Path(project_root) / "outputs"
         self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/outputs")
-        self.local_images_path = self.local_outputs_path / "nifti_data"
-        self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/outputs/nifti_data")
+        self.local_images_path = self.local_outputs_path / "nifti"
+        self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/outputs/nifti")
         
         # Parse IMAGE_SERVER URL to get components
         image_server_url = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
@@ -108,14 +109,14 @@ class Vista3DManager:
             # Local file access
             "file://*", "file:///*", "file:///home/*", "file:///Users/*",
             "file:///workspace/*", "file:///workspace/outputs/*",
-            "file:///workspace/outputs/nifti_data/*", "/workspace/outputs/*",
-            "/workspace/outputs/nifti_data/*", "/workspace/outputs/nifti_data",
+            "file:///workspace/outputs/nifti/*", "/workspace/outputs/*",
+            "/workspace/outputs/nifti/*", "/workspace/outputs/nifti",
             # Container paths
             "/*", "/workspace/*", "/workspace/outputs/.*", "/workspace/outputs/**",
             "/workspace/**", "/workspace/outputs", "/workspace", "/home/*",
             "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
             # Project-specific paths (configurable)
-            f"{project_root}/*", f"{project_root}/outputs/*", f"{project_root}/outputs/nifti_data/*"
+            f"{project_root}/*", f"{project_root}/outputs/*", f"{project_root}/outputs/nifti/*"
         ]
         
         # Supported image extensions
@@ -195,6 +196,7 @@ class Vista3DManager:
         """Create the local outputs directory if it doesn't exist"""
         self.local_outputs_path.mkdir(parents=True, exist_ok=True)
         self.local_images_path.mkdir(parents=True, exist_ok=True)
+        (self.local_outputs_path / "segments").mkdir(parents=True, exist_ok=True)
         
         logger.info(f"✅ Outputs directory created: {self.local_outputs_path}")
         
@@ -204,7 +206,7 @@ class Vista3DManager:
             for item in self.local_outputs_path.iterdir():
                 logger.info(f"  {item.name}")
         else:
-            logger.info("No outputs found. Please place your .nii.gz, .nii, .nrrd, or .dcm files in the nifti_data subdirectory")
+            logger.info("No outputs found. Please place your .nii.gz, .nii, .nrrd, or .dcm files in the nifti subdirectory")
     
     def check_external_image_server(self) -> bool:
         """Check if the external image server is accessible"""
@@ -341,7 +343,7 @@ class Vista3DManager:
         # Test 1: Local file path access
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         logger.info("Test 1: Testing local file path access...")
-        test_data = {"image": "/workspace/outputs/nifti_data/test.nii.gz"}
+        test_data = {"image": "/workspace/outputs/nifti/test.nii.gz"}
         try:
             response = requests.post(
                 f"http://localhost:{vista3d_port}/v1/vista3d/inference",
@@ -354,7 +356,7 @@ class Vista3DManager:
         
         # Test 2: File protocol access
         logger.info("Test 2: Testing file:// protocol access...")
-        test_data = {"image": "file:///workspace/outputs/nifti_data/test.nii.gz"}
+        test_data = {"image": "file:///workspace/outputs/nifti/test.nii.gz"}
         try:
             response = requests.post(
                 f"http://localhost:{vista3d_port}/v1/vista3d/inference",
