@@ -162,7 +162,7 @@ with st.sidebar:
         
         st.header("Viewer Settings")
         color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=2)
-        slice_type = st.selectbox("Slice Type", ["Single View", "Multiplanar", "3D Render"], index=1)
+        slice_type = st.selectbox("Slice Type", ["Single View", "Multiplanar", "3D Render"], index=2)
         
         # Show orientation selector only for single view
         orientation = "Axial"  # default
