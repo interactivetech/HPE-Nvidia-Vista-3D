@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import os
-import glob # Need glob for file scanning
 import requests # For HTTP requests to image server
 import urllib3
 from urllib.parse import urljoin
@@ -18,7 +17,6 @@ load_dotenv()
 
 # Get config from environment
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
-PROJECT_ROOT = os.getenv('PROJECT_ROOT', '.') # Default to current directory
 st.set_page_config(layout="wide")
 
 def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
@@ -72,7 +70,8 @@ def get_folder_contents(base_url: str, folder_path: str, verify_ssl: bool = Fals
     """Get contents of a folder from the image server."""
     
     # Construct the full URL
-    folder_url = urljoin(base_url.rstrip('/') + '/', f"outputs/{folder_path}/")
+    folder_url = f"{base_url.rstrip('/')}/outputs/{folder_path.strip('/')}/"
+    st.write(f"Attempting to fetch contents from: {folder_url}")
     
     try:
         # Make request with SSL verification disabled for self-signed certs
@@ -80,12 +79,15 @@ def get_folder_contents(base_url: str, folder_path: str, verify_ssl: bool = Fals
         
         if response.status_code == 200:
             items = parse_directory_listing(response.text)
+            st.write(f"Found {len(items)} items in {folder_path}.")
             return items
         elif response.status_code == 404:
             st.warning(f"Folder not found: {folder_path}")
+            st.write(f"URL that returned 404: {folder_url}")
             return None
         else:
             st.error(f"HTTP {response.status_code}: {response.reason}")
+            st.write(f"Problematic URL: {folder_url}")
             return None
             
     except requests.exceptions.SSLError as e:
