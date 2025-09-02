@@ -110,14 +110,14 @@ class DirectoryListingStaticFiles(StaticFiles):
             
             # List directories first
             for item in sorted(directory_path.iterdir()):
-                if item.is_dir():
+                if item.is_dir() and not item.name.startswith('.'):
                     item_name = item.name
                     item_path = f"{request_path.rstrip('/')}/{item_name}/"
                     items.append(f'<li><a href="{item_path}">📁 {item_name}/</a></li>')
             
             # Then list files
             for item in sorted(directory_path.iterdir()):
-                if item.is_file():
+                if item.is_file() and not item.name.startswith('.'):
                     item_name = item.name
                     item_path = f"{request_path.rstrip('/')}/{item_name}"
                     file_size = item.stat().st_size
@@ -162,18 +162,24 @@ class DirectoryListingStaticFiles(StaticFiles):
         """
         return html
     
-    def file_response(self, full_path: str, stat_result: os.stat_result, scope, status_code: int = 200):
-        """Override to handle directory listing"""
-        path_obj = Path(full_path)
+    async def get_response(self, path: str, scope):
+        """Override get_response to handle directory listing properly"""
+        try:
+            full_path, stat_result = await self.lookup_path(path)
+        except (OSError, FileNotFoundError):
+            raise HTTPException(status_code=404)
         
-        if path_obj.is_dir():
-            # Generate directory listing
-            request_path = scope.get("path", "/")
-            html_content = self.generate_directory_listing(path_obj, request_path)
-            return HTMLResponse(content=html_content, status_code=200)
+        if stat_result and stat_result.st_mode:
+            # Check if it's a directory
+            import stat as stat_module
+            if stat_module.S_ISDIR(stat_result.st_mode):
+                # Generate directory listing
+                request_path = scope.get("path", "/")
+                html_content = self.generate_directory_listing(Path(full_path), request_path)
+                return HTMLResponse(content=html_content, status_code=200)
         
         # For files, use the default behavior
-        return super().file_response(full_path, stat_result, scope, status_code)
+        return await super().get_response(path, scope)
 
 # --- FastAPI Application ---
 app = FastAPI(title="Medical Imaging Server", description="HTTPS server for medical imaging files with directory browsing")
