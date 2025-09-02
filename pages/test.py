@@ -18,7 +18,7 @@ st.set_page_config(layout="wide")
 with st.sidebar:
     st.header("Controls")
     
-    source_folder = 'segments'
+    source_folder = 'nifti'
 
     # Get patient folders from local filesystem
     patient_folders = []

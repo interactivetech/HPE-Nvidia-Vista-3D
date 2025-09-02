@@ -5,6 +5,10 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 import nibabel as nib
+import gzip
+import zipfile
+import io
+import numpy as np # Added numpy
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -16,6 +20,7 @@ VISTA3D_INFERENCE_URL = "http://localhost:8000/v1/vista3d/inference"
 PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', '.'))
 NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "nifti"
 SEGMENTATION_OUTPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "segments" # Changed to 'segments'
+
 
 # Load label dictionary
 LABEL_DICT_PATH = PROJECT_ROOT / "vista3d" / "label_dict.json"
@@ -59,62 +64,84 @@ def get_nifti_files_in_folder(folder_path: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Vista3D Batch Segmentation Script")
-    parser.add_argument("patient_folder", type=str, help="Name of the patient folder in outputs/nifti to process.")
+    parser.add_argument("patient_folder", type=str, nargs='?', default=None, help="Name of the patient folder in outputs/nifti to process. If not provided, all patient folders will be processed.")
     args = parser.parse_args()
 
-    patient_folder_name = args.patient_folder
-    patient_nifti_path = NIFTI_INPUT_BASE_DIR / patient_folder_name
+    patient_folders_to_process = []
+    if args.patient_folder:
+        patient_folders_to_process.append(args.patient_folder)
+    else:
+        # Process all patient folders
+        if os.path.exists(NIFTI_INPUT_BASE_DIR):
+            patient_folders_to_process = [f for f in os.listdir(NIFTI_INPUT_BASE_DIR) if os.path.isdir(NIFTI_INPUT_BASE_DIR / f)]
+        else:
+            print(f"Error: NIfTI input base directory not found: {NIFTI_INPUT_BASE_DIR}")
+            return
+
+    if not patient_folders_to_process:
+        print("No patient folders found to process. Exiting.")
+        return
 
     print("--- Vista3D Batch Segmentation Script ---")
-    print(f"Processing patient folder: {patient_nifti_path.absolute()}")
     print(f"Output Segmentation directory: {SEGMENTATION_OUTPUT_BASE_DIR.absolute()}")
     print("------------------------------------------")
 
-    # Determine vessels of interest
-    vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower()
-    target_vessels = []
-    if vessels_of_interest_env == "all":
-        target_vessels = list(LABEL_DICT.keys())
-        print("Segmenting ALL available labels from label_dict.json.")
-    elif vessels_of_interest_env:
-        target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()]
-        # Validate requested vessels against LABEL_DICT
-        invalid_vessels = [v for v in target_vessels if v not in LABEL_DICT]
-        if invalid_vessels:
-            print(f"Warning: The following vessels are not found in label_dict.json and will be ignored: {invalid_vessels}")
-            target_vessels = [v for v in target_vessels if v in LABEL_DICT]
-        print(f"Segmenting specified vessels: {', '.join(target_vessels)}")
-    else:
-        print("No Vessels_OF_INTEREST specified in .env. No segmentation will be performed.")
-        return
+    successful_patient_conversions = 0
+    failed_patient_conversions = 0
 
-    if not target_vessels:
-        print("No valid vessels to segment. Exiting.")
-        return
+    for patient_folder_name in tqdm(patient_folders_to_process, desc="Processing patients", unit="patient"):
+        patient_nifti_path = NIFTI_INPUT_BASE_DIR / patient_folder_name
+        print(f"\nProcessing patient folder: {patient_nifti_path.absolute()}")
+        print("-" * 50)
+
+    # Determine vessels of interest
+        vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower()
+        target_vessels = []
+        if vessels_of_interest_env == "all":
+            target_vessels = list(LABEL_DICT.keys())
+            print("Segmenting ALL available labels from label_dict.json.")
+        elif vessels_of_interest_env:
+            target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()]
+            # Validate requested vessels against LABEL_DICT
+            invalid_vessels = [v for v in target_vessels if v not in LABEL_DICT]
+            if invalid_vessels:
+                print(f"Warning: The following vessels are not found in label_dict.json and will be ignored: {invalid_vessels}")
+                target_vessels = [v for v in target_vessels if v in LABEL_DICT]
+            print(f"Segmenting specified vessels: {', '.join(target_vessels)}")
+        else:
+            print("No Vessels_OF_INTEREST specified in .env. No segmentation will be performed.")
+            # If no vessels are specified, consider this patient as failed for segmentation purposes
+            failed_patient_conversions += 1
+            continue # Skip to next patient
+
+        if not target_vessels:
+            print("No valid vessels to segment. Exiting.")
+            failed_patient_conversions += 1
+            continue # Skip to next patient
 
     # Convert vessel names to IDs
-    target_vessel_ids = [LABEL_DICT[vessel] for vessel in target_vessels]
-    print(f"Requesting segmentation for vessel IDs: {target_vessel_ids}")
+        target_vessel_ids = [LABEL_DICT[vessel] for vessel in target_vessels]
+        print(f"Requesting segmentation for vessel IDs: {target_vessel_ids}")
 
-    # Create output directory for the patient
-    patient_segmentation_output_path = SEGMENTATION_OUTPUT_BASE_DIR / patient_folder_name
-    patient_segmentation_output_path.mkdir(parents=True, exist_ok=True)
+        # Create output directory for the patient
+        patient_segmentation_output_path = SEGMENTATION_OUTPUT_BASE_DIR / patient_folder_name
+        patient_segmentation_output_path.mkdir(parents=True, exist_ok=True)
 
-    all_nifti_files = get_nifti_files_in_folder(patient_nifti_path)
-    if not all_nifti_files:
-        print(f"No NIfTI files found in {patient_nifti_path}. Exiting.")
-        return
+        all_nifti_files = get_nifti_files_in_folder(patient_nifti_path)
+        if not all_nifti_files:
+            print(f"No NIfTI files found in {patient_nifti_path}. Exiting.")
+            failed_patient_conversions += 1
+            continue # Skip to next patient
 
     print(f"Found {len(all_nifti_files)} NIfTI files to process in {patient_folder_name}.")
     print("\n--- Starting Segmentation ---")
 
-    successful_segmentations = 0
-    failed_segmentations = 0
+    successful_segmentations_for_patient = 0
+    failed_segmentations_for_patient = 0
 
     for nifti_file_path in tqdm(all_nifti_files, desc="Processing NIfTI files", unit="file"):
         try:
             # Construct output path
-            output_segmentation_path = patient_segmentation_output_path / f"{nifti_file_path.stem}_seg.nii.gz"
 
             # Construct URL for Vista3D (using host.docker.internal for container access)
             # The image server serves from PROJECT_ROOT, so relative_path is correct for URL
@@ -134,37 +161,97 @@ def main():
             print(f"    Requesting segmentation for: {target_vessels} (IDs: {target_vessel_ids})")
 
             inference_response = requests.post(VISTA3D_INFERENCE_URL, json=payload, headers=headers, verify=False)
-            print(f"    DEBUG: Raw inference response text: {inference_response.text}") # Added for debugging
+            
             inference_response.raise_for_status()
             
-            # Directly save the binary content of the response as the NIfTI file
-            with open(output_segmentation_path, 'wb') as f:
-                f.write(inference_response.content)
             
-            print(f"    Inference successful. Segmented file saved to: {output_segmentation_path.name}")
             
-            print(f"    Segmented file saved to: {output_segmentation_path.name}")
-            successful_segmentations += 1
+            
+            
+            # Construct output path with .nii.gz extension
+            output_segmentation_path = patient_segmentation_output_path / f"{nifti_file_path.with_suffix('').stem}_seg.nii.gz"
+
+            # Process the ZIP file response
+            zip_file_like_object = io.BytesIO(inference_response.content)
+            with zipfile.ZipFile(zip_file_like_object, 'r') as zip_ref:
+                # Assuming there's only one file in the zip, or the NIfTI is the first one
+                nifti_filename = zip_ref.namelist()[0]
+                extracted_nifti_content = zip_ref.read(nifti_filename)
+
+            
+
+            # Construct output path with .nii.gz extension
+            output_segmentation_path = patient_segmentation_output_path / f"{nifti_file_path.with_suffix('').stem}_seg.nii.gz"
+
+            import tempfile
+            tmp_file_path = None # Initialize to None
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".nii.gz") as tmp_file:
+                    tmp_file.write(extracted_nifti_content)
+                    tmp_file_path = Path(tmp_file.name)
+
+                original_nifti_img = nib.load(tmp_file_path)
+                segmentation_scan = original_nifti_img.get_fdata()
+                affine = original_nifti_img.affine
+
+                # Define the labels of interest and remap them
+                # These should match the keys in LABEL_DICT that you want to segment
+                label_rois = [k for k in target_vessels if k in LABEL_DICT] # Use target_vessels from earlier
+                
+                # Create a new segmentation map with only the vessels of interest in it.
+                new_segmentation_scan = np.zeros_like(segmentation_scan, dtype=np.uint8) # Ensure uint8 dtype
+                
+                # Create a mapping from original Vista3D label IDs to new sequential IDs (1, 2, 3...)
+                # This is crucial for consistent colormap display in Niivue
+                remapped_label_id = 1
+                for vessel_name in label_rois:
+                    original_label_id = LABEL_DICT[vessel_name]
+                    # Assign new sequential label to voxels matching original_label_id
+                    new_segmentation_scan[segmentation_scan == original_label_id] = remapped_label_id
+                    remapped_label_id += 1
+
+                # Create a new NIfTI image with the remapped data
+                # Preserve original affine and header info
+                remapped_nifti_img = nib.Nifti1Image(new_segmentation_scan, affine, original_nifti_img.header)
+                
+                # Save the remapped NIfTI image
+                nib.save(remapped_nifti_img, output_segmentation_path)
+                
+                print(f"    Saved NIfTI dtype: {remapped_nifti_img.header.get_data_dtype()}")
+                print(f"    Saved NIfTI shape: {remapped_nifti_img.shape}")
+                print(f"    Inference successful. Remapped and saved to: {output_segmentation_path.name}")
+
+            finally:
+                if tmp_file_path and tmp_file_path.exists(): # Only delete if it was created and still exists
+                    os.unlink(tmp_file_path)
+            
+            successful_segmentations_for_patient += 1
 
         except requests.exceptions.RequestException as e:
             print(f"\n  Error during inference request for {nifti_file_path.name}: {e}")
             print(f"  Status Code: {inference_response.status_code}") # Debugging
-            print(f"  Response Text: {inference_response.text}") # Debugging
+            
             print(f"  Please ensure the Vista3D Docker container is running and accessible at {VISTA3D_INFERENCE_URL}")
-            failed_segmentations += 1
+            failed_segmentations_for_patient += 1
         except json.JSONDecodeError:
             print(f"\n  Error: Could not decode JSON response from inference server for {nifti_file_path.name}.")
-            print(f"  Response content: {inference_response.text}")
-            failed_segmentations += 1
+            
+            failed_segmentations_for_patient += 1
         except Exception as e:
             print(f"\n  An unexpected error occurred for {nifti_file_path.name}: {e}")
-            failed_segmentations += 1
+            failed_segmentations_for_patient += 1
+        
+        # Update patient-level counts
+        if successful_segmentations_for_patient > 0:
+            successful_patient_conversions += 1
+        else:
+            failed_patient_conversions += 1
 
     print("\n--- Segmentation Process Complete ---")
-    print(f"Successful segmentations: {successful_segmentations}")
-    print(f"Failed segmentations: {failed_segmentations}")
+    print(f"Successful patient segmentations: {successful_patient_conversions}")
+    print(f"Failed patient segmentations: {failed_patient_conversions}")
     print("-------------------------------------")
-    print(f"You can now view the segmented files in your Streamlit app by selecting them from the 'outputs/segments/{patient_folder_name}' folder.")
+    print(f"You can now view the segmented files in your Streamlit app by selecting them from the 'outputs/segments/<patient_folder>' folder.")
 
 if __name__ == "__main__":
     main()
