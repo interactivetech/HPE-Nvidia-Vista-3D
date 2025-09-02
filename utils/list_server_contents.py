@@ -145,14 +145,25 @@ def test_server_connection(base_url: str, verify_ssl: bool = False) -> bool:
     """Test if the image server is accessible."""
     try:
         print(f"🔗 Testing connection to: {base_url}")
-        response = requests.get(base_url, verify=verify_ssl, timeout=10)
+        
+        # Test with a known file first (README.md)
+        test_url = urljoin(base_url.rstrip('/') + '/', 'README.md')
+        response = requests.get(test_url, verify=verify_ssl, timeout=10)
         
         if response.status_code == 200:
-            print(f"✅ Server is accessible")
+            print(f"✅ Server is accessible (tested with README.md)")
             return True
         else:
-            print(f"⚠️  Server responded with HTTP {response.status_code}")
-            return False
+            print(f"⚠️  Server responded with HTTP {response.status_code} for README.md")
+            
+            # Fallback: try root path
+            response = requests.get(base_url, verify=verify_ssl, timeout=10)
+            if response.status_code in [200, 404]:  # 404 is OK for root if no index
+                print(f"✅ Server is running (HTTP {response.status_code} from root)")
+                return True
+            else:
+                print(f"❌ Server responded with HTTP {response.status_code}")
+                return False
             
     except requests.exceptions.SSLError as e:
         print(f"❌ SSL Error: {e}")

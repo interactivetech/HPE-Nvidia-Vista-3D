@@ -95,97 +95,116 @@ def get_server_config():
     
     return host, port
 
-# --- Custom StaticFiles with Directory Listing ---
-class DirectoryListingStaticFiles(StaticFiles):
-    """Custom StaticFiles that provides directory listings"""
-
-    def __init__(self, *args, **kwargs):
-        self.directory_listing_enabled = kwargs.pop("directory_listing_enabled", True)
-        super().__init__(*args, **kwargs)
-
-    def generate_directory_listing(self, directory_path: Path, request_path: str) -> str:
-        """Generate HTML directory listing"""
-        items = []
-        
-        try:
-            # Add parent directory link if not at root
-            if request_path != "/":
-                parent_path = str(Path(request_path).parent)
-                if parent_path == ".":
-                    parent_path = "/"
-                items.append(f'<li><a href="{parent_path}">📁 ../</a></li>')
-            
-            # List directories first
-            for item in sorted(directory_path.iterdir()):
-                if item.is_dir() and not item.name.startswith('.'):
-                    item_name = item.name
-                    item_path = f"{request_path.rstrip('/')}/{item_name}/"
-                    items.append(f'<li><a href="{item_path}">📁 {item_name}/</a></li>')
-            
-            # Then list files
-            for item in sorted(directory_path.iterdir()):
-                if item.is_file() and not item.name.startswith('.'):
-                    item_name = item.name
-                    item_path = f"{request_path.rstrip('/')}/{item_name}"
-                    file_size = item.stat().st_size
-                    size_str = f"({file_size:,} bytes)" if file_size < 1024*1024 else f"({file_size/(1024*1024):.1f} MB)"
-                    items.append(f'<li><a href="{item_path}">📄 {item_name}</a> <span style="color: #666; font-size: 0.8em;">{size_str}</span></li>')
-        
-        except Exception as e:
-            items.append(f'<li><span style="color: #cc0000;">Error reading directory: {e}</span></li>')
-        
-        items_html = "\n".join(items)
-        
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Directory listing for {request_path}</title>
-            <meta charset="utf-8">
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
-                h1 {{ color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }}
-                ul {{ list-style: none; padding: 0; }}
-                li {{ margin: 5px 0; }}
-                a {{ text-decoration: none; color: #0066cc; }}
-                a:hover {{ text-decoration: underline; }}
-                .header {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
-                .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>📁 Directory listing for {request_path}</h1>
-                <p>Image Server - Medical Imaging Files</p>
-            </div>
-            <ul>
-                {items_html}
-            </ul>
-            <div class="footer">
-                <p>🏥 Medical Imaging Server | FastAPI + Uvicorn</p>
-            </div>
-        </body>
-        </html>
-        """
-        return html
+def generate_directory_listing(directory_path: Path, request_path: str) -> str:
+    """Generate HTML directory listing"""
+    items = []
     
-    async def get_response(self, path: str, scope):
-        """Override get_response to handle directory listing properly"""
-        try:
-            full_path, stat_result = await self.lookup_path(path)
-        except (OSError, FileNotFoundError):
-            raise HTTPException(status_code=404)
+    try:
+        # Add parent directory link if not at root
+        if request_path != "/":
+            parent_path = str(Path(request_path).parent)
+            if parent_path == ".":
+                parent_path = "/"
+            items.append(f'<li><a href="{parent_path}">📁 ../</a></li>')
         
-        if self.directory_listing_enabled and osp.isdir(full_path):
-            request_path = scope.get("path", "/")
-            html_content = self.generate_directory_listing(Path(full_path), request_path)
-            return HTMLResponse(content=html_content, status_code=200)
-
-        # For files, use the default behavior
-        return await super().get_response(path, scope)
+        # List directories first
+        for item in sorted(directory_path.iterdir()):
+            if item.is_dir() and not item.name.startswith('.'):
+                item_name = item.name
+                item_path = f"{request_path.rstrip('/')}/{item_name}/"
+                items.append(f'<li><a href="{item_path}">📁 {item_name}/</a></li>')
+        
+        # Then list files
+        for item in sorted(directory_path.iterdir()):
+            if item.is_file() and not item.name.startswith('.'):
+                item_name = item.name
+                item_path = f"{request_path.rstrip('/')}/{item_name}"
+                file_size = item.stat().st_size
+                size_str = f"({file_size:,} bytes)" if file_size < 1024*1024 else f"({file_size/(1024*1024):.1f} MB)"
+                items.append(f'<li><a href="{item_path}">📄 {item_name}</a> <span style="color: #666; font-size: 0.8em;">{size_str}</span></li>')
+    
+    except Exception as e:
+        items.append(f'<li><span style="color: #cc0000;">Error reading directory: {e}</span></li>')
+    
+    items_html = "\n".join(items)
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Directory listing for {request_path}</title>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
+            h1 {{ color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }}
+            ul {{ list-style: none; padding: 0; }}
+            li {{ margin: 5px 0; }}
+            a {{ text-decoration: none; color: #0066cc; }}
+            a:hover {{ text-decoration: underline; }}
+            .header {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+            .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>📁 Directory listing for {request_path}</h1>
+            <p>Image Server - Medical Imaging Files</p>
+        </div>
+        <ul>
+            {items_html}
+        </ul>
+        <div class="footer">
+            <p>🏥 Medical Imaging Server | FastAPI + Uvicorn</p>
+        </div>
+    </body>
+    </html>
+    """
+    return html
 
 # --- FastAPI Application ---
 app = FastAPI(title="Medical Imaging Server", description="HTTPS server for medical imaging files with directory browsing")
+
+@app.get("/{full_path:path}")
+async def serve_files(request: Request, full_path: str):
+    """Serve files and directory listings"""
+    
+    # Handle root path
+    if full_path == "":
+        full_path = "."
+    
+    # Construct absolute path
+    absolute_path = project_root / full_path
+    
+    # Security check - ensure path is within project root
+    try:
+        absolute_path = absolute_path.resolve()
+        project_root_resolved = project_root.resolve()
+        
+        # Check if the resolved path is within project root
+        if not str(absolute_path).startswith(str(project_root_resolved)):
+            raise HTTPException(status_code=403, detail="Access denied")
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # Check if path exists
+    if not absolute_path.exists():
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # If it's a file, serve it
+    if absolute_path.is_file():
+        return FileResponse(absolute_path)
+    
+    # If it's a directory, generate listing
+    elif absolute_path.is_dir():
+        request_path = "/" + full_path.strip("/")
+        if request_path != "/" and not request_path.endswith("/"):
+            request_path += "/"
+        
+        html_content = generate_directory_listing(absolute_path, request_path)
+        return HTMLResponse(content=html_content, status_code=200)
+    
+    else:
+        raise HTTPException(status_code=404, detail="Not found")
 
 origins = [
     "http://localhost",
@@ -228,12 +247,8 @@ if __name__ == "__main__":
         print("Self-signed certificate not found. Generating new one...")
         generate_self_signed_cert(cert_dir, cert_file, key_file, host)
     
-    # Mount static files from project root with directory listing support
-    static_files = DirectoryListingStaticFiles(
-        directory=str(project_root), 
-        directory_listing_enabled=not args.disable_dir_listing
-    )
-    app.mount("/", static_files, name="static")
+    # Note: Files are served via the @app.get("/{full_path:path}") route above
+    # This provides better control over directory listings and security
 
     # Run Uvicorn with SSL
     print(f"Starting HTTPS Image Server with FastAPI/Uvicorn...")
