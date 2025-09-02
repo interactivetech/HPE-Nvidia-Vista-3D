@@ -211,7 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("--cert-dir", help="Directory to store SSL certificate and key files", default=str(project_root / "outputs" / "certs"))
     parser.add_argument("--disable-dir-listing", action="store_true", help="Disable directory listing for enhanced security (files will still be served)")
     
-    args = parser.parse_argument()
+    args = parser.parse_args()
     
     # Get configuration
     default_host, default_port = get_server_config()
