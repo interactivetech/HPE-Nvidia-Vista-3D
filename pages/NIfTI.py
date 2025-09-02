@@ -161,10 +161,10 @@ with st.sidebar:
             st.warning(f"No medical imaging files found for patient {selected_patient}")
         
         st.header("Viewer Settings")
-        color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'])
-        show_crosshair = st.checkbox("Show 3D Crosshair", True)
-        slice_type = st.selectbox("Slice Type", ["Axial", "Coronal", "Sagittal", "Render"], index=3)
+        color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=2)
+        slice_type = st.selectbox("Slice Type", ["Axial", "Coronal", "Sagittal", "Multiplanar", "ACS", "Quad"], index=5)
         drag_mode = st.selectbox("Drag Mode", ["Contrast", "Measurement", "Pan"], index=0)
+        show_crosshair = st.checkbox("Show 3D Crosshair", True)
         show_colorbar = st.checkbox("Show Colorbar", True)
         show_ruler = st.checkbox("Show Ruler", True)
 
@@ -175,10 +175,12 @@ if selected_file: # Check if selected_file is not None
     file_url = f'{IMAGE_SERVER_URL}/outputs/{selected_source_folder}/{selected_patient}/{selected_file}'
 
     slice_type_map = {
-        "Axial": 0,
-        "Coronal": 1,
-        "Sagittal": 2,
-        "Render": 3
+        "Axial": 0,          # Just Axial view
+        "Coronal": 1,        # Just Coronal view  
+        "Sagittal": 2,       # Just Sagittal view
+        "Multiplanar": 4,    # Just 3D/volumetric rendering view (what Quad was showing)
+        "ACS": 3,            # Axial, Coronal, Sagittal together (3-panel view)
+        "Quad": 6            # Try 6 for true quad view (A/C/S + 3D render)
     }
     drag_mode_map = {
         "Contrast": 1,
@@ -204,7 +206,7 @@ body, html {{
 <canvas id=\"niivue-canvas\"></canvas>
 <script src=\"{IMAGE_SERVER_URL}/assets/niivue.umd.js\"></script>
 <script>
-    const nv = new niivue.Niivue ({{ 
+    const nv = new niivue.Niivue({{
         show3Dcrosshair: {str(show_crosshair).lower()},
         sliceType: {slice_type_map[slice_type]},
         dragMode: {drag_mode_map[drag_mode]},
