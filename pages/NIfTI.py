@@ -162,7 +162,13 @@ with st.sidebar:
         
         st.header("Viewer Settings")
         color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=2)
-        slice_type = st.selectbox("Slice Type", ["Axial", "Coronal", "Sagittal", "Multiplanar", "ACS", "Quad"], index=5)
+        slice_type = st.selectbox("Slice Type", ["Single View", "Multiplanar", "3D Render"], index=1)
+        
+        # Show orientation selector only for single view
+        orientation = "Axial"  # default
+        if slice_type == "Single View":
+            orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
+        
         drag_mode = st.selectbox("Drag Mode", ["Contrast", "Measurement", "Pan"], index=0)
         show_crosshair = st.checkbox("Show 3D Crosshair", True)
         show_colorbar = st.checkbox("Show Colorbar", True)
@@ -174,14 +180,16 @@ with st.sidebar:
 if selected_file: # Check if selected_file is not None
     file_url = f'{IMAGE_SERVER_URL}/outputs/{selected_source_folder}/{selected_patient}/{selected_file}'
 
-    slice_type_map = {
-        "Axial": 0,          # Just Axial view
-        "Coronal": 1,        # Just Coronal view  
-        "Sagittal": 2,       # Just Sagittal view
-        "Multiplanar": 4,    # Just 3D/volumetric rendering view (what Quad was showing)
-        "ACS": 3,            # Axial, Coronal, Sagittal together (3-panel view)
-        "Quad": 6            # Try 6 for true quad view (A/C/S + 3D render)
-    }
+    # Determine the actual sliceType value based on selection
+    if slice_type == "Single View":
+        orientation_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2}
+        actual_slice_type = orientation_map[orientation]
+    elif slice_type == "Multiplanar":
+        actual_slice_type = 3  # Multiplanar
+    elif slice_type == "3D Render":
+        actual_slice_type = 4  # 3D render view
+    else:
+        actual_slice_type = 3  # fallback to multiplanar
     drag_mode_map = {
         "Contrast": 1,
         "Measurement": 2,
@@ -206,24 +214,84 @@ body, html {{
 <canvas id=\"niivue-canvas\"></canvas>
 <script src=\"{IMAGE_SERVER_URL}/assets/niivue.umd.js\"></script>
 <script>
-    const nv = new niivue.Niivue({{
-        show3Dcrosshair: {str(show_crosshair).lower()},
-        sliceType: {slice_type_map[slice_type]},
-        dragMode: {drag_mode_map[drag_mode]},
-        isColorbar: {str(show_colorbar).lower()},
-        isRuler: {str(show_ruler).lower()},
-    }});
-    nv.attachTo('niivue-canvas');
-    const volumeList = [
-        {{
-            url: '{file_url}',
-            colormap: '{color_map}',
+    console.log('Starting Niivue initialization...');
+    console.log('File URL:', '{file_url}');
+    console.log('Niivue available:', typeof niivue !== 'undefined');
+    
+    if (typeof niivue === 'undefined') {{
+        console.error('Niivue library not loaded!');
+        document.getElementById('niivue-canvas').innerHTML = '<p style="color: red;">Error: Niivue library not loaded. Check if ./assets/niivue.umd.js exists.</p>';
+    }} else {{
+        try {{
+        console.log('Creating Niivue with sliceType:', {actual_slice_type});
+        const nv = new niivue.Niivue({{
+            show3Dcrosshair: {str(show_crosshair).lower()},
+            sliceType: {actual_slice_type},
+            dragMode: {drag_mode_map[drag_mode]},
+            isColorbar: {str(show_colorbar).lower()},
+            isRuler: {str(show_ruler).lower()},
+        }});
+        console.log('Niivue instance created successfully:', nv);
+        console.log('Available methods:', Object.getOwnPropertyNames(nv).filter(name => typeof nv[name] === 'function'));
+        
+        nv.attachTo('niivue-canvas');
+        console.log('Attached to canvas');
+        
+
+        
+        const volumeList = [
+            {{
+                url: '{file_url}',
+                colormap: '{color_map}',
+            }}
+        ];
+        console.log('Loading volumes:', volumeList);
+        
+        nv.loadVolumes(volumeList).then(() => {{
+            console.log('Volumes loaded successfully');
+            
+            // Configure 4-panel layout for Multiplanar view after volumes are loaded
+            if ({actual_slice_type} === 3) {{
+                try {{
+                    // Set multiplanar layout to 2x2 grid
+                    if (nv.setMultiplanarLayout && nv.MULTIPLANAR_TYPE) {{
+                        nv.setMultiplanarLayout(nv.MULTIPLANAR_TYPE.GRID);
+                        console.log('Set 4-panel grid layout for Multiplanar view');
+                    }} else if (nv.setMultiplanarLayout) {{
+                        nv.setMultiplanarLayout('GRID');
+                        console.log('Set 4-panel grid layout for Multiplanar view (string)');
+                    }}
+
+                    // Ensure 3D render is always shown in multiplanar
+                    if (nv.opts && nv.SHOW_RENDER) {{
+                        nv.opts.multiplanarShowRender = nv.SHOW_RENDER.ALWAYS;
+                        console.log('Set multiplanarShowRender to ALWAYS');
+                    }} else if (nv.opts) {{
+                        nv.opts.multiplanarShowRender = 'ALWAYS';
+                        console.log('Set multiplanarShowRender to ALWAYS (string)');
+                    }}
+                    // Fallback: force render tile on
+                    if (nv.opts) {{
+                        nv.opts.multiplanarForceRender = true;
+                        console.log('Enabled multiplanarForceRender');
+                    }}
+
+                    if (nv.drawScene) nv.drawScene();
+                }} catch (layoutError) {{
+                    console.warn('Could not set multiplanar layout:', layoutError);
+                }}
+            }}
+        }}).catch((error) => {{
+            console.error('Error loading volumes:', error);
+        }});
+        }} catch (error) {{
+            console.error('Error initializing Niivue:', error);
+            document.getElementById('niivue-canvas').innerHTML = '<p style="color: red;">Error loading Niivue viewer: ' + error.message + '</p>';
         }}
-    ];
-    nv.loadVolumes(volumeList);
+    }}
 </script>
 """
         
-        components.html(html_string, height=700, width=2000)
+        components.html(html_string, height=800, width=1600)
 else:
     st.info("Select a patient and a NIfTI file to view.")
