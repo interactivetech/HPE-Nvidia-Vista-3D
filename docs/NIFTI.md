@@ -25,7 +25,7 @@ pip install pydicom nibabel numpy tqdm python-dotenv
 ### Required Files
 
 - `.env` file with environment variables
-- `vista3d/label_dict.json` containing anatomical structure mappings
+- `conf/label_dict.json` containing anatomical structure mappings
 - DICOM data organized in patient-specific directories
 
 ## Configuration
@@ -44,7 +44,7 @@ DICOM_FOLDER="dicom"
 
 ### Label Dictionary
 
-The script automatically loads the Vista-3D label dictionary from `vista3d/label_dict.json`, which contains mappings for 124+ anatomical structures including:
+The script automatically loads the Vista-3D label dictionary from `conf/label_dict.json`, which contains mappings for 124+ anatomical structures including:
 
 - Background (0)
 - Liver (1)

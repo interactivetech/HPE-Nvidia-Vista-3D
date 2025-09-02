@@ -11,8 +11,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption
 import datetime
 
-from fastapi import FastAPI, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, status, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware # Added
 import uvicorn
@@ -92,8 +92,91 @@ def get_server_config():
     
     return host, port
 
+# --- Custom StaticFiles with Directory Listing ---
+class DirectoryListingStaticFiles(StaticFiles):
+    """Custom StaticFiles that provides directory listings"""
+    
+    def generate_directory_listing(self, directory_path: Path, request_path: str) -> str:
+        """Generate HTML directory listing"""
+        items = []
+        
+        try:
+            # Add parent directory link if not at root
+            if request_path != "/":
+                parent_path = str(Path(request_path).parent)
+                if parent_path == ".":
+                    parent_path = "/"
+                items.append(f'<li><a href="{parent_path}">📁 ../</a></li>')
+            
+            # List directories first
+            for item in sorted(directory_path.iterdir()):
+                if item.is_dir():
+                    item_name = item.name
+                    item_path = f"{request_path.rstrip('/')}/{item_name}/"
+                    items.append(f'<li><a href="{item_path}">📁 {item_name}/</a></li>')
+            
+            # Then list files
+            for item in sorted(directory_path.iterdir()):
+                if item.is_file():
+                    item_name = item.name
+                    item_path = f"{request_path.rstrip('/')}/{item_name}"
+                    file_size = item.stat().st_size
+                    size_str = f"({file_size:,} bytes)" if file_size < 1024*1024 else f"({file_size/(1024*1024):.1f} MB)"
+                    items.append(f'<li><a href="{item_path}">📄 {item_name}</a> <span style="color: #666; font-size: 0.8em;">{size_str}</span></li>')
+        
+        except Exception as e:
+            items.append(f'<li>Error reading directory: {e}</li>')
+        
+        items_html = "\n".join(items)
+        
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Directory listing for {request_path}</title>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                h1 {{ color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }}
+                ul {{ list-style: none; padding: 0; }}
+                li {{ margin: 5px 0; }}
+                a {{ text-decoration: none; color: #0066cc; }}
+                a:hover {{ text-decoration: underline; }}
+                .header {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+                .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>📁 Directory listing for {request_path}</h1>
+                <p>Image Server - Medical Imaging Files</p>
+            </div>
+            <ul>
+                {items_html}
+            </ul>
+            <div class="footer">
+                <p>🏥 Medical Imaging Server | FastAPI + Uvicorn</p>
+            </div>
+        </body>
+        </html>
+        """
+        return html
+    
+    def file_response(self, full_path: str, stat_result: os.stat_result, scope, status_code: int = 200):
+        """Override to handle directory listing"""
+        path_obj = Path(full_path)
+        
+        if path_obj.is_dir():
+            # Generate directory listing
+            request_path = scope.get("path", "/")
+            html_content = self.generate_directory_listing(path_obj, request_path)
+            return HTMLResponse(content=html_content, status_code=200)
+        
+        # For files, use the default behavior
+        return super().file_response(full_path, stat_result, scope, status_code)
+
 # --- FastAPI Application ---
-app = FastAPI()
+app = FastAPI(title="Medical Imaging Server", description="HTTPS server for medical imaging files with directory browsing")
 
 origins = [
     "http://localhost",
@@ -110,8 +193,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files from project root
-app.mount("/", StaticFiles(directory=str(project_root)), name="static")
+# Mount static files from project root with directory listing support
+app.mount("/", DirectoryListingStaticFiles(directory=str(project_root)), name="static")
 
 # --- Main execution block for Uvicorn ---
 if __name__ == "__main__":

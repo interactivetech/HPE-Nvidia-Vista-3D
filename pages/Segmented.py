@@ -15,11 +15,11 @@ PROJECT_ROOT = os.getenv('PROJECT_ROOT', '.') # Default to current directory
 NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'segments')
 
 # Load label dictionary
-LABEL_DICT_PATH = Path(PROJECT_ROOT) / "vista3d" / "label_dict.json"
+LABEL_DICT_PATH = Path(PROJECT_ROOT) / "conf" / "label_dict.json"
 with open(LABEL_DICT_PATH, 'r') as f:
     LABEL_DICT = json.load(f)
 
-LABEL_COLORS_PATH = Path(PROJECT_ROOT) / "vista3d" / "label_colors.json"
+LABEL_COLORS_PATH = Path(PROJECT_ROOT) / "conf" / "label_colors.json"
 with open(LABEL_COLORS_PATH, 'r') as f:
     LABEL_COLORS = json.load(f)
 

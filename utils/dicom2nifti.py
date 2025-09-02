@@ -32,8 +32,8 @@ def load_environment():
 def load_label_dictionary():
     """Load the Vista-3D label dictionary from JSON file"""
     try:
-        # Try to load from the vista3d directory first
-        label_file = Path("vista3d/label_dict.json")
+        # Try to load from the conf directory first
+        label_file = Path("conf/label_dict.json")
         if not label_file.exists():
             # Fallback to current directory
             label_file = Path("label_dict.json")

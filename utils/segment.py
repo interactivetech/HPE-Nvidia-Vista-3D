@@ -23,7 +23,7 @@ SEGMENTATION_OUTPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "segments" # Changed t
 
 
 # Load label dictionary
-LABEL_DICT_PATH = PROJECT_ROOT / "vista3d" / "label_dict.json"
+LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "label_dict.json"
 with open(LABEL_DICT_PATH, 'r') as f:
     LABEL_DICT = json.load(f)
 
@@ -99,13 +99,13 @@ def main():
         target_vessels = []
         if vessels_of_interest_env == "all":
             target_vessels = list(LABEL_DICT.keys())
-            print("Segmenting ALL available labels from label_dict.json.")
+            print("Segmenting ALL available labels from conf/label_dict.json.")
         elif vessels_of_interest_env:
             target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()]
             # Validate requested vessels against LABEL_DICT
             invalid_vessels = [v for v in target_vessels if v not in LABEL_DICT]
             if invalid_vessels:
-                print(f"Warning: The following vessels are not found in label_dict.json and will be ignored: {invalid_vessels}")
+                print(f"Warning: The following vessels are not found in conf/label_dict.json and will be ignored: {invalid_vessels}")
                 target_vessels = [v for v in target_vessels if v in LABEL_DICT]
             print(f"Segmenting specified vessels: {', '.join(target_vessels)}")
         else:
