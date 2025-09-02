@@ -10,34 +10,44 @@ load_dotenv()
 # Get config from environment
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 PROJECT_ROOT = os.getenv('PROJECT_ROOT', '.') # Default to current directory
-NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'segments')
-
 st.set_page_config(layout="wide")
 
 # Sidebar for controls
 with st.sidebar:
     st.header("Controls")
     
-    source_folder = 'segments'
+    # Data Source Selection
+    data_sources = ['nifti', 'segments']
+    selected_source_folder = st.selectbox("Select Data Source", data_sources)
+
+    NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', selected_source_folder)
+    st.write(f"DEBUG: NIFTI_BASE_DIR: {NIFTI_BASE_DIR}")
 
     # Get patient folders from local filesystem
     patient_folders = []
     if os.path.exists(NIFTI_BASE_DIR):
         patient_folders = [f for f in os.listdir(NIFTI_BASE_DIR) if os.path.isdir(os.path.join(NIFTI_BASE_DIR, f))]
+    st.write(f"DEBUG: Patient Folders Found: {patient_folders}")
     
     selected_patient = st.selectbox("Select Patient", patient_folders)
+    st.write(f"DEBUG: Selected Patient: {selected_patient}")
     
     selected_file = None # Initialize selected_file
     if selected_patient:
-        # Get NIfTI files from local filesystem
+        # Get NIfTI and DICOM files from local filesystem
         folder_path = os.path.join(NIFTI_BASE_DIR, selected_patient)
+        st.write(f"DEBUG: Folder Path: {folder_path}")
         nifti_files = glob.glob(os.path.join(folder_path, '*.nii')) + \
-                      glob.glob(os.path.join(folder_path, '*.nii.gz'))
+                      glob.glob(os.path.join(folder_path, '*.nii.gz')) + \
+                      glob.glob(os.path.join(folder_path, '*.dcm')) # Add DICOM files
+        st.write(f"DEBUG: NIfTI/DICOM Files Found: {nifti_files}")
         
         # Extract just the filenames
         nifti_filenames = [os.path.basename(f) for f in nifti_files]
+        st.write(f"DEBUG: NIfTI/DICOM Filenames: {nifti_filenames}")
         
-        selected_file = st.selectbox("Select NIfTI File", nifti_filenames)
+        selected_file = st.selectbox("Select File", nifti_filenames)
+        st.write(f"DEBUG: Selected File: {selected_file}")
         
         st.header("Viewer Settings")
         color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'])
@@ -50,8 +60,10 @@ with st.sidebar:
 
 
 # Main area for viewer
+st.write(f"DEBUG: IMAGE_SERVER_URL: {IMAGE_SERVER_URL}")
 if selected_file: # Check if selected_file is not None
-    file_url = f'{IMAGE_SERVER_URL}/outputs/{source_folder}/{selected_patient}/{selected_file}'
+    file_url = f'{IMAGE_SERVER_URL}/outputs/{selected_source_folder}/{selected_patient}/{selected_file}'
+    st.write(f"DEBUG: File URL: {file_url}")
 
     slice_type_map = {
         "Axial": 0,

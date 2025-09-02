@@ -194,28 +194,39 @@ def main():
                 segmentation_scan = original_nifti_img.get_fdata()
                 affine = original_nifti_img.affine
 
-                # Define the labels of interest and remap them
-                # These should match the keys in LABEL_DICT that you want to segment
-                label_rois = [k for k in target_vessels if k in LABEL_DICT] # Use target_vessels from earlier
-                
                 # Create a new segmentation map with only the vessels of interest in it.
-                new_segmentation_scan = np.zeros_like(segmentation_scan, dtype=np.uint8) # Ensure uint8 dtype
+                # The VISTA-3D output should already contain the correct label IDs.
+                # We will filter it to only include the target vessels.
+                filtered_segmentation_scan = np.zeros_like(segmentation_scan, dtype=np.uint8) # Ensure uint8 dtype
                 
-                # Create a mapping from original Vista3D label IDs to new sequential IDs (1, 2, 3...)
-                # This is crucial for consistent colormap display in Niivue
-                remapped_label_id = 1
-                for vessel_name in label_rois:
+                for vessel_name in target_vessels:
                     original_label_id = LABEL_DICT[vessel_name]
-                    # Assign new sequential label to voxels matching original_label_id
-                    new_segmentation_scan[segmentation_scan == original_label_id] = remapped_label_id
-                    remapped_label_id += 1
+                    # Assign original label ID to voxels matching original_label_id
+                    filtered_segmentation_scan[segmentation_scan == original_label_id] = original_label_id
 
-                # Create a new NIfTI image with the remapped data
+                # Create a new NIfTI image with the filtered data
                 # Preserve original affine and header info
-                remapped_nifti_img = nib.Nifti1Image(new_segmentation_scan, affine, original_nifti_img.header)
+                remapped_nifti_img = nib.Nifti1Image(filtered_segmentation_scan, affine, original_nifti_img.header)
                 
                 # Save the remapped NIfTI image
-                nib.save(remapped_nifti_img, output_segmentation_path)
+                if not output_segmentation_path.parent.exists():
+                    print(f"    ERROR: Output directory does not exist: {output_segmentation_path.parent}")
+                    raise IOError("Output directory not found")
+
+                print(f"    Attempting to save to: {output_segmentation_path}")
+                print(f"    NIfTI image shape before saving: {remapped_nifti_img.shape}")
+                print(f"    NIfTI image dtype before saving: {remapped_nifti_img.header.get_data_dtype()}")
+
+                try:
+                    nib.save(remapped_nifti_img, output_segmentation_path)
+                    if os.path.exists(output_segmentation_path):
+                        print(f"    Successfully saved: {output_segmentation_path.name}")
+                    else:
+                        print(f"    ERROR: File not found after saving: {output_segmentation_path.name}")
+                        raise IOError("File not found after save operation")
+                except Exception as save_e:
+                    print(f"    ERROR: Failed to save NIfTI file: {save_e}")
+                    raise IOError(f"Failed to save NIfTI file: {save_e}")
                 
                 print(f"    Saved NIfTI dtype: {remapped_nifti_img.header.get_data_dtype()}")
                 print(f"    Saved NIfTI shape: {remapped_nifti_img.shape}")
