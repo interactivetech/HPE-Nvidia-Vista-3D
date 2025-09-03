@@ -37,5 +37,5 @@ with st.sidebar:
             color_hex = f"#{color_rgb[0]:02x}{color_rgb[1]:02x}{color_rgb[2]:02x}"
             st.markdown(f"<div style=\"display: flex; align-items: center; margin-bottom: 5px;\">" 
                         f"<div style=\"width: 20px; height: 20px; background-color: {color_hex}; border: 1px solid #ccc; margin-right: 10px;\"></div>" 
-                        f"<span>**{label_name}** (ID: {label_id}) - RGB: {color_rgb}</span>" 
+                        f"<span>{label_name} (ID: {label_id})</span>" 
                         f"</div>", unsafe_allow_html=True)
