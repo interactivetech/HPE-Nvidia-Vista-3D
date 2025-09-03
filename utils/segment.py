@@ -123,11 +123,10 @@ def main():
 
         for nifti_file_path in tqdm(all_nifti_files, desc="Processing NIfTI files"):
             base_name = nifti_file_path.name.replace('.nii.gz', '').replace('.nii', '')
-            output_segmentation_path = patient_segmentation_output_path / f"{base_name}_seg.nii.gz"
-            colored_output_path = patient_segmentation_output_path / f"{base_name}_colored_seg.nii.gz"
+            output_path = patient_segmentation_output_path / f"{base_name}_seg.nii.gz"
 
-            if not args.force and output_segmentation_path.exists() and colored_output_path.exists():
-                print(f"\n  Skipping {nifti_file_path.name} as output files already exist. Use --force to overwrite.")
+            if not args.force and output_path.exists():
+                print(f"\n  Skipping {nifti_file_path.name} as segmentation already exists. Use --force to overwrite.")
                 continue
 
             try:
@@ -144,18 +143,15 @@ def main():
                     nifti_filename = zip_ref.namelist()[0]
                     extracted_nifti_content = zip_ref.read(nifti_filename)
                 
-                with open(output_segmentation_path, 'wb') as f:
-                    f.write(extracted_nifti_content)
+                # Create NIfTI image directly from extracted content
+                with io.BytesIO(extracted_nifti_content) as nifti_buffer:
+                    raw_nifti_img = nib.load(nifti_buffer)
                 
-                print(f"    Successfully saved raw segmentation: {output_segmentation_path.name}")
-
-                # Create and save the colored version
-                raw_nifti_img = nib.load(output_segmentation_path)
                 print("    Creating colored segmentation...")
                 colored_nifti_img = create_colored_segmentation(raw_nifti_img)
                 
-                nib.save(colored_nifti_img, colored_output_path)
-                print(f"    Successfully saved colored segmentation: {colored_output_path.name}")
+                nib.save(colored_nifti_img, output_path)
+                print(f"    Successfully saved segmentation: {output_path.name}")
 
             except requests.exceptions.RequestException as e:
                 print(f"\n  Error during inference for {nifti_file_path.name}: {e}")

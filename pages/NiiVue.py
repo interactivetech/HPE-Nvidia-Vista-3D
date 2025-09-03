@@ -85,7 +85,11 @@ with st.sidebar:
     if slice_type == "Single View":
         orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
 
-    color_map = st.selectbox("Color Map", ['None', 'gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
+    # Only show colormap selector when not viewing segments directly
+    if selected_source != 'segments':
+        color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
+    else:
+        color_map = 'gray'  # Default value, won't be used
 
 # --- Main Viewer Area ---
 if selected_file:
@@ -102,13 +106,17 @@ if selected_file:
 
     # --- HTML and Javascript for NiiVue ---
     volume_list_entry_parts = [f"url: \"{base_file_url}\""]
-    if color_map != 'None':
+    # Only apply colormap when not viewing segments directly
+    if selected_source != 'segments':
         volume_list_entry_parts.append(f"colormap: \"{color_map}\"")
+    else:
+        # For segments, specify that this is RGB data
+        volume_list_entry_parts.append("colormap: \"rgb\"")
     volume_list_entry = "{ " + ", ".join(volume_list_entry_parts) + " }"
 
     # --- Prepare Custom Colormap for Segments ---
     custom_colormap_js = ""
-    if selected_source == 'segments':
+    if show_overlay or selected_source == 'segments':
         try:
             with open('conf/vista3d_label_colors.json', 'r') as f:
                 label_colors_list = json.load(f)
@@ -155,6 +163,7 @@ if selected_file:
                     A: [{ ",".join(map(str, a_values)) }],
                     labels: [{ ",".join(f'"{l}"' for l in labels) }]
                 }}; 
+                console.log('Custom colormap loaded:', customSegmentationColormap);
                 """
         except Exception as e:
             st.error(f"Error loading label_dict.json: {e}")
@@ -184,20 +193,20 @@ if selected_file:
 
             const volumeList = [{volume_list_entry}];
             nv.loadVolumes(volumeList).then(() => {{
+                {custom_colormap_js}
+                console.log('Selected source:', '{selected_source}');
+                console.log('Volume list:', volumeList);
+                if (typeof customSegmentationColormap !== 'undefined' && '{selected_source}' !== 'segments') {{
+                    // For overlays only, set as label colormap
+                    console.log('Setting label colormap for overlay');
+                    nv.setColormapLabel(customSegmentationColormap);
+                }} else if ('{selected_source}' === 'segments') {{
+                    console.log('Segments loaded - no colormap manipulation needed');
+                }} else {{
+                    console.log('Custom colormap not defined');
+                }}
                 if ('{segment_url}') {{
-                    if ('{color_map}' === 'None') {{
-                        nv.loadDrawingFromUrl('{segment_url}');
-                        {custom_colormap_js}
-                        if (typeof customSegmentationColormap !== 'undefined') {{
-                            nv.setColormapLabel(customSegmentationColormap);
-                        }}
-                    }} else {{
-                        nv.loadVolumes([{{
-                            url: '{segment_url}',
-                            colormap: 'jet',
-                            opacity: {overlay_opacity}
-                        }}] );
-                    }}
+                    nv.loadDrawingFromUrl('{segment_url}');
                 }}
                 if ({actual_slice_type} === 3) {{ // 3 is Multiplanar
                     nv.setSliceType(nv.sliceType.MULTIPLANAR); // Ensure correct slice type
