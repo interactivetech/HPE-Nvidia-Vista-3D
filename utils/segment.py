@@ -22,13 +22,15 @@ NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "nifti"
 SEGMENTATION_OUTPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "segments"
 
 # Load label dictionaries
-LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "label_dict.json"
+LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
 with open(LABEL_DICT_PATH, 'r') as f:
-    LABEL_DICT = json.load(f)
+    label_colors_list = json.load(f)
 
-LABEL_COLORS_PATH = PROJECT_ROOT / "conf" / "label_colors.json"
-with open(LABEL_COLORS_PATH, 'r') as f:
-    LABEL_COLORS = json.load(f)
+    # Convert list to a dictionary for easier lookup by ID
+    LABEL_DICT = {item['id']: item for item in label_colors_list}
+
+    # Create a name-to-id map for target_vessels processing
+    NAME_TO_ID_MAP = {item['name']: item['id'] for item in label_colors_list}
 
 def create_colored_segmentation(label_map_nii):
     """Creates a colored NIfTI image from a label map."""
@@ -39,10 +41,26 @@ def create_colored_segmentation(label_map_nii):
     colored_data = np.zeros((*data.shape, 3), dtype=np.uint8)
     unique_labels = np.unique(data)
 
+    print(f"  Unique labels in NIfTI data: {unique_labels}")
+    print(f"  LABEL_DICT content (first 5 values): {list(LABEL_DICT.values())[:5]}")
+
     for label_id in unique_labels:
         if label_id == 0:
             continue
-        color = LABEL_COLORS.get(str(int(label_id)), [255, 255, 255]) # Default to white
+        color = [255, 255, 255] # Default to white
+        found_color = False
+        print(f"  Processing label_id: {label_id} (type: {type(label_id)})")
+        
+        # Direct lookup using the new LABEL_DICT structure
+        if int(label_id) in LABEL_DICT:
+            label_info = LABEL_DICT[int(label_id)]
+            color = label_info["color"]
+            found_color = True
+            print(f"    ID: {label_info['id']} - Name: {label_info['name']}, Color: {label_info['color']} (Match: True)")
+        else:
+            print(f"    ID: {label_id} - Name: N/A, Color: [255, 255, 255] (Match: False)") # No match found
+        
+        print(f"  Applying color {color} to label ID {label_id} (Found: {found_color})")
         colored_data[data == label_id] = color
 
     return nib.Nifti1Image(colored_data, affine, header)
@@ -84,13 +102,17 @@ def main():
         print(f"\nProcessing patient folder: {patient_nifti_path}")
 
         vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower()
-        target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()] if vessels_of_interest_env != "all" else list(LABEL_DICT.keys())
+        target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()] if vessels_of_interest_env != "all" else list(NAME_TO_ID_MAP.keys())
         
         if not target_vessels:
             print("No VESSELS_OF_INTEREST specified in .env. Skipping patient.")
             continue
 
-        target_vessel_ids = [LABEL_DICT[v] for v in target_vessels if v in LABEL_DICT]
+        target_vessel_ids = []
+        for v in target_vessels:
+            if v in NAME_TO_ID_MAP:
+                target_vessel_ids.append(NAME_TO_ID_MAP[v])
+        
         patient_segmentation_output_path = SEGMENTATION_OUTPUT_BASE_DIR / patient_folder_name
         patient_segmentation_output_path.mkdir(parents=True, exist_ok=True)
 

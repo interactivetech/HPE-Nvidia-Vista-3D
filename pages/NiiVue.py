@@ -6,6 +6,7 @@ import requests
 from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+import json
 
 # --- Initial Setup ---
 st.set_page_config(layout="wide")
@@ -22,7 +23,7 @@ def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
             link = item.find('a')
             if link and link.get('href'):
                 text = link.get_text().strip()
-                if text == "📁 .." or text.endswith('../'):
+                if text == "📁 ../" or text.endswith('../'):
                     continue
                 is_directory = text.startswith('📁') or text.endswith('/')
                 name = re.sub(r'^📁\s*|📄\s*', '', text).strip('/')
@@ -58,7 +59,7 @@ def get_server_data(path: str, type: str, file_extensions: tuple):
 # --- Sidebar UI ---
 with st.sidebar:
     st.header("Controls")
-    data_sources = ['nifti', 'segments', 'overlay', 'mesh']
+    data_sources = ['nifti', 'segments']
     selected_source = st.selectbox("Select Data Source", data_sources)
 
     patient_folders = get_server_data(selected_source, 'folders', ('',))
@@ -66,7 +67,7 @@ with st.sidebar:
 
     selected_file = None
     if selected_patient:
-        file_ext = ('.nii', '.nii.gz', '.dcm') if selected_source != 'mesh' else ('.vtk', '.obj', '.stl', '.gltf', '.glb')
+        file_ext = ('.nii', '.nii.gz', '.dcm')
         filenames = get_server_data(f"{selected_source}/{selected_patient}", 'files', file_ext)
         selected_file = st.selectbox("Select File", filenames)
 
@@ -79,14 +80,12 @@ with st.sidebar:
         if show_overlay:
             overlay_opacity = st.slider("Overlay Opacity", 0.0, 1.0, 0.5)
 
-    if selected_source != 'mesh':
-        slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
-        orientation = "Axial"
-        if slice_type == "Single View":
-            orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
-        color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
-    else:
-        slice_type, orientation, color_map = '3D Render', 'Axial', 'gray'
+    slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
+    orientation = "Axial"
+    if slice_type == "Single View":
+        orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
+
+    color_map = st.selectbox("Color Map", ['None', 'gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
 
 # --- Main Viewer Area ---
 if selected_file:
@@ -102,6 +101,65 @@ if selected_file:
     actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
 
     # --- HTML and Javascript for NiiVue ---
+    volume_list_entry_parts = [f"url: \"{base_file_url}\""]
+    if color_map != 'None':
+        volume_list_entry_parts.append(f"colormap: \"{color_map}\"")
+    volume_list_entry = "{ " + ", ".join(volume_list_entry_parts) + " }"
+
+    # --- Prepare Custom Colormap for Segments ---
+    custom_colormap_js = ""
+    if selected_source == 'segments':
+        try:
+            with open('conf/vista3d_label_colors.json', 'r') as f:
+                label_colors_list = json.load(f)
+
+            r_values = [0] * 256 # Assuming max ID is less than 256, adjust if needed
+            g_values = [0] * 256
+            b_values = [0] * 256
+            a_values = [0] * 256 # Default to transparent
+            labels = [""] * 256
+
+            # Set background (ID 0) to transparent black
+            r_values[0] = 0
+            g_values[0] = 0
+            b_values[0] = 0
+            a_values[0] = 0
+            labels[0] = "Background"
+
+            max_id = 0
+            for item in label_colors_list: # Iterate over the list
+                idx = item['id']
+                label_name = item['name'] # Get name
+                color = item['color']
+                if 0 <= idx < 256: # Ensure index is within bounds
+                    r_values[idx] = color[0]
+                    g_values[idx] = color[1]
+                    b_values[idx] = color[2]
+                    a_values[idx] = 255 # Make segments opaque
+                    labels[idx] = label_name
+                if idx > max_id:
+                    max_id = idx
+            
+            # Trim arrays to max_id + 1
+            r_values = r_values[:max_id + 1]
+            g_values = g_values[:max_id + 1]
+            b_values = b_values[:max_id + 1]
+            a_values = a_values[:max_id + 1]
+            labels = labels[:max_id + 1]
+
+            custom_colormap_js = f"""
+                const customSegmentationColormap = {{
+                    R: [{ ",".join(map(str, r_values)) }],
+                    G: [{ ",".join(map(str, g_values)) }],
+                    B: [{ ",".join(map(str, b_values)) }],
+                    A: [{ ",".join(map(str, a_values)) }],
+                    labels: [{ ",".join(f'"{l}"' for l in labels) }]
+                }}; 
+                """
+        except Exception as e:
+            st.error(f"Error loading label_dict.json: {e}")
+            custom_colormap_js = "" # Ensure it's empty if error
+
     html_string = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -118,22 +176,29 @@ if selected_file:
         if (typeof niivue === 'undefined') {{
             console.error('Niivue library not loaded!');
         }} else {{
-            const nv = new niivue.Niivue({{
+            const nv = new niivue.Niivue ({{
                 sliceType: {actual_slice_type},
                 isColorbar: true
             }});
             nv.attachTo('niivue-canvas');
 
-            const volumeList = [{{ url: \"{base_file_url}\", colormap: \"{color_map}\" }}];
-            if ('{segment_url}') {{
-                volumeList.push({{
-                    url: '{segment_url}',
-                    colormap: 'jet',
-                    opacity: {overlay_opacity}
-                }});
-            }}
-
-            nv.loadVolumes(volumeList).then(() => {{ 
+            const volumeList = [{volume_list_entry}];
+            nv.loadVolumes(volumeList).then(() => {{
+                if ('{segment_url}') {{
+                    if ('{color_map}' === 'None') {{
+                        nv.loadDrawingFromUrl('{segment_url}');
+                        {custom_colormap_js}
+                        if (typeof customSegmentationColormap !== 'undefined') {{
+                            nv.setColormapLabel(customSegmentationColormap);
+                        }}
+                    }} else {{
+                        nv.loadVolumes([{{
+                            url: '{segment_url}',
+                            colormap: 'jet',
+                            opacity: {overlay_opacity}
+                        }}] );
+                    }}
+                }}
                 if ({actual_slice_type} === 3) {{ // 3 is Multiplanar
                     nv.setSliceType(nv.sliceType.MULTIPLANAR); // Ensure correct slice type
                     nv.opts.multiplanarShowRender = 'ALWAYS';
@@ -143,7 +208,8 @@ if selected_file:
         }}
     </script>
 </body>
-</html>"""
+</html>"
+"""
 
     components.html(html_string, height=1000, scrolling=False)
 else:

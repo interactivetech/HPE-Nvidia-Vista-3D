@@ -4,14 +4,11 @@ import json
 
 # Load label dictionaries
 PROJECT_ROOT = Path(__file__).parent
-LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "label_dict.json"
+LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
 LABEL_COLORS_PATH = PROJECT_ROOT / "conf" / "label_colors.json"
 
 with open(LABEL_DICT_PATH, 'r') as f:
     LABEL_DICT = json.load(f)
-
-with open(LABEL_COLORS_PATH, 'r') as f:
-    LABEL_COLORS = json.load(f)
 
 st.set_page_config(
     page_title="NIfTI Vessel Segmentation and Viewer",
@@ -19,7 +16,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("NIfTI Vessel Segmentation and Viewer!")
+st.title("Vessel Segmentation Viewer")
 
 # Sidebar for controls
 with st.sidebar:
@@ -32,8 +29,10 @@ with st.sidebar:
     # Pop down for segment colors
     with st.expander("Segment Colors"):
         st.write("Colors used for segmentation visualization:")
-        for label_name, label_id in LABEL_DICT.items():
-            color_rgb = LABEL_COLORS.get(str(label_id), [0, 0, 0]) # Default to black if not found
+        for label_info in LABEL_DICT:
+            label_name = label_info["name"]
+            label_id = label_info["id"]
+            color_rgb = label_info["color"]
             color_hex = f"#{color_rgb[0]:02x}{color_rgb[1]:02x}{color_rgb[2]:02x}"
             st.markdown(f"<div style=\"display: flex; align-items: center; margin-bottom: 5px;\">" 
                         f"<div style=\"width: 20px; height: 20px; background-color: {color_hex}; border: 1px solid #ccc; margin-right: 10px;\"></div>" 
