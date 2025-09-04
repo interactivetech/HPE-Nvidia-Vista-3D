@@ -72,18 +72,26 @@ with st.sidebar:
         selected_file = st.selectbox("Select File", filenames)
 
     # --- Viewer Settings ---
-    st.header("Viewer Settings")
-    show_overlay = False
-    overlay_opacity = 0.5
-    if selected_source == 'nifti' and selected_file:
-        show_overlay = st.checkbox("Show Segmentation Overlay", value=True)
-        if show_overlay:
-            overlay_opacity = st.slider("Overlay Opacity", 0.0, 1.0, 0.5)
+    if selected_source != 'segments':
+        st.header("Viewer Settings")
+        show_overlay = False
+        overlay_opacity = 0.5
+        if selected_source == 'nifti' and selected_file:
+            show_overlay = st.checkbox("Show Segmentation Overlay", value=False)
+            if show_overlay:
+                overlay_opacity = st.slider("Overlay Opacity", 0.0, 1.0, 0.5)
+    else:
+        show_overlay = False # Default when hidden
+        overlay_opacity = 0.5 # Default when hidden
 
-    slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
-    orientation = "Axial"
-    if slice_type == "Single View":
-        orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
+    if selected_source == 'segments':
+        slice_type = "3D Render"
+        orientation = "Axial" # This won't be used, but good to set a default
+    else:
+        slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
+        orientation = "Axial"
+        if slice_type == "Single View":
+            orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
 
     # Only show colormap selector when not viewing segments directly
     if selected_source != 'segments':

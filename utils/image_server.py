@@ -207,14 +207,7 @@ async def serve_files(request: Request, full_path: str):
     else:
         raise HTTPException(status_code=404, detail="Not found")
 
-origins = [
-    "http://localhost",
-    "http://localhost:8501", # Streamlit's default port
-    "http://localhost:8502", # Alternative Streamlit port
-    "https://localhost",
-    "https://localhost:8501",
-    "https://localhost:8502",
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
