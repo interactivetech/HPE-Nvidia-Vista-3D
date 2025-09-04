@@ -9,12 +9,78 @@ st.set_page_config(layout="wide")
 load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 
-# --- Fixed file path for testing ---
-TEST_FILE_PATH = "outputs/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
+# --- Dynamic file selection for segments created by utils/segment.py ---
+import glob
+
+# Get available patient folders
+segments_base_path = "outputs/segments"
+# Default test image (served by the image server)
+DEFAULT_PATIENT = "PA00000002"
+DEFAULT_FILENAME = "01_2.5MM_ARTERIAL_seg_int16.nii.gz"
+DEFAULT_TEST_PATH = f"{segments_base_path}/{DEFAULT_PATIENT}/{DEFAULT_FILENAME}"
+available_patients = []
+if os.path.exists(segments_base_path):
+    available_patients = [d for d in os.listdir(segments_base_path) 
+                         if os.path.isdir(os.path.join(segments_base_path, d))]
+
+# Sidebar controls for file selection
+with st.sidebar:
+    st.header("File Selection")
+    
+    if available_patients:
+        default_patient_index = available_patients.index(DEFAULT_PATIENT) if DEFAULT_PATIENT in available_patients else 0
+        selected_patient = st.selectbox("Select Patient", available_patients, index=default_patient_index)
+        
+        # Get available segmentation files for selected patient
+        patient_segments_path = os.path.join(segments_base_path, selected_patient)
+        available_files = [f for f in os.listdir(patient_segments_path) 
+                          if f.endswith(('.nii', '.nii.gz'))]
+        
+        if available_files:
+            default_file_index = available_files.index(DEFAULT_FILENAME) if DEFAULT_FILENAME in available_files else 0
+            selected_file = st.selectbox("Select Segmentation File", available_files, index=default_file_index)
+            TEST_FILE_PATH = f"{segments_base_path}/{selected_patient}/{selected_file}"
+        else:
+            st.error(f"No segmentation files found in {patient_segments_path}")
+            TEST_FILE_PATH = DEFAULT_TEST_PATH  # Fallback to image server path
+    else:
+        st.warning("No patient folders found in outputs/segments")
+        TEST_FILE_PATH = DEFAULT_TEST_PATH  # Fallback to image server path
+    
+    st.header("Viewer Controls")
+    
+    # Force fixed test image toggle
+    use_fixed_test_image = st.checkbox(
+        "Use fixed test image",
+        value=True,
+        help=f"Always use {DEFAULT_TEST_PATH} regardless of selection"
+    )
+
+    # Opacity control
+    opacity = st.slider("Opacity", 0.0, 1.0, 1.0)
+    
+    # Color source toggle
+    color_mode = st.radio(
+        "Color Source",
+        ["Vista3D JSON colors", "NIfTI embedded (if available)"],
+        index=0,
+        help="Use colors from `conf/vista3d_label_colors.json` or any LUT embedded in the NIfTI."
+    )
+    use_embedded_colors = color_mode.startswith("NIfTI")
+    
+    # Reset view button
+    if st.button("Reset View"):
+        st.rerun()
+
+# If requested, force the fixed test path
+if 'use_fixed_test_image' in locals() and use_fixed_test_image:
+    TEST_FILE_PATH = DEFAULT_TEST_PATH
+
 TEST_FILE_URL = f"{IMAGE_SERVER_URL}/{TEST_FILE_PATH}"
 
-st.title("Test Segment Viewer")
-st.write(f"Viewing: `{TEST_FILE_PATH}`")
+st.title("Test Segment Viewer for Vista3D Segments")
+st.write(f"**Currently viewing:** `{TEST_FILE_PATH}`")
+st.info("This viewer works with segmentation files created by `utils/segment.py`. Select different patients and files using the sidebar controls.")
 
 # --- Comprehensive Debugging Section ---
 import requests
@@ -125,18 +191,7 @@ except Exception as e:
 st.write("**6. Browser Capabilities Test:**")
 st.info("Check browser console for WebGL and canvas capabilities")
 
-# --- Sidebar Controls ---
-with st.sidebar:
-    st.header("Viewer Controls")
-    
-    # Opacity control
-    opacity = st.slider("Opacity", 0.0, 1.0, 1.0)
-    
-    
-    
-    # Reset view button
-    if st.button("Reset View"):
-        st.rerun()
+# --- Sidebar Controls Moved Above ---
 
 # --- Prepare Custom Colormap for Segments ---
 custom_colormap_js = ""
@@ -178,15 +233,31 @@ try:
     a_values = a_values[:max_id + 1]
     labels = labels[:max_id + 1]
 
+    # JSON-encode arrays safely for JS injection
+    r_js = json.dumps(r_values)
+    g_js = json.dumps(g_values)
+    b_js = json.dumps(b_values)
+    a_js = json.dumps(a_values)
+    labels_js = json.dumps(labels)
+    # Intensity indices 0..max_id
+    i_js = json.dumps(list(range(len(r_values))))
+
     custom_colormap_js = f"""
-        const customSegmentationColormap = {{
-            R: [{ ",".join(map(str, r_values)) }],
-            G: [{ ",".join(map(str, g_values)) }],
-            B: [{ ",".join(map(str, b_values)) }],
-            A: [{ ",".join(map(str, a_values)) }],
-            labels: [{ ",".join(f'"{l}"' for l in labels) }]
-        }}; 
-        console.log('Custom colormap loaded:', customSegmentationColormap);
+        window.customSegmentationColormap = {{
+            R: {r_js},
+            G: {g_js},
+            B: {b_js},
+            A: {a_js},
+            labels: {labels_js}
+        }};
+        window.customSegmentationColormapIntensity = {{
+            R: {r_js},
+            G: {g_js},
+            B: {b_js},
+            A: {a_js},
+            I: {i_js}
+        }};
+        console.log('Custom colormaps ready:', {{ label: window.customSegmentationColormap, intensity: window.customSegmentationColormapIntensity }});
         """
 except Exception as e:
     st.error(f"Error loading label colors: {e}")
@@ -194,6 +265,9 @@ except Exception as e:
 
 # --- Fixed to 3D Render view ---
 actual_slice_type = 4  # 3D Render
+
+# Prepare JS boolean for color mode
+use_embedded_colors_js = json.dumps(use_embedded_colors)
 
 # --- HTML and JavaScript for NiiVue with Extensive Debugging ---
 html_string = f"""<style>
@@ -249,6 +323,11 @@ body, html {{
         currentStep: 'Starting...',
         niiVueLibraryLoaded: false
     }};
+    
+    // Inject custom segmentation colormap built on the server
+    {custom_colormap_js}
+    // Selected color mode from Streamlit (True => try embedded LUT; False => use JSON)
+    const useEmbeddedColors = {use_embedded_colors_js};
     
     function updateDebugInfo() {{
         const status = document.getElementById('debug-status');
@@ -531,12 +610,12 @@ body, html {{
             setTimeout(() => {{
                 console.log('📋 Starting volume loading process...');
                 
-                const volumeList = [{
+                const volumeList = [{{
                     "url": "{TEST_FILE_URL}",
                     "opacity": {opacity},
-                    "dataType": niivue.NV_DT_INT16,
-                    "volumeType": niivue.NV_VOLUME_TYPE_SEGMENTATION
-                }];
+                    "dataType": niivue.NV_DT_UINT16,
+                    "volumeType": (niivue.NV_VOLUME_TYPE_LABEL !== undefined ? niivue.NV_VOLUME_TYPE_LABEL : niivue.NV_VOLUME_TYPE_SEGMENTATION)
+                }}];
                 
                 console.log('🚀 Volume configuration:', volumeList);
                 
@@ -546,17 +625,53 @@ body, html {{
                         console.log('🎉 Volume loaded event fired:', volume);
                         window.debugState.volumesLoaded++;
                         updateDebugInfo();
-                        
-                        // Apply custom colormap after volume is loaded
-                        if (typeof customSegmentationColormap !== 'undefined') {{
-                            console.log('🎨 Applying custom segmentation colormap...');
-                            console.log('Inspecting nv object before setColormapLabel:', nv);
-                            try {{
-                                nv.setColormapLabel(customSegmentationColormap);
-                                console.log('✅ Custom colormap applied');
-                            }} catch (error) {{
-                                logError(error, 'Colormap Application');
+
+                        try {{
+                            if (useEmbeddedColors) {{
+                                console.log('💎 Attempting to use embedded NIfTI colormap (if present)...');
+                                const embedded = volume && volume.colormapLabel ? volume.colormapLabel : null;
+                                if (embedded && embedded.R && embedded.R.length) {{
+                                    nv.setColormapLabel(embedded);
+                                    nv.updateGLVolume();
+                                    console.log('✅ Embedded label colormap applied');
+                                }} else if (typeof window.customSegmentationColormap !== 'undefined') {{
+                                    console.log('⚠️ No embedded LUT detected, applying JSON label colormap');
+                                    nv.setColormapLabel(window.customSegmentationColormap);
+                                    nv.updateGLVolume();
+                                }} else {{
+                                    console.log('⚠️ No colormap available; leaving default');
+                                }}
+                            }} else {{
+                                if (typeof window.customSegmentationColormap !== 'undefined') {{
+                                    console.log('🎨 Applying JSON label colormap');
+                                    nv.setColormapLabel(window.customSegmentationColormap);
+                                    nv.updateGLVolume();
+                                }} else {{
+                                    console.log('⚠️ Custom label colormap not defined; leaving default');
+                                }}
                             }}
+                        }} catch (error) {{
+                            logError(error, 'Colormap Application (label)');
+                        }}
+
+                        // Fallback: apply as intensity colormap name if label route not visible
+                        try {{
+                            if (nv.volumes && nv.volumes.length > 0 && window.customSegmentationColormapIntensity) {{
+                                const volId = nv.volumes[0].id;
+                                nv.addColormap('Vista3D', window.customSegmentationColormapIntensity);
+                                nv.setColormap(volId, 'Vista3D');
+                                if (nv.setVolumeType) {{
+                                    // Try to ensure segmentation/label rendering mode
+                                    const LabelType = niivue.NV_VOLUME_TYPE_LABEL || niivue.NV_VOLUME_TYPE_SEGMENTATION;
+                                    if (LabelType !== undefined) {{
+                                        nv.setVolumeType(volId, LabelType);
+                                    }}
+                                }}
+                                nv.updateGLVolume();
+                                console.log('✅ Applied intensity-style custom colormap as fallback');
+                            }}
+                        }} catch (error) {{
+                            logError(error, 'Colormap Application (intensity fallback)');
                         }}
                     }});
                     
@@ -601,9 +716,7 @@ body, html {{
                         
                         clearInterval(checkInterval);
                         
-                        // Apply custom colormap
-                        {custom_colormap_js}
-                        
+                        // Colormap already applied in volumeLoaded handler
                         
                         // Set to 3D Render view
                         console.log('🖼️ Setting slice type to 3D Render...');
@@ -616,75 +729,22 @@ body, html {{
                         
                         // Multiple render attempts with different strategies
                         console.log('🔄 Starting render attempts...');
-                        
-                        // Strategy 1: Immediate render
                         try {{
-                            console.log('🔄 Render attempt 1: Immediate');
                             nv.drawScene();
                             window.debugState.renderAttempts++;
-                            updateDebugInfo();
-                            console.log('✅ Render attempt 1 completed');
+                            console.log('✅ Single render call completed');
                         }} catch (error) {{
-                            logError(error, 'Render Attempt 1');
+                            logError(error, 'Render Draw');
                         }}
-                        
-                        // Strategy 2: Delayed render
-                        setTimeout(() => {{
-                            try {{
-                                console.log('🔄 Render attempt 2: Delayed (100ms)');
-                                nv.drawScene();
-                                window.debugState.renderAttempts++;
-                                updateDebugInfo();
-                                console.log('✅ Render attempt 2 completed');
-                            }} catch (error) {{
-                                logError(error, 'Render Attempt 2');
-                            }}
-                        }}, 100);
-                        
-                        // Strategy 3: Force refresh
-                        setTimeout(() => {{
-                            try {{
-                                console.log('🔄 Render attempt 3: Force refresh (500ms)');
-                                nv.refreshLayers();
-                                nv.drawScene();
-                                window.debugState.renderAttempts++;
-                                updateDebugInfo();
-                                console.log('✅ Render attempt 3 completed');
-                            }} catch (error) {{
-                                logError(error, 'Render Attempt 3');
-                            }}
-                        }}, 500);
-                        
-                        // Strategy 4: Reset and render
-                        setTimeout(() => {{
-                            try {{
-                                console.log('🔄 Render attempt 4: Reset and render (1000ms)');
-                                nv.resetScene();
-                                nv.drawScene();
-                                window.debugState.renderAttempts++;
-                                updateDebugInfo();
-                                console.log('✅ Render attempt 4 completed');
-                            }} catch (error) {{
-                                logError(error, 'Render Attempt 4');
-                            }}
-                        }}, 1000);
-                        
-                        // Final check
+
+                        // Final status check after short delay
                         setTimeout(() => {{
                             console.log('🔍 Final status check:');
                             console.log('  Volumes loaded:', nv.volumes ? nv.volumes.length : 0);
-                            console.log('  Scene ready:', nv.isLoaded);
                             console.log('  Canvas context:', window.canvas ? (window.canvas.getContext('webgl2') || window.canvas.getContext('webgl')) : 'Canvas not available');
                             console.log('  Render attempts:', window.debugState.renderAttempts);
                             console.log('  Errors encountered:', window.debugState.errors.length);
-                            
-                            if (window.debugState.errors.length > 0) {{
-                                console.log('❌ Errors summary:');
-                                window.debugState.errors.forEach((error, i) => {{
-                                    console.log(`  ${{i+1}}. ${{error}}`);
-                                }});
-                            }}
-                        }}, 2000);
+                        }}, 300);
                         
                     }} else if (checkCount >= 60) {{ // Increased timeout to 30 seconds
                         console.log('❌ Timeout: Volume never loaded after 30 seconds');
@@ -726,6 +786,45 @@ st.code(f"Slice Type: 3D Render (NiiVue value: {actual_slice_type})")
 
 st.code(f"Opacity: {opacity}")
 
+# --- Segmentation metadata from file and label map ---
+st.subheader("Segmentation Summary")
+try:
+    import io
+    import gzip
+    import numpy as np
+    import nibabel as nib
+    resp = requests.get(TEST_FILE_URL, timeout=30, verify=False)
+    resp.raise_for_status()
+    data_bytes = io.BytesIO(resp.content)
+    # Handle .nii.gz and .nii
+    if TEST_FILE_URL.endswith('.nii.gz'):
+        with gzip.GzipFile(fileobj=data_bytes) as gz:
+            nii = nib.Nifti1Image.from_bytes(gz.read())
+    else:
+        nii = nib.Nifti1Image.from_bytes(data_bytes.read())
+    arr = np.asanyarray(nii.dataobj)
+    arr = arr.astype(np.int64, copy=False)
+    unique_ids, counts = np.unique(arr, return_counts=True)
+    # Load label colors
+    with open('conf/vista3d_label_colors.json', 'r') as f:
+        label_colors_list = json.load(f)
+    id_to_entry = {int(item['id']): item for item in label_colors_list}
+    # Build table rows
+    rows = []
+    for uid, cnt in zip(unique_ids.tolist(), counts.tolist()):
+        entry = id_to_entry.get(int(uid))
+        name = entry['name'] if entry else '(unknown)'
+        color = entry['color'] if entry else [128, 128, 128]
+        rows.append((uid, cnt, name, color))
+    rows.sort(key=lambda r: r[0])
+    st.write(f"Unique labels found: {len(rows)}")
+    # Show top 25 by voxel count
+    st.write("Top labels (by voxel count):")
+    for uid, cnt, name, color in sorted(rows, key=lambda r: r[1], reverse=True)[:25]:
+        st.write(f"- ID {uid}: {name} — voxels: {cnt:,} — RGB{tuple(color)}")
+except Exception as e:
+    st.warning(f"Could not analyze segmentation file: {e}")
+
 # --- Instructions ---
 st.subheader("Instructions")
 st.markdown("""
@@ -748,7 +847,11 @@ st.markdown("""
 6. **Volume Loading** - Monitors the NiiVue volume loading process
 7. **Rendering** - Attempts multiple rendering strategies
 
-**Important Note:** The NiiVue library is now loaded from the local `assets/` folder instead of the image server to avoid HTTP 405 errors.
+**Important Note:** 
+- This viewer now works with segmentation files created by `utils/segment.py`
+- Files are loaded from `outputs/segments/{patient}/{file}.nii.gz` 
+- Use the sidebar to select different patients and segmentation files
+- The NiiVue library is loaded from CDN for reliability
 
 **Debug Features:**
 - Real-time debug panel overlay (green box in viewer)
