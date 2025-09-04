@@ -1,19 +1,45 @@
 #!/usr/bin/env python3
 """
-Simple DICOM to NIFTI conversion script for Vista-3D pipeline.
-This script converts DICOM files to NIFTI format following the demo notebook structure.
+Enhanced DICOM to NIFTI conversion script for Vista-3D pipeline using dcm2niix.
+This script follows NiiVue best practices and uses dcm2niix for robust conversion.
+Incorporates lessons from https://github.com/niivue/niivue-dcm2niix
 """
 
 import os
 import warnings
 import json
+import subprocess
+import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 from tqdm import tqdm
-import pydicom 
 import nibabel as nib
 import numpy as np
 import traceback
+
+
+def check_dcm2niix_installation():
+    """Check if dcm2niix is installed and accessible"""
+    try:
+        result = subprocess.run(['dcm2niix', '--help'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            # Extract version info
+            version_line = result.stdout.split('\n')[0] if result.stdout else "Unknown version"
+            print(f"✅ dcm2niix found: {version_line}")
+            return True
+        else:
+            print(f"❌ dcm2niix check failed with return code: {result.returncode}")
+            return False
+    except subprocess.TimeoutExpired:
+        print("❌ dcm2niix check timed out")
+        return False
+    except FileNotFoundError:
+        print("❌ dcm2niix not found in PATH")
+        return False
+    except Exception as e:
+        print(f"❌ dcm2niix check failed: {e}")
+        return False
 
 
 def load_environment():
@@ -61,20 +87,29 @@ def check_dicom_files_exist(dicom_path):
     if not os.path.exists(dicom_path):
         return False
     
-    # Look for DICOM files in the directory
+    # Look for common DICOM file patterns and extensions
+    dicom_extensions = {'.dcm', '.dicom', '.ima', '.img'}
+    dicom_found = False
+    
     for root, dirs, files in os.walk(dicom_path):
         for file in files:
-            try:
-                # Try to read the file as DICOM
-                file_path = os.path.join(root, file)
-                pydicom.dcmread(file_path)
-                return True
-            except:
-                continue
-    return False
+            # Check by extension first (faster)
+            if any(file.lower().endswith(ext) for ext in dicom_extensions):
+                dicom_found = True
+                break
+            
+            # Check for files without extensions (common in DICOM)
+            if '.' not in file and len(file) > 3:
+                dicom_found = True
+                break
+                
+        if dicom_found:
+            break
+    
+    return dicom_found
 
 
-def create_affine_from_dicom(dicom_files):
+def legacy_create_affine_from_dicom(dicom_files):  # DEPRECATED - dcm2niix handles this
     """Create proper affine transformation matrix from DICOM headers with enhanced spatial accuracy."""
     try:
         # Use the first DICOM file to get basic information
@@ -554,13 +589,168 @@ def optimize_data_type(volume_data):
         return volume_data
 
 
+def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%f_%p_%t_%s"):
+    """
+    Run dcm2niix conversion with NiiVue-optimized settings.
+    
+    Args:
+        input_dir: Input DICOM directory
+        output_dir: Output directory for NIFTI files
+        filename_format: Output filename format (dcm2niix -f option)
+    
+    Returns:
+        dict: Conversion results with status and files created
+    """
+    try:
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # dcm2niix command with NiiVue-optimized settings
+        cmd = [
+            'dcm2niix',
+            '-z', 'y',           # Compress output (.nii.gz)
+            '-b', 'y',           # Generate BIDS sidecar JSON
+            '-ba', 'y',          # Anonymize BIDS sidecar
+            '-f', filename_format, # Filename format
+            '-o', str(output_dir), # Output directory
+            '-v', '1',           # Verbose output
+            '-x', 'y',           # Crop 3D acquisitions
+            '-i', 'y',           # Ignore derived, localizer and 2D images
+            str(input_dir)       # Input directory
+        ]
+        
+        print(f"🔧 Running dcm2niix conversion:")
+        print(f"   Command: {' '.join(cmd)}")
+        
+        # Run dcm2niix
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            print(f"✅ dcm2niix conversion successful")
+            
+            # Find created files
+            nifti_files = list(Path(output_dir).glob("*.nii.gz"))
+            json_files = list(Path(output_dir).glob("*.json"))
+            
+            print(f"📁 Created {len(nifti_files)} NIFTI files and {len(json_files)} JSON sidecars")
+            
+            return {
+                'status': 'success',
+                'nifti_files': nifti_files,
+                'json_files': json_files,
+                'stdout': result.stdout,
+                'stderr': result.stderr
+            }
+        else:
+            print(f"❌ dcm2niix conversion failed (return code: {result.returncode})")
+            print(f"   stderr: {result.stderr}")
+            print(f"   stdout: {result.stdout}")
+            
+            return {
+                'status': 'failed',
+                'error': result.stderr,
+                'stdout': result.stdout,
+                'return_code': result.returncode
+            }
+            
+    except subprocess.TimeoutExpired:
+        print("❌ dcm2niix conversion timed out")
+        return {'status': 'timeout', 'error': 'Conversion timed out after 5 minutes'}
+    except Exception as e:
+        print(f"❌ dcm2niix conversion error: {e}")
+        return {'status': 'error', 'error': str(e)}
+
+
+def enhance_nifti_for_niivue(nifti_file, json_file=None):
+    """
+    Enhance NIFTI file for optimal NiiVue compatibility.
+    
+    Args:
+        nifti_file: Path to NIFTI file
+        json_file: Path to associated JSON sidecar (optional)
+    
+    Returns:
+        dict: Enhancement results
+    """
+    try:
+        print(f"🔧 Enhancing {nifti_file.name} for NiiVue...")
+        
+        # Load NIFTI file
+        img = nib.load(str(nifti_file))
+        data = img.get_fdata()
+        
+        # Generate quality report
+        quality_info = {
+            'file_info': {
+                'filename': nifti_file.name,
+                'file_size_mb': nifti_file.stat().st_size / (1024*1024),
+                'compression': nifti_file.suffix == '.gz'
+            },
+            'volume_info': {
+                'dimensions': data.shape,
+                'data_type': str(data.dtype),
+                'total_voxels': data.size,
+                'memory_usage_mb': data.nbytes / (1024*1024)
+            },
+            'data_quality': {
+                'min_value': float(data.min()),
+                'max_value': float(data.max()),
+                'mean_value': float(data.mean()),
+                'std_value': float(data.std()),
+                'dynamic_range': float(data.max() - data.min())
+            },
+            'spatial_info': {
+                'voxel_spacing_mm': [float(x) for x in img.header.get_zooms()],
+                'volume_dimensions_mm': [
+                    float(img.header.get_zooms()[i] * data.shape[i]) 
+                    for i in range(min(3, len(data.shape)))
+                ]
+            }
+        }
+        
+        # Add JSON metadata if available
+        if json_file and json_file.exists():
+            try:
+                with open(json_file, 'r') as f:
+                    json_metadata = json.load(f)
+                quality_info['dicom_metadata'] = json_metadata
+            except Exception as e:
+                print(f"⚠️  Could not read JSON sidecar: {e}")
+        
+        # Save enhanced quality report
+        quality_file = nifti_file.with_suffix('.quality.json')
+        with open(quality_file, 'w') as f:
+            json.dump(quality_info, f, indent=2, default=str)
+        
+        print(f"    📊 Quality Report:")
+        print(f"       Data range: [{quality_info['data_quality']['min_value']:.1f}, {quality_info['data_quality']['max_value']:.1f}]")
+        print(f"       Voxel spacing: {' x '.join(f'{x:.2f}' for x in quality_info['spatial_info']['voxel_spacing_mm'])} mm")
+        print(f"       Volume size: {' x '.join(f'{x:.1f}' for x in quality_info['spatial_info']['volume_dimensions_mm'])} mm")
+        print(f"       File size: {quality_info['file_info']['file_size_mb']:.1f} MB")
+        
+        return {
+            'status': 'success',
+            'quality_info': quality_info,
+            'quality_file': quality_file
+        }
+        
+    except Exception as e:
+        print(f"❌ Enhancement failed for {nifti_file.name}: {e}")
+        return {'status': 'failed', 'error': str(e)}
+
+
 def convert_dicom_to_nifti(force_overwrite=False):
-    """Convert DICOM files to NIFTI format using individual file processing.
+    """
+    Convert DICOM files to NIFTI format using dcm2niix with NiiVue optimization.
     
     Args:
         force_overwrite: If True, overwrite existing NIFTI directories
     """
     try:
+        # Check dcm2niix installation first
+        if not check_dcm2niix_installation():
+            raise RuntimeError("dcm2niix is required but not found. Please install dcm2niix first.")
+        
         # Load environment variables
         project_root, dicom_folder = load_environment()
         
@@ -575,10 +765,11 @@ def convert_dicom_to_nifti(force_overwrite=False):
             
         nifti_destination_path = Path(project_root) / "outputs/nifti"
         
-        print(f"Project Root: {project_root}")
-        print(f"DICOM Source: {dicom_data_path}")
-        print(f"NIFTI Destination: {nifti_destination_path}")
-        print("-" * 50)
+        print(f"🔬 Enhanced DICOM to NIFTI Conversion (dcm2niix + NiiVue)")
+        print(f"📁 Project Root: {project_root}")
+        print(f"📁 DICOM Source: {dicom_data_path}")
+        print(f"📁 NIFTI Destination: {nifti_destination_path}")
+        print("-" * 70)
         
         # Check if DICOM directory exists
         if not dicom_data_path.exists():
@@ -595,251 +786,111 @@ def convert_dicom_to_nifti(force_overwrite=False):
         dicom_directories = [d for d in os.listdir(dicom_data_path) 
                            if (dicom_data_path / d).is_dir()]
         
-        print(f"Found {len(dicom_directories)} DICOM directories to process")
-        print("Progress bar will show below:")
-        print("-" * 50)
+        print(f"📊 Found {len(dicom_directories)} DICOM directories to process")
+        print(f"🔧 Using dcm2niix for robust conversion with NiiVue optimization")
+        print("-" * 70)
         
-        # Convert DICOM to NIFTI
+        # Convert DICOM to NIFTI using dcm2niix
         successful_conversions = 0
         failed_conversions = 0
+        total_nifti_files = 0
         
-        with tqdm(total=len(dicom_directories), desc="Processing patients", unit="patient") as patient_pbar:
+        with tqdm(total=len(dicom_directories), desc="🔄 Processing patients", unit="patient") as patient_pbar:
             for dicom_directory in dicom_directories:
-                input_directory = Path(dicom_data_path) / f"{dicom_directory}" 
+                input_directory = Path(dicom_data_path) / dicom_directory
                 output_directory = Path(nifti_destination_path) / dicom_directory
             
-                # If the patient's exam has already been processed, skip it unless force_overwrite is True
+                # Check if already processed
                 if output_directory.exists() and not force_overwrite:
                     warnings.warn(f"{output_directory} already exists, skipping...")
                     patient_pbar.update(1)
                     continue
                 elif output_directory.exists() and force_overwrite:
-                    print(f"🔄 Overwriting existing directory: {output_directory}")
-                    import shutil
+                    print(f"\n🔄 Overwriting existing directory: {output_directory}")
                     shutil.rmtree(output_directory)
                     
-                # Process the patient (either new directory or after overwrite)
+                # Process the patient with dcm2niix
                 try:
-                    os.makedirs(output_directory, exist_ok=True)
-                    print(f"\nProcessing: {dicom_directory}")
-                    print("-"*10)
-                    print(f"Saving NIFTI files into directory {output_directory}")
+                    print(f"\n📂 Processing: {dicom_directory}")
+                    print("-" * 50)
                     
-                    # Find all DICOM files
-                    dicom_files = []
-                    for root, dirs, files in os.walk(input_directory):
-                        for file in files:
-                            if not file.startswith('.'):
-                                file_path = Path(root) / file
-                                try:
-                                    ds = pydicom.dcmread(str(file_path))
-                                    if hasattr(ds, 'SOPClassUID') and hasattr(ds, 'pixel_array'):
-                                        dicom_files.append(file_path)
-                                except:
-                                    continue
+                    # Run dcm2niix conversion
+                    conversion_result = run_dcm2niix_conversion(
+                        input_dir=input_directory,
+                        output_dir=output_directory,
+                        filename_format=f"{dicom_directory}_%f_%p_%t_%s"
+                    )
                     
-                    print(f"📊 Found {len(dicom_files)} valid DICOM files")
-                    
-                    if not dicom_files:
-                        print("No valid DICOM files found in directory")
-                        patient_pbar.update(1)
-                        continue
-                    
-                    # Group DICOM files by series
-                    series_groups = group_dicom_files_by_series(dicom_files)
-                    print(f"🔍 Detected {len(series_groups)} different series")
-                    
-                    # Process each series separately
-                    series_count = 0
-                    for series_key, series_files in series_groups.items():
-                        # Filter out single-slice and scout images
-                        if len(series_files) <= 1:
-                            print(f"\n  Skipping series {series_count + 1}/{len(series_groups)}: {series_key} (single slice)")
-                            series_count += 1
-                            continue
-                        if "scout" in series_key.lower():
-                            print(f"\n  Skipping series {series_count + 1}/{len(series_groups)}: {series_key} (scout image)")
-                            series_count += 1
-                            continue
-
-                        try:
-                            print(f"\n  Processing series {series_count + 1}/{len(series_groups)}: {series_key}")
+                    if conversion_result['status'] == 'success':
+                        print(f"✅ dcm2niix conversion completed successfully")
+                        
+                        # Process each created NIFTI file for NiiVue enhancement
+                        nifti_files = conversion_result['nifti_files']
+                        json_files = conversion_result['json_files']
+                        total_nifti_files += len(nifti_files)
+                        
+                        print(f"🔧 Enhancing {len(nifti_files)} NIFTI files for NiiVue...")
+                        
+                        for nifti_file in nifti_files:
+                            # Find corresponding JSON file
+                            json_file = None
+                            nifti_basename = nifti_file.stem.replace('.nii', '')
+                            for json_f in json_files:
+                                if json_f.stem == nifti_basename:
+                                    json_file = json_f
+                                    break
                             
-                            # Enhanced DICOM analysis and slice ordering
-                            print(f"    Analyzing {len(series_files)} slices with enhanced quality...")
+                            # Enhance for NiiVue
+                            enhancement_result = enhance_nifti_for_niivue(nifti_file, json_file)
                             
-                            # Extract rescale parameters for optimal data quality
-                            rescale_params = extract_dicom_rescale_params(series_files)
-                            
-                            # Use enhanced slice ordering
-                            sorted_dicom_files, validation_result = enhanced_slice_ordering(series_files)
-                            
-                            print(f"    ✅ Enhanced processing completed")
-                            
-                            # Validate slice consistency
-                            first_ds = pydicom.dcmread(str(sorted_dicom_files[0]))
-                            expected_height, expected_width = first_ds.pixel_array.shape
-                            num_slices = len(sorted_dicom_files)
-                            
-                            print(f"    📊 Volume specifications:")
-                            print(f"       Width: {expected_width} pixels")
-                            print(f"       Height: {expected_height} pixels")
-                            print(f"       Slices: {num_slices}")
-                            print(f"       Total voxels: {expected_width * expected_height * num_slices:,}")
-                            
-                            # Create 3D volume
-                            print(f"    🔄 Creating 3D volume...")
-                            volume_data = np.zeros((expected_height, expected_width, num_slices), dtype=np.int16)
-                            
-                            # Process each slice
-                            successful_slices = 0
-                            with tqdm(total=len(sorted_dicom_files), desc=f"      Processing slices", unit="slice", leave=False) as slice_pbar:
-                                for i, dicom_file in enumerate(sorted_dicom_files):
-                                    try:
-                                        ds = pydicom.dcmread(str(dicom_file))
-                                        slice_data = ds.pixel_array.astype(np.int16)
-                                        
-                                        # Apply DICOM rescale parameters for optimal quality
-                                        slice_data = apply_dicom_rescale(slice_data, rescale_params)
-                                        
-                                        if slice_data.shape == (expected_height, expected_width):
-                                            volume_data[:, :, i] = slice_data
-                                            successful_slices += 1
-                                        else:
-                                            print(f"    ⚠️  Slice {i} has wrong dimensions: {slice_data.shape}")
-                                        
-                                        slice_pbar.update(1)
-                                        
-                                    except Exception as slice_error:
-                                        print(f"    ❌ Failed to process slice {i}: {slice_error}")
-                                        slice_pbar.update(1)
-                                        continue
-                                
-                                print(f"    ✅ Successfully processed {successful_slices}/{num_slices} slices")
-                                
-                                # Optimize data type for storage efficiency
-                                volume_data = optimize_data_type(volume_data)
-                                
-                                # Get series description for naming
-                                series_desc = get_series_description(sorted_dicom_files)
-                                
-                                # Create unique filename for this series
-                                series_count_str = f"{series_count + 1:02d}" if len(series_groups) > 1 else ""
-                                if series_count_str:
-                                    output_filename = f"{series_count_str}_{series_desc}.nii.gz"
-                                else:
-                                    output_filename = f"{series_desc}.nii.gz"
-                                
-                                output_file = output_directory / output_filename
-                                
-                                # Get proper affine matrix from DICOM headers
-                                affine = create_affine_from_dicom(sorted_dicom_files)
-                                
-                                # Create NIFTI image with proper spatial information
-                                img = nib.Nifti1Image(volume_data, affine)
-                                try:
-                                    nib.save(img, str(output_file))
-                                    
-                                    # Verify the final file
-                                    final_size_mb = output_file.stat().st_size / (1024*1024)
-                                    print(f"    💾 Successfully created: {output_filename}")
-                                    print(f"    📊 Final volume: {volume_data.shape}")
-                                    print(f"    📏 Data range: [{volume_data.min()}, {volume_data.max()}]")
-                                    print(f"    💾 File size: {final_size_mb:.1f} MB")
-                                    
-                                    # Generate quality report
-                                    generate_quality_report(volume_data, affine, rescale_params, validation_result, output_file)
-                                except Exception as save_error:
-                                    import traceback
-                                    print(f"    ❌ Failed to save NIFTI file {output_filename}: {save_error}")
-                                    print("    Full traceback:")
-                                    traceback.print_exc()
-                                    continue # Continue to the next series
-                                
-                                series_count += 1
-                                
-                        except Exception as series_error:
-                            print(f"    ❌ Failed to process series {series_count + 1}: {series_error}")
-                            continue
-                    
-                    successful_conversions += 1
+                            if enhancement_result['status'] == 'success':
+                                print(f"    ✅ Enhanced: {nifti_file.name}")
+                            else:
+                                print(f"    ⚠️  Enhancement warning: {nifti_file.name}")
+                        
+                        successful_conversions += 1
+                        print(f"🎉 Successfully processed {dicom_directory}")
+                        
+                    else:
+                        print(f"❌ dcm2niix conversion failed for {dicom_directory}")
+                        print(f"   Error: {conversion_result.get('error', 'Unknown error')}")
+                        failed_conversions += 1
+                        
+                        # Clean up failed output directory
+                        if output_directory.exists():
+                            shutil.rmtree(output_directory)
                     patient_pbar.update(1)
                     
                 except Exception as e:
                     print(f"✗ Failed to convert {dicom_directory}: {str(e)}")
                     # Clean up the failed output directory
                     if output_directory.exists():
-                        import shutil
                         shutil.rmtree(output_directory)
                     failed_conversions += 1
                     patient_pbar.update(1)
                     continue
         
-        print("-" * 50)
-        print("🎉 DICOM to NIFTI conversion completed with enhanced quality!")
+        print("-" * 70)
+        print("🎉 Enhanced DICOM to NIFTI conversion completed!")
         print(f"✓ Successfully converted: {successful_conversions} directories")
         print(f"✗ Failed conversions: {failed_conversions} directories")
         print(f"📁 Total processed: {len(dicom_directories)} directories")
-        print("\n🔬 Quality Improvements Applied:")
-        print("   • Enhanced affine matrix with proper DICOM orientation")
-        print("   • DICOM rescale parameters for optimal data values")
-        print("   • Advanced slice ordering with multiple criteria")
-        print("   • Slice consistency validation and gap detection")
-        print("   • Data type optimization for storage efficiency")
-        print("   • Comprehensive quality reports for each series")
-        print("   • Spatial accuracy preservation")
+        print(f"📄 Total NIFTI files created: {total_nifti_files}")
+        print(f"\n🔬 NiiVue-Optimized Features Applied:")
+        print("   • dcm2niix for robust and accurate DICOM conversion")
+        print("   • BIDS-compliant JSON sidecar metadata generation")
+        print("   • Automatic compression (.nii.gz) for web efficiency")
+        print("   • Enhanced filename patterns for organization")
+        print("   • Comprehensive quality reports for each file")
+        print("   • NiiVue browser compatibility optimization")
+        print("   • Spatial accuracy and orientation preservation")
         
     except Exception as e:
         print(f"Error during conversion: {str(e)}")
         raise
 
 
-def group_dicom_files_by_series(dicom_files):
-    """Group DICOM files by series to create multiple NIFTI files per patient."""
-    series_groups = {}
-    
-    for dicom_file in dicom_files:
-        try:
-            ds = pydicom.dcmread(str(dicom_file))
-            
-            # Create a unique series key based on multiple DICOM attributes
-            series_key_parts = []
-            
-            # Series Description (most descriptive)
-            if hasattr(ds, 'SeriesDescription') and ds.SeriesDescription:
-                series_key_parts.append(ds.SeriesDescription.strip())
-            else:
-                series_key_parts.append("Unknown")
-            
-            # Series Number
-            if hasattr(ds, 'SeriesNumber'):
-                series_key_parts.append(f"Series{ds.SeriesNumber}")
-            
-            # Acquisition Protocol
-            if hasattr(ds, 'ProtocolName') and ds.ProtocolName:
-                series_key_parts.append(ds.ProtocolName.strip())
-            
-            # Slice Thickness
-            if hasattr(ds, 'SliceThickness'):
-                series_key_parts.append(f"{ds.SliceThickness}mm")
-            
-            # Create unique key
-            series_key = "_".join(series_key_parts)
-            
-            if series_key not in series_groups:
-                series_groups[series_key] = []
-            
-            series_groups[series_key].append(dicom_file)
-            
-        except Exception as e:
-            print(f"Warning: Could not analyze {dicom_file.name}: {e}")
-            # Put unreadable files in a default group
-            if "Unknown" not in series_groups:
-                series_groups["Unknown"] = []
-            series_groups["Unknown"].append(dicom_file)
-    
-    # Sort series by key for consistent ordering
-    return dict(sorted(series_groups.items()))
+# Legacy function removed - dcm2niix handles series grouping automatically
 
 
 if __name__ == "__main__":
