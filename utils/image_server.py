@@ -42,7 +42,7 @@ def generate_self_signed_cert(cert_dir: Path, cert_file: Path, key_file: Path, h
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, "San Francisco"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, "San Jose"),
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Image Server"),
         x509.NameAttribute(NameOID.COMMON_NAME, hostname),
     ])

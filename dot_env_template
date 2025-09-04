@@ -1,0 +1,10 @@
+PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
+
+# DICOM folder location (relative to PROJECT_ROOT or absolute path)
+DICOM_FOLDER="dicom"
+# Extermal HTTPS Image Server
+IMAGE_SERVER="https://localhost:8888"
+
+# Vessels of interest for segmentation analysis or "all"
+#VESSELS_OF_INTEREST="aorta,left iliac artery,right iliac artery"
+VESSELS_OF_INTEREST="all"

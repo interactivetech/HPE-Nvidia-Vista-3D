@@ -300,7 +300,7 @@ def convert_dicom_to_nifti(force_overwrite=False):
             raise FileNotFoundError(f"No DICOM files found in: {dicom_data_path}")
         
         # Create NIFTI destination directory if it doesn't exist
-        nifti_destination_path.mkdir(exist_ok=True)
+        nifti_destination_path.mkdir(parents=True, exist_ok=True)
         
         # Get list of DICOM directories for progress tracking
         dicom_directories = [d for d in os.listdir(dicom_data_path) 
