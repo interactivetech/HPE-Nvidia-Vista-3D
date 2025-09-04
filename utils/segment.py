@@ -1,3 +1,4 @@
+import tempfile
 import os
 import requests
 import json
@@ -9,6 +10,7 @@ import gzip
 import zipfile
 import io
 import numpy as np
+import traceback
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -143,9 +145,41 @@ def main():
                     nifti_filename = zip_ref.namelist()[0]
                     extracted_nifti_content = zip_ref.read(nifti_filename)
                 
-                # Create NIfTI image directly from extracted content
-                with io.BytesIO(extracted_nifti_content) as nifti_buffer:
-                    raw_nifti_img = nib.load(nifti_buffer)
+                # Create a temporary file to load the NIfTI image, as nibabel.load
+                # can have issues with in-memory BytesIO objects.
+                raw_nifti_img = None
+                tmp_path = None
+                try:
+                    # The '.nii.gz' suffix is important for nibabel to correctly decompress.
+                    with tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False) as tmp:
+                        tmp.write(extracted_nifti_content)
+                        tmp_path = tmp.name
+
+                    # Load the NIfTI image from the temporary file.
+                    img_loaded = nib.load(tmp_path)
+                    
+                    # Immediately load the data into memory to prevent issues with the temp file.
+                    data = img_loaded.get_fdata()
+                    affine = img_loaded.affine
+                    header = img_loaded.header
+                    
+                    # Create a new NIfTI image object in memory.
+                    raw_nifti_img = nib.Nifti1Image(data, affine, header)
+
+                except Exception as load_error:
+                    import traceback
+                    print(f"    ❌ Error loading NIfTI file with nibabel: {load_error}")
+                    print("    Full traceback for nibabel.load error:")
+                    traceback.print_exc()
+                    raise  # Re-raise the exception
+                finally:
+                    # Clean up the temporary file.
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+
+                # After loading, check if the image object was created successfully
+                if raw_nifti_img is None:
+                    raise Exception("Failed to load NIfTI image from received content.")
                 
                 print("    Creating colored segmentation...")
                 colored_nifti_img = create_colored_segmentation(raw_nifti_img)

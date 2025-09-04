@@ -13,6 +13,7 @@ from tqdm import tqdm
 import pydicom 
 import nibabel as nib
 import numpy as np
+import traceback
 
 
 def load_environment():
@@ -33,10 +34,10 @@ def load_label_dictionary():
     """Load the Vista-3D label dictionary from JSON file"""
     try:
         # Try to load from the conf directory first
-        label_file = Path("conf/label_dict.json")
+        label_file = Path("conf/vista3d_label_dict.json")
         if not label_file.exists():
             # Fallback to current directory
-            label_file = Path("label_dict.json")
+            label_file = Path("vista3d_label_dict.json")
         
         with open(label_file, 'r') as f:
             label_dict = json.load(f)
@@ -736,17 +737,24 @@ def convert_dicom_to_nifti(force_overwrite=False):
                                 
                                 # Create NIFTI image with proper spatial information
                                 img = nib.Nifti1Image(volume_data, affine)
-                                nib.save(img, str(output_file))
-                                
-                                # Verify the final file
-                                final_size_mb = output_file.stat().st_size / (1024*1024)
-                                print(f"    💾 Successfully created: {output_filename}")
-                                print(f"    📊 Final volume: {volume_data.shape}")
-                                print(f"    📏 Data range: [{volume_data.min()}, {volume_data.max()}]")
-                                print(f"    💾 File size: {final_size_mb:.1f} MB")
-                                
-                                # Generate quality report
-                                generate_quality_report(volume_data, affine, rescale_params, validation_result, output_file)
+                                try:
+                                    nib.save(img, str(output_file))
+                                    
+                                    # Verify the final file
+                                    final_size_mb = output_file.stat().st_size / (1024*1024)
+                                    print(f"    💾 Successfully created: {output_filename}")
+                                    print(f"    📊 Final volume: {volume_data.shape}")
+                                    print(f"    📏 Data range: [{volume_data.min()}, {volume_data.max()}]")
+                                    print(f"    💾 File size: {final_size_mb:.1f} MB")
+                                    
+                                    # Generate quality report
+                                    generate_quality_report(volume_data, affine, rescale_params, validation_result, output_file)
+                                except Exception as save_error:
+                                    import traceback
+                                    print(f"    ❌ Failed to save NIFTI file {output_filename}: {save_error}")
+                                    print("    Full traceback:")
+                                    traceback.print_exc()
+                                    continue # Continue to the next series
                                 
                                 series_count += 1
                                 
