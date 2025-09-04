@@ -34,38 +34,7 @@ with open(LABEL_DICT_PATH, 'r') as f:
     # Create a name-to-id map for target_vessels processing
     NAME_TO_ID_MAP = {item['name']: item['id'] for item in label_colors_list}
 
-def create_colored_segmentation(label_map_nii):
-    """Creates a colored NIfTI image from a label map."""
-    data = label_map_nii.get_fdata().astype(np.int16)
-    affine = label_map_nii.affine
-    header = label_map_nii.header
 
-    colored_data = np.zeros((*data.shape, 3), dtype=np.uint8)
-    unique_labels = np.unique(data)
-
-    print(f"  Unique labels in NIfTI data: {unique_labels}")
-    print(f"  LABEL_DICT content (first 5 values): {list(LABEL_DICT.values())[:5]}")
-
-    for label_id in unique_labels:
-        if label_id == 0:
-            continue
-        color = [255, 255, 255] # Default to white
-        found_color = False
-        print(f"  Processing label_id: {label_id} (type: {type(label_id)})")
-        
-        # Direct lookup using the new LABEL_DICT structure
-        if int(label_id) in LABEL_DICT:
-            label_info = LABEL_DICT[int(label_id)]
-            color = label_info["color"]
-            found_color = True
-            print(f"    ID: {label_info['id']} - Name: {label_info['name']}, Color: {label_info['color']} (Match: True)")
-        else:
-            print(f"    ID: {label_id} - Name: N/A, Color: [255, 255, 255] (Match: False)") # No match found
-        
-        print(f"  Applying color {color} to label ID {label_id} (Found: {found_color})")
-        colored_data[data == label_id] = color
-
-    return nib.Nifti1Image(colored_data, affine, header)
 
 def get_nifti_files_in_folder(folder_path: Path):
     """Scans a specific folder for NIfTI files and returns their absolute paths."""
@@ -125,7 +94,7 @@ def main():
 
         for nifti_file_path in tqdm(all_nifti_files, desc="Processing NIfTI files"):
             base_name = nifti_file_path.name.replace('.nii.gz', '').replace('.nii', '')
-            output_path = patient_segmentation_output_path / f"{base_name}_seg.nii.gz"
+            output_path = patient_segmentation_output_path / f"{base_name}_seg_int16.nii.gz"
 
             if not args.force and output_path.exists():
                 print(f"\n  Skipping {nifti_file_path.name} as segmentation already exists. Use --force to overwrite.")
@@ -159,12 +128,21 @@ def main():
                     img_loaded = nib.load(tmp_path)
                     
                     # Immediately load the data into memory to prevent issues with the temp file.
-                    data = img_loaded.get_fdata()
+                    # Get data as float, then explicitly convert to int16
+                    float_data = img_loaded.get_fdata(dtype=np.float32)
+                    data = np.zeros(float_data.shape, dtype=np.int16)
+                    data[:] = float_data[:]
+                    data = np.ascontiguousarray(data) # Ensure contiguous
+                    print(f"    Shape of data array: {data.shape}")
                     affine = img_loaded.affine
-                    header = img_loaded.header
                     
-                    # Create a new NIfTI image object in memory.
-                    raw_nifti_img = nib.Nifti1Image(data, affine, header)
+                    # Create a new NIfTI header to ensure 3D dimensions
+                    new_header = nib.Nifti1Header()
+                    new_header.set_data_shape(data.shape)
+                    new_header.set_data_dtype(np.int16) # Set dtype based on the numpy array
+                    
+                    # Create a new NIfTI image object in memory with the new header.
+                    raw_nifti_img = nib.Nifti1Image(data, affine, new_header)
 
                 except Exception as load_error:
                     import traceback
@@ -181,10 +159,9 @@ def main():
                 if raw_nifti_img is None:
                     raise Exception("Failed to load NIfTI image from received content.")
                 
-                print("    Creating colored segmentation...")
-                colored_nifti_img = create_colored_segmentation(raw_nifti_img)
-                
-                nib.save(colored_nifti_img, output_path)
+                print(f"    Data type of raw_nifti_img data: {raw_nifti_img.get_fdata().dtype}")
+                print(f"    NIfTI header datatype: {raw_nifti_img.header['datatype']}")
+                nib.save(raw_nifti_img, output_path)
                 print(f"    Successfully saved segmentation: {output_path.name}")
 
             except requests.exceptions.RequestException as e:

@@ -10,7 +10,7 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 
 # --- Fixed file path for testing ---
-TEST_FILE_PATH = "outputs/segments/PA00000002/01_2.5MM_ARTERIAL_seg.nii.gz"
+TEST_FILE_PATH = "outputs/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
 TEST_FILE_URL = f"{IMAGE_SERVER_URL}/{TEST_FILE_PATH}"
 
 st.title("Test Segment Viewer")
@@ -132,8 +132,7 @@ with st.sidebar:
     # Opacity control
     opacity = st.slider("Opacity", 0.0, 1.0, 1.0)
     
-    # Color map selector
-    color_map = st.selectbox("Color Map", ['rgb', 'gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
+    
     
     # Reset view button
     if st.button("Reset View"):
@@ -315,7 +314,7 @@ body, html {{
     
     console.log('🚀 Starting comprehensive NiiVue debugging...');
     console.log('📁 Test file URL:', "{TEST_FILE_URL}");
-    console.log('🎨 Color map:', "{color_map}");
+    
     console.log('👁️ Opacity:', {opacity});
     console.log('🖼️ Slice type:', {actual_slice_type});
     
@@ -532,11 +531,12 @@ body, html {{
             setTimeout(() => {{
                 console.log('📋 Starting volume loading process...');
                 
-                const volumeList = [{{
-                    url: "{TEST_FILE_URL}",
-                    colormap: "{color_map}",
-                    opacity: {opacity}
-                }}];
+                const volumeList = [{
+                    "url": "{TEST_FILE_URL}",
+                    "opacity": {opacity},
+                    "dataType": niivue.NV_DT_INT16,
+                    "volumeType": niivue.NV_VOLUME_TYPE_SEGMENTATION
+                }];
                 
                 console.log('🚀 Volume configuration:', volumeList);
                 
@@ -546,6 +546,18 @@ body, html {{
                         console.log('🎉 Volume loaded event fired:', volume);
                         window.debugState.volumesLoaded++;
                         updateDebugInfo();
+                        
+                        // Apply custom colormap after volume is loaded
+                        if (typeof customSegmentationColormap !== 'undefined') {{
+                            console.log('🎨 Applying custom segmentation colormap...');
+                            console.log('Inspecting nv object before setColormapLabel:', nv);
+                            try {{
+                                nv.setColormapLabel(customSegmentationColormap);
+                                console.log('✅ Custom colormap applied');
+                            }} catch (error) {{
+                                logError(error, 'Colormap Application');
+                            }}
+                        }}
                     }});
                     
                     nv.on('volumeError', (error) => {{
@@ -591,15 +603,7 @@ body, html {{
                         
                         // Apply custom colormap
                         {custom_colormap_js}
-                        if (typeof customSegmentationColormap !== 'undefined') {{
-                            console.log('🎨 Applying custom segmentation colormap...');
-                            try {{
-                                nv.setColormapLabel(customSegmentationColormap);
-                                console.log('✅ Custom colormap applied');
-                            }} catch (error) {{
-                                logError(error, 'Colormap Application');
-                            }}
-                        }}
+                        
                         
                         // Set to 3D Render view
                         console.log('🖼️ Setting slice type to 3D Render...');
@@ -719,7 +723,7 @@ components.html(html_string, height=800, scrolling=False)
 st.subheader("File Information")
 st.code(f"File URL: {TEST_FILE_URL}")
 st.code(f"Slice Type: 3D Render (NiiVue value: {actual_slice_type})")
-st.code(f"Color Map: {color_map}")
+
 st.code(f"Opacity: {opacity}")
 
 # --- Instructions ---
