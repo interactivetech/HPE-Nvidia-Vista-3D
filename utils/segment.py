@@ -93,8 +93,7 @@ def main():
             continue
 
         for nifti_file_path in tqdm(all_nifti_files, desc="Processing NIfTI files"):
-            base_name = nifti_file_path.name.replace('.nii.gz', '').replace('.nii', '')
-            output_path = patient_segmentation_output_path / f"{base_name}_seg_int16.nii.gz"
+            output_path = patient_segmentation_output_path / nifti_file_path.name
 
             if not args.force and output_path.exists():
                 print(f"\n  Skipping {nifti_file_path.name} as segmentation already exists. Use --force to overwrite.")

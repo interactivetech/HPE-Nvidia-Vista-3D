@@ -15,7 +15,7 @@ load_dotenv()
 IMAGE_SERVER_URL = "https://localhost:8888"
 
 # Fixed test file (int16 labels created by utils/segment.py)
-TEST_REL_PATH = "output/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
+TEST_REL_PATH = "output/segments/PA00000058/2.5_mm_STD_-_30%_ASIR_2.nii.gz"
 # Build from the fixed HTTPS image server base
 TEST_FILE_URL = f"{IMAGE_SERVER_URL}/{TEST_REL_PATH}"
 
@@ -55,13 +55,13 @@ with st.sidebar:
     # Remote browser for output/segments
     base_segments_path = "output/segments"
     patients, _ = list_server_dir(base_segments_path)
-    default_patient = "PA00000002" if "PA00000002" in patients else (patients[0] if patients else "")
+    default_patient = "PA00000058" if "PA00000058" in patients else (patients[0] if patients else "")
     selected_patient = st.selectbox("Select patient (server)", patients or [""], index=(patients.index(default_patient) if default_patient in patients else 0))
     files = []
     if selected_patient:
         files_path = f"{base_segments_path}/{selected_patient}"
         _, files = list_server_dir(files_path)
-    default_file = "01_2.5MM_ARTERIAL_seg_int16.nii.gz" if "01_2.5MM_ARTERIAL_seg_int16.nii.gz" in files else (files[0] if files else "")
+    default_file = "2.5_mm_STD_-_30%_ASIR_2.nii.gz" if "2.5_mm_STD_-_30%_ASIR_2.nii.gz" in files else (files[0] if files else "")
     selected_file = st.selectbox("Select file (server)", files or [""], index=(files.index(default_file) if default_file in files else 0))
     use_embedded_lut = st.radio(
         "Color Source",

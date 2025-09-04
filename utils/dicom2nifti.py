@@ -82,34 +82,18 @@ def load_label_dictionary():
         }
 
 
-def check_dicom_files_exist(dicom_path):
-    """Check if DICOM files exist in the specified directory"""
-    if not os.path.exists(dicom_path):
+def check_patient_folders_exist(dicom_path: Path) -> bool:
+    """Check if any subdirectories (patient folders) exist in the DICOM path."""
+    if not dicom_path.is_dir():
         return False
     
-    # Look for common DICOM file patterns and extensions
-    dicom_extensions = {'.dcm', '.dicom', '.ima', '.img'}
-    dicom_found = False
-    
-    for root, dirs, files in os.walk(dicom_path):
-        for file in files:
-            # Check by extension first (faster)
-            if any(file.lower().endswith(ext) for ext in dicom_extensions):
-                dicom_found = True
-                break
-            
-            # Check for files without extensions (common in DICOM)
-            if '.' not in file and len(file) > 3:
-                dicom_found = True
-                break
-                
-        if dicom_found:
-            break
-    
-    return dicom_found
+    for entry in os.scandir(dicom_path):
+        if entry.is_dir():
+            return True
+    return False
 
 
-def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%f_%p_%t_%s"):
+def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s"):
     """
     Run dcm2niix conversion with NiiVue-optimized settings.
     
@@ -133,9 +117,8 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%f_%p_%t_%s"
             '-ba', 'y',          # Anonymize BIDS sidecar
             '-f', filename_format, # Filename format
             '-o', str(output_dir), # Output directory
-            '-v', '1',           # Verbose output
+            '-v', '2',           # More verbose output for troubleshooting
             '-x', 'y',           # Crop 3D acquisitions
-            '-i', 'y',           # Ignore derived, localizer and 2D images
             str(input_dir)       # Input directory
         ]
         
@@ -259,12 +242,13 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         return {'status': 'failed', 'error': str(e)}
 
 
-def convert_dicom_to_nifti(force_overwrite=False):
+def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=35):
     """
     Convert DICOM files to NIFTI format using dcm2niix with NiiVue optimization.
     
     Args:
         force_overwrite: If True, overwrite existing NIFTI directories
+        min_size_mb: If > 0, delete NIFTI files smaller than this size in MB.
     """
     try:
         # Check dcm2niix installation first
@@ -295,9 +279,9 @@ def convert_dicom_to_nifti(force_overwrite=False):
         if not dicom_data_path.exists():
             raise FileNotFoundError(f"DICOM directory not found: {dicom_data_path}")
         
-        # Check if DICOM files exist
-        if not check_dicom_files_exist(dicom_data_path):
-            raise FileNotFoundError(f"No DICOM files found in: {dicom_data_path}")
+        # Check if patient folders (subdirectories) exist
+        if not check_patient_folders_exist(dicom_data_path):
+            raise FileNotFoundError(f"No patient folders (subdirectories) found in: {dicom_data_path}")
         
         # Create NIFTI destination directory if it doesn't exist
         nifti_destination_path.mkdir(parents=True, exist_ok=True)
@@ -337,15 +321,42 @@ def convert_dicom_to_nifti(force_overwrite=False):
                     # Run dcm2niix conversion
                     conversion_result = run_dcm2niix_conversion(
                         input_dir=input_directory,
-                        output_dir=output_directory,
-                        filename_format=f"{dicom_directory}_%f_%p_%t_%s"
+                        output_dir=output_directory
                     )
                     
                     if conversion_result['status'] == 'success':
                         print(f"✅ dcm2niix conversion completed successfully")
                         
-                        # Process each created NIFTI file for NiiVue enhancement
                         nifti_files = conversion_result['nifti_files']
+                        
+                        # Filter by size if requested
+                        if min_size_mb > 0:
+                            print(f"🗑️  Filtering NIFTI files by size (min size: {min_size_mb} MB)...")
+                            large_nifti_files = []
+                            deleted_count = 0
+                            for nifti_file in nifti_files:
+                                file_size_mb = nifti_file.stat().st_size / (1024 * 1024)
+                                if file_size_mb >= min_size_mb:
+                                    large_nifti_files.append(nifti_file)
+                                else:
+                                    print(f"   Deleting small file: {nifti_file.name} ({file_size_mb:.2f} MB)")
+                                    nifti_file.unlink()
+                                    deleted_count += 1
+                                    # Also delete corresponding json and quality files
+                                    base_name = nifti_file.name.replace('.nii.gz', '').replace('.nii', '')
+                                    json_file = nifti_file.with_name(base_name + '.json')
+                                    if json_file.exists():
+                                        print(f"   Deleting corresponding json file: {json_file.name}")
+                                        json_file.unlink()
+                                    quality_file = nifti_file.with_name(base_name + '.quality.json')
+                                    if quality_file.exists():
+                                        print(f"   Deleting corresponding quality file: {quality_file.name}")
+                                        quality_file.unlink()
+                            
+                            print(f"   Deleted {deleted_count} small NIFTI files.")
+                            nifti_files = large_nifti_files
+
+                        # Process each created NIFTI file for NiiVue enhancement
                         json_files = conversion_result['json_files']
                         total_nifti_files += len(nifti_files)
                         
@@ -411,8 +422,19 @@ def convert_dicom_to_nifti(force_overwrite=False):
         raise
 
 
+
 if __name__ == "__main__":
     import sys
     # Check if force overwrite flag is passed
     force_overwrite = '--force' in sys.argv or '--overwrite' in sys.argv
-    convert_dicom_to_nifti(force_overwrite=force_overwrite)
+    
+    kwargs = {}
+    if '--min-size-mb' in sys.argv:
+        try:
+            index = sys.argv.index('--min-size-mb')
+            kwargs['min_size_mb'] = int(sys.argv[index + 1])
+        except (ValueError, IndexError):
+            print("Error: --min-size-mb requires an integer value (e.g., --min-size-mb 10)")
+            sys.exit(1)
+
+    convert_dicom_to_nifti(force_overwrite=force_overwrite, **kwargs)
