@@ -17,7 +17,7 @@ The `vista3d.py` script is a comprehensive Python-based management tool for depl
 - Starts external HTTPS image server (`image_server.py`)
 - Automatic SSL certificate generation
 - CORS support for cross-origin requests
-- File serving from outputs directory
+- File serving from output directory
 - Health monitoring and auto-restart capabilities
 
 ### 🔧 **Advanced Configuration**
@@ -90,7 +90,7 @@ python3 utils/vista3d.py
 
 This command will:
 - Check Docker availability
-- Create outputs directory
+- Create output directory
 - Start external image server
 - Launch Vista3D Docker container
 - Configure networking and volumes
@@ -121,8 +121,8 @@ Checks external image server health and restarts if needed.
 
 #### Custom Configuration
 ```bash
-# Start with custom outputs directory
-python3 utils/vista3d.py --outputs-dir /path/to/outputs
+# Start with custom output directory
+python3 utils/vista3d.py --output-dir /path/to/output
 
 # Start with custom image server port
 IMAGE_SERVER_PORT=9999 python3 utils/vista3d.py
@@ -169,7 +169,7 @@ EXTERNAL_IMAGE_SERVER_PORT=8888
 ALLOW_LOCAL_FILES=True
 ENABLE_FILE_ACCESS=True
 ALLOW_FILE_PROTOCOL=True
-WORKSPACE_IMAGES_PATH=/workspace/outputs/nifti
+WORKSPACE_IMAGES_PATH=/workspace/output/nifti
 ```
 
 #### Security Settings
@@ -228,7 +228,7 @@ The script supports various medical imaging formats:
 2. **External Image Server**
    - Generate SSL certificates
    - Start HTTPS server
-   - Serve files from outputs directory
+   - Serve files from output directory
 
 3. **Docker Container**
    - Pull Vista3D image
@@ -249,7 +249,7 @@ utils/
 ├── image_server.py         # External image server
 └── monitor_image_server.py # Monitoring script (generated)
 
-outputs/
+output/
 ├── nifti/            # Medical image files
 └── certs/                 # SSL certificates
 
@@ -316,18 +316,18 @@ sudo fuser -k 8000/tcp
 #### SSL Certificate Issues
 ```bash
 # Regenerate certificates
-rm -f outputs/certs/server.crt outputs/certs/server.key
+rm -f output/certs/server.crt output/certs/server.key
 python3 utils/image_server.py
 
 # Check certificate validity
-openssl x509 -in outputs/certs/server.crt -text -noout
+openssl x509 -in output/certs/server.crt -text -noout
 ```
 
 #### Permission Issues
 ```bash
 # Fix output directory permissions
-sudo chown -R $USER:$USER outputs/
-chmod -R 755 outputs/
+sudo chown -R $USER:$USER output/
+chmod -R 755 output/
 
 # Fix script permissions
 chmod +x utils/vista3d.py

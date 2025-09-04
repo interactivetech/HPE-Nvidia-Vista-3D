@@ -107,7 +107,7 @@ python utils/dicom2nifti_processor.py --force
 After successful conversion, the script creates the following directory structure:
 
 ```
-outputs/
+output/
 └── nifti/
     ├── PA00000002/
     │   ├── 01_2.5MM_ARTERIAL.nii.gz
@@ -224,7 +224,7 @@ The script preserves critical spatial information:
 ✅ Loaded label dictionary with 124 anatomical structures
 Project Root: /home/hpadmin/NV
 DICOM Source: /home/hpadmin/NV/dicom
-NIFTI Destination: /home/hpadmin/NV/outputs/nifti
+NIFTI Destination: /home/hpadmin/NV/output/nifti
 --------------------------------------------------
 Found 5 DICOM directories to process
 Progress bar will show below:
@@ -233,7 +233,7 @@ Processing patients:   0%|  | 0/5 [00:00<?, ?patient/s]
 
 Processing: PA00000002
 ----------
-Saving NIFTI files into directory /home/hpadmin/NV/outputs/nifti/PA00000002
+Saving NIFTI files into directory /home/hpadmin/NV/output/nifti/PA00000002
 📊 Found 390 valid DICOM files
 Analyzing DICOM files for slice information...
 ✅ Sorted 390 slices

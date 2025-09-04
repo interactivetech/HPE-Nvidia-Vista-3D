@@ -1,6 +1,6 @@
 # HTTPS Image Server
 
-A secure HTTPS server for serving image files from the `outputs/` directory with self-signed SSL certificates. This server is specifically designed for medical imaging workflows and integrates seamlessly with Vista3D and other medical imaging tools.
+A secure HTTPS server for serving image files from the `output/` directory with self-signed SSL certificates. This server is specifically designed for medical imaging workflows and integrates seamlessly with Vista3D and other medical imaging tools.
 
 ## 🎯 What Was Created
 
@@ -38,7 +38,7 @@ I've successfully created a comprehensive HTTPS server script for serving NIFTI 
 - No manual certificate management required
 
 ### **Smart File Serving**
-- Serves NIFTI files from `outputs/nifti` directory
+- Serves NIFTI files from `output/nifti` directory
 - Proper MIME types for medical imaging formats
 - Web interface for file browsing
 
@@ -74,7 +74,7 @@ NV/
 │   ├── image_server.py          # Main HTTPS server
 │   ├── README_image_server.md   # Documentation
 │   └── dicom2nifti_processor.py # Existing DICOM processor
-├── outputs/
+├── output/
 │   └── nifti/                   # NIFTI images directory
 ├── .env                         # Environment configuration
 ├── demo_image_server.py         # Interactive demo
@@ -86,7 +86,7 @@ NV/
 ### **Environment Variables (.env)**
 ```bash
 PROJECT_ROOT="/home/hpadmin/NV"
-LOCAL_IMAGES_PATH="outputs/nifti"
+LOCAL_IMAGES_PATH="output/nifti"
 NIFTI_IMAGE_SERVER="https://localhost:8888"
 ```
 
@@ -183,7 +183,7 @@ The NIFTI Image HTTPS Server is now ready for production use:
 - **Self-signed certificates** will show browser security warnings (normal for development)
 - **Accept security warnings** in browser when accessing the server
 - **Port 8888** is configured as default (matches .env configuration)
-- **Images directory** must exist at `outputs/nifti` (already present in project)
+- **Images directory** must exist at `output/nifti` (already present in project)
 
 ---
 
@@ -207,7 +207,7 @@ Options:
   --port PORT           Port to bind to (default: from IMAGE_SERVER env var)
   --cert CERT           Path to SSL certificate file
   --key KEY             Path to SSL private key file
-  --outputs-dir DIR     Directory to serve (default: ./outputs)
+  --output-dir DIR     Directory to serve (default: ./output)
   -h, --help            Show help message
 ```
 
@@ -225,7 +225,7 @@ python utils/image_server.py --cert /path/to/cert.pem --key /path/to/key.pem
 
 Serve from a different directory:
 ```bash
-python utils/image_server.py --outputs-dir /path/to/images
+python utils/image_server.py --output-dir /path/to/images
 ```
 
 ## Configuration
@@ -243,8 +243,8 @@ This sets the default host and port for the server.
 ### Auto-generation
 
 The server automatically generates self-signed SSL certificates on first run:
-- **Certificate**: `outputs/certs/server.crt`
-- **Private Key**: `outputs/certs/server.key`
+- **Certificate**: `output/certs/server.crt`
+- **Private Key**: `output/certs/server.key`
 
 ### Manual Certificate Management
 
@@ -266,8 +266,8 @@ Generated certificates include:
 
 ## File Access
 
-The server serves files from the `outputs/` directory by default:
-- **Document Root**: `./outputs/`
+The server serves files from the `output/` directory by default:
+- **Document Root**: `./output/`
 - **File Types**: All file types supported
 - **Directory Listing**: Enabled for browsing
 
@@ -296,7 +296,7 @@ python utils/image_server.py --port 8889
 If you have SSL certificate problems:
 ```bash
 # Remove existing certificates
-rm -rf outputs/certs/
+rm -rf output/certs/
 
 # Restart server to regenerate
 python utils/image_server.py

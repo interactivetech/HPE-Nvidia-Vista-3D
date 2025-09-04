@@ -2,7 +2,7 @@
 import nibabel as nib
 import os
 
-nifti_dir = "/home/hpadmin/NV/outputs/segments/PA00000002"
+nifti_dir = "/home/hpadmin/NV/output/segments/PA00000002"
 nifti_files = [f for f in os.listdir(nifti_dir) if f.endswith(".nii.gz")]
 
 print(f"Checking NIfTI files in {nifti_dir}:")

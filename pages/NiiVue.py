@@ -34,7 +34,7 @@ def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
 
 def get_folder_contents(folder_path: str) -> Optional[List[Dict[str, str]]]:
     """Fetches and parses the contents of a specific folder from the image server."""
-    url = f"{IMAGE_SERVER_URL.rstrip('/')}/outputs/{folder_path.strip('/')}/"
+    url = f"{IMAGE_SERVER_URL.rstrip('/')}/output/{folder_path.strip('/')}/"
     try:
         response = requests.get(url, verify=False, timeout=10) # verify=False for self-signed certs
         if response.status_code == 200:
@@ -102,12 +102,12 @@ with st.sidebar:
 # --- Main Viewer Area ---
 if selected_file:
     # --- Prepare URLs and Settings for Viewer ---
-    base_file_url = f"{IMAGE_SERVER_URL}/outputs/{selected_source}/{selected_patient}/{selected_file}"
+    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
     segment_url = ''
     if show_overlay:
         base_name = selected_file.replace('.nii.gz', '').replace('.nii', '')
         segment_filename = f"{base_name}_colored_seg.nii.gz"
-        segment_url = f"{IMAGE_SERVER_URL}/outputs/segments/{selected_patient}/{segment_filename}"
+        segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
 
     slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
     actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)

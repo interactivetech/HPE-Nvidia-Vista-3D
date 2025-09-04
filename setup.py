@@ -61,9 +61,9 @@ def create_output_directories():
     print_status("Creating output directories...", "directory")
     
     directories = [
-        "outputs",
-        "outputs/nifti", 
-        "outputs/certs"
+        "output",
+        "output/nifti", 
+        "output/certs"
     ]
     
     for directory in directories:
@@ -144,7 +144,7 @@ def start_https_server() -> Optional[int]:
         # Start server process
         process = subprocess.Popen(
             [python_cmd, str(server_script)],
-            stdout=open("outputs/server.log", "w"),
+            stdout=open("output/server.log", "w"),
             stderr=subprocess.STDOUT,
             start_new_session=True
         )
@@ -155,7 +155,7 @@ def start_https_server() -> Optional[int]:
         # Check if server started successfully
         if process.poll() is None:  # Process is still running
             print_status(f"   HTTPS image server started successfully (PID: {process.pid})", "success")
-            print_status("   Server logs: outputs/server.log", "info")
+            print_status("   Server logs: output/server.log", "info")
             print_status(f"   To stop server: kill {process.pid}", "info")
             return process.pid
         else:
@@ -181,10 +181,10 @@ def run_dicom_conversion() -> bool:
         print_status("   Warning: .env file not found, conversion may fail", "warning")
         print_status("   Please ensure PROJECT_ROOT and DICOM_FOLDER are set in .env", "warning")
     
-    # Check if outputs/nifti directory exists
-    nifti_dir = Path("outputs/nifti")
+    # Check if output/nifti directory exists
+    nifti_dir = Path("output/nifti")
     if not nifti_dir.exists():
-        print_status("   Creating outputs/nifti directory...", "directory")
+        print_status("   Creating output/nifti directory...", "directory")
         nifti_dir.mkdir(parents=True, exist_ok=True)
     
     print_status("   Starting conversion process...", "conversion")
@@ -210,7 +210,7 @@ def run_dicom_conversion() -> bool:
             if nifti_files:
                 print_status(f"   Converted files: {len(nifti_files)} NIFTI files", "info")
             else:
-                print_status("   No NIFTI files found in outputs/nifti/", "info")
+                print_status("   No NIFTI files found in output/nifti/", "info")
             
             return True
         else:
@@ -233,7 +233,7 @@ def get_server_status() -> Tuple[bool, Optional[int]]:
 
 def get_conversion_status() -> int:
     """Get count of converted NIFTI files."""
-    nifti_dir = Path("outputs/nifti")
+    nifti_dir = Path("output/nifti")
     if nifti_dir.exists():
         return len(list(nifti_dir.glob("*.nii.gz")))
     return 0
@@ -244,9 +244,9 @@ def print_final_status():
     print()
     
     print_status("Output directories created:", "directory")
-    print("   • outputs/")
-    print("   • outputs/nifti/")
-    print("   • outputs/certs/")
+    print("   • output/")
+    print("   • output/nifti/")
+    print("   • output/certs/")
     
     # Server status
     server_running, server_pid = get_server_status()
@@ -254,7 +254,7 @@ def print_final_status():
     print_status("HTTPS image server status:", "server")
     if server_running:
         print(f"   • Running (PID: {server_pid})")
-        print("   • Logs: outputs/server.log")
+        print("   • Logs: output/server.log")
     else:
         print("   • Not running")
     
@@ -264,7 +264,7 @@ def print_final_status():
     nifti_count = get_conversion_status()
     if nifti_count > 0:
         print(f"   • Converted files: {nifti_count} NIFTI files")
-        print("   • Location: outputs/nifti/")
+        print("   • Location: output/nifti/")
     else:
         print("   • No NIFTI files found")
     

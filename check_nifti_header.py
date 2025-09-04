@@ -2,7 +2,7 @@ import nibabel as nib
 import numpy as np
 import os
 
-file_path = "outputs/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
+file_path = "output/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
 
 if not os.path.exists(file_path):
     print(f"Error: File not found at {file_path}")

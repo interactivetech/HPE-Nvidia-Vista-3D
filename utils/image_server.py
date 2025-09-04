@@ -223,7 +223,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HTTPS Image Server")
     parser.add_argument("--host", help="Host to bind to (default: from IMAGE_SERVER env var)")
     parser.add_argument("--port", type=int, help="Port to bind to (default: from IMAGE_SERVER env var)")
-    parser.add_argument("--cert-dir", help="Directory to store SSL certificate and key files", default=str(project_root / "outputs" / "certs"))
+    parser.add_argument("--cert-dir", help="Directory to store SSL certificate and key files", default=str(project_root / "output" / "certs"))
     parser.add_argument("--disable-dir-listing", action="store_true", help="Disable directory listing for enhanced security (files will still be served)")
     
     args = parser.parse_args()

@@ -13,7 +13,7 @@ IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 import glob
 
 # Get available patient folders
-segments_base_path = "outputs/segments"
+segments_base_path = "output/segments"
 # Default test image (served by the image server)
 DEFAULT_PATIENT = "PA00000002"
 DEFAULT_FILENAME = "01_2.5MM_ARTERIAL_seg_int16.nii.gz"
@@ -44,7 +44,7 @@ with st.sidebar:
             st.error(f"No segmentation files found in {patient_segments_path}")
             TEST_FILE_PATH = DEFAULT_TEST_PATH  # Fallback to image server path
     else:
-        st.warning("No patient folders found in outputs/segments")
+        st.warning("No patient folders found in output/segments")
         TEST_FILE_PATH = DEFAULT_TEST_PATH  # Fallback to image server path
     
     st.header("Viewer Controls")
@@ -849,7 +849,7 @@ st.markdown("""
 
 **Important Note:** 
 - This viewer now works with segmentation files created by `utils/segment.py`
-- Files are loaded from `outputs/segments/{patient}/{file}.nii.gz` 
+- Files are loaded from `output/segments/{patient}/{file}.nii.gz` 
 - Use the sidebar to select different patients and segmentation files
 - The NiiVue library is loaded from CDN for reliability
 

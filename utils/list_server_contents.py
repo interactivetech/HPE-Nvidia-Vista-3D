@@ -86,7 +86,7 @@ def get_folder_contents(base_url: str, folder_path: str, verify_ssl: bool = Fals
     """Get contents of a folder from the image server."""
     
     # Construct the full URL
-    folder_url = urljoin(base_url.rstrip('/') + '/', f"outputs/{folder_path}/")
+    folder_url = urljoin(base_url.rstrip('/') + '/', f"output/{folder_path}/")
     
     try:
         print(f"🔍 Fetching: {folder_url}")

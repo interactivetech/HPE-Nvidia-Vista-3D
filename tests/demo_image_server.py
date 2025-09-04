@@ -28,9 +28,9 @@ def main():
         return
     
     # Check if images directory exists
-    images_dir = Path("outputs/nifti")
+    images_dir = Path("output/nifti")
     if not images_dir.exists():
-        print("❌ Error: NIFTI images directory not found at outputs/nifti")
+        print("❌ Error: NIFTI images directory not found at output/nifti")
         print("   Please ensure the directory exists and contains NIFTI files")
         return
     
@@ -53,7 +53,7 @@ def main():
     print("   This will:")
     print("   1. Generate self-signed SSL certificates")
     print("   2. Start HTTPS server on port 8888")
-    print("   3. Serve NIFTI images from outputs/nifti")
+    print("   3. Serve NIFTI images from output/nifti")
     print("   4. Open web browser to the server")
     
     # Ask user if they want to proceed
@@ -107,7 +107,7 @@ def main():
             print("\n📋 Server Information:")
             print("   - URL: https://localhost:8888")
             print("   - Port: 8888")
-            print("   - Images: outputs/nifti")
+            print("   - Images: output/nifti")
             print("   - SSL: Self-signed (accept security warning in browser)")
             
             print("\n⏹️  To stop the server:")

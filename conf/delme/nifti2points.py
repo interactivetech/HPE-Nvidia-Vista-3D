@@ -5,8 +5,8 @@ import json
 import argparse
 
 # Constants
-INPUT_DIR = "/home/hpadmin/Nvidia-Vista3d-segmenation/outputs/segments"
-OUTPUT_DIR = "/home/hpadmin/Nvidia-Vista3d-segmenation/outputs/points"
+INPUT_DIR = "/home/hpadmin/Nvidia-Vista3d-segmenation/output/segments"
+OUTPUT_DIR = "/home/hpadmin/Nvidia-Vista3d-segmenation/output/points"
 LABEL_COLORS_PATH = "/home/hpadmin/Nvidia-Vista3d-segmenation/conf/label_colors.json"
 LABEL_DICT_PATH = "/home/hpadmin/Nvidia-Vista3d-segmenation/conf/label_dict.json"
 MIN_POINTS = 200

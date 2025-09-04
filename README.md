@@ -54,9 +54,9 @@ python3 segment_vessels.py
 ```
 
 This script will:
-1.  Scan the `outputs/nifti` directory for NIfTI files.
+1.  Scan the `output/nifti` directory for NIfTI files.
 2.  Send each file to the Vista3D inference server for segmentation.
-3.  Save the segmented files in the `outputs/segmentation` directory.
+3.  Save the segmented files in the `output/segmentation` directory.
 
 You can configure the vessels of interest by setting the `VESSELS_OF_INTEREST` environment variable.
 

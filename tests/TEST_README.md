@@ -70,7 +70,7 @@ python3 test_vista3d_services.py --create-test-file
 - **Required for**: All other tests
 
 ### 2. Outputs Directory Structure Test
-- Verifies `outputs/`, `outputs/certs/`, and `outputs/nifti/` directories exist
+- Verifies `output/`, `output/certs/`, and `output/nifti/` directories exist
 - **Required for**: SSL certificates and file serving tests
 
 ### 3. SSL Certificates Test
@@ -120,7 +120,7 @@ python3 test_vista3d_services.py --create-test-file
 ✅ Docker is available: Docker version 20.10.21, build baeda1f
 
 📋 Running: Outputs Directory Structure
-🔍 Testing outputs directory structure...
+🔍 Testing output directory structure...
 ✅ Outputs directory structure is correct
 
 📋 Running: SSL Certificates
@@ -253,7 +253,7 @@ docker logs vista3d
 #### 4. SSL Certificate Issues
 ```bash
 # Remove existing certificates
-rm -f outputs/certs/server.crt outputs/certs/server.key
+rm -f output/certs/server.crt output/certs/server.key
 
 # Restart image server to regenerate certificates
 pkill -f image_server.py

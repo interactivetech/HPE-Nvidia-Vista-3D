@@ -15,7 +15,7 @@ load_dotenv()
 IMAGE_SERVER_URL = "https://localhost:8888"
 
 # Fixed test file (int16 labels created by utils/segment.py)
-TEST_REL_PATH = "outputs/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
+TEST_REL_PATH = "output/segments/PA00000002/01_2.5MM_ARTERIAL_seg_int16.nii.gz"
 # Build from the fixed HTTPS image server base
 TEST_FILE_URL = f"{IMAGE_SERVER_URL}/{TEST_REL_PATH}"
 
@@ -52,8 +52,8 @@ def list_server_dir(path: str):
 with st.sidebar:
     st.header("Viewer Options")
     st.caption("Image Server: https://localhost:8888")
-    # Remote browser for outputs/segments
-    base_segments_path = "outputs/segments"
+    # Remote browser for output/segments
+    base_segments_path = "output/segments"
     patients, _ = list_server_dir(base_segments_path)
     default_patient = "PA00000002" if "PA00000002" in patients else (patients[0] if patients else "")
     selected_patient = st.selectbox("Select patient (server)", patients or [""], index=(patients.index(default_patient) if default_patient in patients else 0))
@@ -73,7 +73,7 @@ with st.sidebar:
 
 # If a valid selection was made, update the test file URL
 if selected_patient and selected_file:
-    TEST_REL_PATH = f"outputs/segments/{selected_patient}/{selected_file}"
+    TEST_REL_PATH = f"output/segments/{selected_patient}/{selected_file}"
     TEST_FILE_URL = f"{IMAGE_SERVER_URL}/{TEST_REL_PATH}"
 
 # Allow direct URL override from the image server

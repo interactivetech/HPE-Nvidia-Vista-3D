@@ -10,7 +10,7 @@ load_dotenv()
 # Get config from environment
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 PROJECT_ROOT = os.getenv('PROJECT_ROOT', '.') # Default to current directory
-NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'nifti')
+NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'output', 'nifti')
 
 st.set_page_config(layout="wide")
 
@@ -31,10 +31,10 @@ with st.sidebar:
     source_selection = st.selectbox("Select Data Source", ["Original Scans", "Segmented Scans"])
     
     if source_selection == "Original Scans":
-        NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'nifti')
+        NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'output', 'nifti')
         source_folder = 'nifti'
     else:
-        NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'outputs', 'segmentation')
+        NIFTI_BASE_DIR = os.path.join(PROJECT_ROOT, 'output', 'segmentation')
         source_folder = 'segmentation'
 
     # Get patient folders from local filesystem
@@ -65,7 +65,7 @@ with st.sidebar:
 
 # Main area for viewer
 if selected_file: # Check if selected_file is not None
-    file_url = f'{IMAGE_SERVER_URL}/outputs/{source_folder}/{selected_patient}/{selected_file}'
+    file_url = f'{IMAGE_SERVER_URL}/output/{source_folder}/{selected_patient}/{selected_file}'
 
     back_color = [float(x) for x in back_color_str.split(',')]
 

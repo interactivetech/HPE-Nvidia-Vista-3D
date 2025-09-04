@@ -28,7 +28,7 @@ except ImportError:
 
 # Configure logging
 project_root = Path(__file__).resolve().parent.parent
-log_dir = project_root / 'outputs' / 'logs'
+log_dir = project_root / 'output' / 'logs'
 log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -61,8 +61,8 @@ class Vista3DManager:
             'ENABLE_FILE_ACCESS': os.getenv('ENABLE_FILE_ACCESS', 'True'),
             'ALLOW_ABSOLUTE_PATHS': os.getenv('ALLOW_ABSOLUTE_PATHS', 'True'),
             'ALLOW_RELATIVE_PATHS': os.getenv('ALLOW_RELATIVE_PATHS', 'True'),
-            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/outputs/nifti'),
-            'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/outputs'),
+            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/output/nifti'),
+            'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/output'),
             'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
             'ALLOW_FILE_PROTOCOL': os.getenv('ALLOW_FILE_PROTOCOL', 'True'),
             'ALLOW_LOCAL_PATHS': os.getenv('ALLOW_LOCAL_PATHS', 'True'),
@@ -84,10 +84,10 @@ class Vista3DManager:
         
         # Paths - load from environment variables or use defaults
         project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
-        self.local_outputs_path = Path(project_root) / "outputs"
-        self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/outputs")
+        self.local_outputs_path = Path(project_root) / "output"
+        self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/output")
         self.local_images_path = self.local_outputs_path / "nifti"
-        self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/outputs/nifti")
+        self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/output/nifti")
         
         # Parse IMAGE_SERVER URL to get components
         image_server_url = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
@@ -108,15 +108,15 @@ class Vista3DManager:
             "https://host.docker.internal:*", "http://host.docker.internal:*",
             # Local file access
             "file://*", "file:///*", "file:///home/*", "file:///Users/*",
-            "file:///workspace/*", "file:///workspace/outputs/*",
-            "file:///workspace/outputs/nifti/*", "/workspace/outputs/*",
-            "/workspace/outputs/nifti/*", "/workspace/outputs/nifti",
+            "file:///workspace/*", "file:///workspace/output/*",
+            "file:///workspace/output/nifti/*", "/workspace/output/*",
+            "/workspace/output/nifti/*", "/workspace/output/nifti",
             # Container paths
-            "/*", "/workspace/*", "/workspace/outputs/.*", "/workspace/outputs/**",
-            "/workspace/**", "/workspace/outputs", "/workspace", "/home/*",
+            "/*", "/workspace/*", "/workspace/output/.*", "/workspace/output/**",
+            "/workspace/**", "/workspace/output", "/workspace", "/home/*",
             "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
             # Project-specific paths (configurable)
-            f"{project_root}/*", f"{project_root}/outputs/*", f"{project_root}/outputs/nifti/*"
+            f"{project_root}/*", f"{project_root}/output/*", f"{project_root}/output/nifti/*"
         ]
         
         # Supported image extensions
@@ -192,21 +192,21 @@ class Vista3DManager:
         
         logger.info("✅ Existing containers cleaned up")
     
-    def create_outputs_directory(self):
-        """Create the local outputs directory if it doesn't exist"""
+    def create_output_directory(self):
+        """Create the local output directory if it doesn't exist"""
         self.local_outputs_path.mkdir(parents=True, exist_ok=True)
         self.local_images_path.mkdir(parents=True, exist_ok=True)
         (self.local_outputs_path / "segments").mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"✅ Outputs directory created: {self.local_outputs_path}")
+        logger.info(f"✅ Output directory created: {self.local_outputs_path}")
         
-        # List any existing outputs
+        # List any existing output
         if any(self.local_outputs_path.iterdir()):
-            logger.info(f"Found existing outputs in {self.local_outputs_path}:")
+            logger.info(f"Found existing output in {self.local_outputs_path}:")
             for item in self.local_outputs_path.iterdir():
                 logger.info(f"  {item.name}")
         else:
-            logger.info("No outputs found. Please place your .nii.gz, .nii, .nrrd, or .dcm files in the nifti subdirectory")
+            logger.info("No output found. Please place your .nii.gz, .nii, .nrrd, or .dcm files in the nifti subdirectory")
     
     def check_external_image_server(self) -> bool:
         """Check if the external image server is accessible"""
@@ -343,7 +343,7 @@ class Vista3DManager:
         # Test 1: Local file path access
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         logger.info("Test 1: Testing local file path access...")
-        test_data = {"image": "/workspace/outputs/nifti/test.nii.gz"}
+        test_data = {"image": "/workspace/output/nifti/test.nii.gz"}
         try:
             response = requests.post(
                 f"http://localhost:{vista3d_port}/v1/vista3d/inference",
@@ -356,7 +356,7 @@ class Vista3DManager:
         
         # Test 2: File protocol access
         logger.info("Test 2: Testing file:// protocol access...")
-        test_data = {"image": "file:///workspace/outputs/nifti/test.nii.gz"}
+        test_data = {"image": "file:///workspace/output/nifti/test.nii.gz"}
         try:
             response = requests.post(
                 f"http://localhost:{vista3d_port}/v1/vista3d/inference",
@@ -463,7 +463,7 @@ from pathlib import Path
 import os
 
 # Configure logging
-log_dir = Path(__file__).resolve().parent.parent / 'outputs' / 'logs'
+log_dir = Path(__file__).resolve().parent.parent / 'output' / 'logs'
 log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -604,8 +604,8 @@ if __name__ == "__main__":
         if not self.check_docker():
             return False
         
-        # Create outputs directory
-        self.create_outputs_directory()
+        # Create output directory
+        self.create_output_directory()
         
         # Start external image server
         if not self.start_external_image_server():

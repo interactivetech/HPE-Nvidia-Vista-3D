@@ -44,13 +44,13 @@ def create_overlay(original_path: Path, segment_path: Path):
 
 def main():
     """
-    Main function to find all NIfTI files in outputs/nifti, 
-    create overlays with corresponding segmentations, and save them in outputs/overlay.
+    Main function to find all NIfTI files in output/nifti, 
+    create overlays with corresponding segmentations, and save them in output/overlay.
     """
     project_root = Path(__file__).resolve().parent.parent
-    nifti_dir = project_root / 'outputs' / 'nifti'
-    segments_dir = project_root / 'outputs' / 'segments'
-    overlay_dir = project_root / 'outputs' / 'overlay'
+    nifti_dir = project_root / 'output' / 'nifti'
+    segments_dir = project_root / 'output' / 'segments'
+    overlay_dir = project_root / 'output' / 'overlay'
 
     if not nifti_dir.exists():
         print(f"Error: Input directory not found at {nifti_dir}")

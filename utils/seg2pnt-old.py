@@ -126,8 +126,8 @@ def main():
                         help="Name of the patient folder to process. If not provided, all patient folders will be processed.")
     args = parser.parse_args()
 
-    input_base_path = PROJECT_ROOT / "outputs" / "segments"
-    points_output_base_path = PROJECT_ROOT / "outputs" / "points"
+    input_base_path = PROJECT_ROOT / "output" / "segments"
+    points_output_base_path = PROJECT_ROOT / "output" / "points"
 
     if not input_base_path.exists():
         print(f"Error: Input base folder not found: {input_base_path}")

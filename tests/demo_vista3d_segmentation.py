@@ -8,8 +8,8 @@ import nibabel as nib
 # Configuration
 VISTA3D_INFERENCE_URL = "http://localhost:8000/v1/vista3d/inference"
 SAMPLE_NIFTI_URL = "https://raw.githubusercontent.com/rordenlab/MRIcroGL/master/Resources/standard/mni152.nii.gz"
-OUTPUT_DIR = Path("outputs/segmentation")
-TEMP_DIR = Path("outputs/temp")
+OUTPUT_DIR = Path("output/segmentation")
+TEMP_DIR = Path("output/temp")
 
 def download_file(url: str, destination_path: Path):
     """Downloads a file from a URL with a progress bar."""
@@ -58,7 +58,7 @@ def main():
     
     # Define sample_nifti_server_url here, before it's used
     image_server_base_url = os.getenv('IMAGE_SERVER', 'https://host.docker.internal:8888')
-    sample_nifti_server_url = f"{image_server_base_url}/outputs/temp/{sample_nifti_local_path.name}"
+    sample_nifti_server_url = f"{image_server_base_url}/output/temp/{sample_nifti_local_path.name}"
     print(f"Payload image URL: {sample_nifti_server_url}") # ADD THIS LINE
 
     payload = {"image": sample_nifti_server_url}
@@ -88,7 +88,7 @@ def main():
         
         print("\nTo view this segmentation:")
         print("1. Ensure your Streamlit app is running (`streamlit run app.py`).")
-        print("2. Select the 'outputs' patient folder (or the folder containing your segmentation).")
+        print("2. Select the 'output' patient folder (or the folder containing your segmentation).")
         print("3. Select the segmented NIfTI file (e.g., 'mni152_seg.nii.gz') from the dropdown.")
         print("4. The segmentation will be displayed in the viewer.")
         print("Note: You might need to adjust viewer settings (e.g., colormap) to see the segmentation clearly.")

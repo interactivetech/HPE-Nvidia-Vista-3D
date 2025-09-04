@@ -42,9 +42,9 @@ class Vista3DServicesTester:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
         self.project_root = Path(__file__).parent.parent
-        self.outputs_dir = self.project_root / "outputs"
-        self.certs_dir = self.outputs_dir / "certs"
-        self.nifti_dir = self.outputs_dir / "nifti"
+        self.output_dir = self.project_root / "output"
+        self.certs_dir = self.output_dir / "certs"
+        self.nifti_dir = self.output_dir / "nifti"
         
         # Service configurations
         self.vista3d_port = 8000
@@ -241,14 +241,14 @@ class Vista3DServicesTester:
         
         try:
             # Create a test file if it doesn't exist
-            test_file_path = self.outputs_dir / "test_file.txt"
+            test_file_path = self.output_dir / "test_file.txt"
             if not test_file_path.exists():
                 test_file_path.write_text("This is a test file for Vista3D services testing\n")
                 logger.info(f"   Created test file: {test_file_path}")
             
             # Test if the file can be accessed via the image server
             response = requests.get(
-                f"{self.image_server_url}/outputs/test_file.txt",
+                f"{self.image_server_url}/output/test_file.txt",
                 timeout=10,
                 verify=False,
                 headers={'User-Agent': 'Vista3D-Tester/1.0'}
@@ -344,12 +344,12 @@ class Vista3DServicesTester:
             self.test_results['ssl_certificates_valid'] = False
             return False
     
-    def test_outputs_directory_structure(self) -> bool:
-        """Test if the outputs directory structure is correct"""
-        logger.info("🔍 Testing outputs directory structure...")
+    def test_output_directory_structure(self) -> bool:
+        """Test if the output directory structure is correct"""
+        logger.info("🔍 Testing output directory structure...")
         
         try:
-            required_dirs = [self.outputs_dir, self.certs_dir, self.nifti_dir]
+            required_dirs = [self.output_dir, self.certs_dir, self.nifti_dir]
             missing_dirs = []
             
             for dir_path in required_dirs:
@@ -358,16 +358,16 @@ class Vista3DServicesTester:
             
             if missing_dirs:
                 logger.error(f"❌ Missing required directories: {', '.join(missing_dirs)}")
-                self.test_results['outputs_directory_structure'] = False
+                self.test_results['output_directory_structure'] = False
                 return False
             
             logger.info("✅ Outputs directory structure is correct")
-            self.test_results['outputs_directory_structure'] = True
+            self.test_results['output_directory_structure'] = True
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error testing outputs directory structure: {e}")
-            self.test_results['outputs_directory_structure'] = False
+            logger.error(f"❌ Error testing output directory structure: {e}")
+            self.test_results['output_directory_structure'] = False
             return False
     
     def create_test_file(self) -> None:
@@ -375,7 +375,7 @@ class Vista3DServicesTester:
         logger.info("📝 Creating test file for testing...")
         
         try:
-            test_file_path = self.outputs_dir / "test_file.txt"
+            test_file_path = self.output_dir / "test_file.txt"
             test_content = f"""This is a test file for Vista3D services testing.
 Created at: {time.strftime('%Y-%m-%d %H:%M:%S')}
 Purpose: Verify that the image server can serve files properly.
@@ -400,7 +400,7 @@ This file should be accessible via:
         # Run all tests
         tests = [
             ("Docker Availability", self.test_docker_availability),
-            ("Outputs Directory Structure", self.test_outputs_directory_structure),
+            ("Outputs Directory Structure", self.test_output_directory_structure),
             ("SSL Certificates", self.test_ssl_certificates),
             ("Image Server Process", self.test_image_server_process),
             ("Image Server Endpoint", self.test_image_server_endpoint_accessibility),
@@ -467,7 +467,7 @@ This file should be accessible via:
         if not self.test_results.get('ssl_certificates_valid', True):
             logger.info("• SSL certificates are invalid. Regenerate them by restarting the image server")
         
-        if not self.test_results.get('outputs_directory_structure', True):
+        if not self.test_results.get('output_directory_structure', True):
             logger.info("• Outputs directory structure is incorrect. Run setup.sh to create directories")
         
         logger.info("=" * 60)

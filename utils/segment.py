@@ -20,8 +20,8 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 VISTA3D_INFERENCE_URL = "http://localhost:8000/v1/vista3d/inference"
 PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', '.'))
-NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "nifti"
-SEGMENTATION_OUTPUT_BASE_DIR = PROJECT_ROOT / "outputs" / "segments"
+NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "output" / "nifti"
+SEGMENTATION_OUTPUT_BASE_DIR = PROJECT_ROOT / "output" / "segments"
 
 # Load label dictionaries
 LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
