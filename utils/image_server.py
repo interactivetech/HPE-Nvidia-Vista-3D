@@ -165,6 +165,7 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
 app = FastAPI(title="Medical Imaging Server", description="HTTPS server for medical imaging files with directory browsing")
 
 @app.get("/{full_path:path}")
+@app.head("/{full_path:path}")
 async def serve_files(request: Request, full_path: str):
     """Serve files and directory listings"""
     
@@ -209,8 +210,10 @@ async def serve_files(request: Request, full_path: str):
 origins = [
     "http://localhost",
     "http://localhost:8501", # Streamlit's default port
+    "http://localhost:8502", # Alternative Streamlit port
     "https://localhost",
     "https://localhost:8501",
+    "https://localhost:8502",
 ]
 
 app.add_middleware(

@@ -185,35 +185,123 @@ if selected_file:
         if (typeof niivue === 'undefined') {{
             console.error('Niivue library not loaded!');
         }} else {{
+            console.log('NiiVue library loaded successfully');
+            
+            console.log('🔧 Creating NiiVue instance...');
             const nv = new niivue.Niivue ({{
                 sliceType: {actual_slice_type},
                 isColorbar: true
             }});
+            console.log('🔧 NiiVue instance created:', nv);
+            
+            console.log('🔧 Attaching to canvas...');
             nv.attachTo('niivue-canvas');
+            console.log('🔧 Canvas attached, canvas element:', document.getElementById('niivue-canvas'));
 
             const volumeList = [{volume_list_entry}];
-            nv.loadVolumes(volumeList).then(() => {{
-                {custom_colormap_js}
-                console.log('Selected source:', '{selected_source}');
-                console.log('Volume list:', volumeList);
-                if (typeof customSegmentationColormap !== 'undefined' && '{selected_source}' !== 'segments') {{
-                    // For overlays only, set as label colormap
-                    console.log('Setting label colormap for overlay');
-                    nv.setColormapLabel(customSegmentationColormap);
-                }} else if ('{selected_source}' === 'segments') {{
-                    console.log('Segments loaded - no colormap manipulation needed');
-                }} else {{
-                    console.log('Custom colormap not defined');
-                }}
-                if ('{segment_url}') {{
-                    nv.loadDrawingFromUrl('{segment_url}');
-                }}
-                if ({actual_slice_type} === 3) {{ // 3 is Multiplanar
-                    nv.setSliceType(nv.sliceType.MULTIPLANAR); // Ensure correct slice type
-                    nv.opts.multiplanarShowRender = 'ALWAYS';
+            
+            console.log('🚀 Starting to load volumes:', volumeList);
+            console.log('📁 File URL:', volumeList[0].url);
+            console.log('🎨 Volume colormap:', volumeList[0].colormap);
+            
+            // TEST: Verify we can access the file URL directly
+            console.log('🔗 Testing file accessibility...');
+            fetch(volumeList[0].url, {{ method: 'HEAD' }})
+                .then(response => {{
+                    console.log('✅ File accessible:', response.status, response.statusText);
+                    console.log('📂 Content-Type:', response.headers.get('content-type'));
+                    console.log('📏 Content-Length:', response.headers.get('content-length'));
+                }})
+                .catch(error => {{
+                    console.error('❌ File accessibility test failed:', error);
+                }});
+            
+            // TRY APPROACH 1: Simple call like the backup version (no promises)
+            console.log('📋 TRYING: Simple loadVolumes call (like working backup)');
+            nv.loadVolumes(volumeList);
+            
+            // Check multiple times to see if/when it loads
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {{
+                checkCount++;
+                console.log(`⏰ Check #${{checkCount}}: Volumes loaded:`, nv.volumes ? nv.volumes.length : 'none');
+                
+                if (nv.volumes && nv.volumes.length > 0) {{
+                    console.log('✅ SUCCESS! Volume loaded:');
+                    console.log('📊 Volume details:', nv.volumes[0]);
+                    console.log('📊 Volume dimensions:', nv.volumes[0].dims);
+                    console.log('📊 Volume data range:', {{min: nv.volumes[0].global_min, max: nv.volumes[0].global_max}});
+                    console.log('📊 Volume matrix:', nv.volumes[0].matRAS);
+                    console.log('📊 Volume colormap:', nv.volumes[0].colormap);
+                    console.log('📊 Volume opacity:', nv.volumes[0].opacity);
+                    
+                    clearInterval(checkInterval);
+                    
+                    // Check canvas and WebGL context
+                    const canvas = document.getElementById('niivue-canvas');
+                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                    console.log('🖼️ Canvas:', canvas);
+                    console.log('🖼️ Canvas size:', canvas.width + 'x' + canvas.height);
+                    console.log('🖼️ WebGL context:', gl);
+                    console.log('🖼️ NiiVue scene:', nv.scene);
+                    console.log('🖼️ NiiVue ready:', nv.isLoaded);
+                    
+                    // Apply colormap and settings
+                    {custom_colormap_js}
+                    if (typeof customSegmentationColormap !== 'undefined' && '{selected_source}' !== 'segments') {{
+                        console.log('🎨 Setting label colormap for overlay');
+                        nv.setColormapLabel(customSegmentationColormap);
+                    }} else if ('{selected_source}' === 'segments') {{
+                        console.log('🎨 Segments loaded - no colormap manipulation needed');
+                    }}
+                    
+                    if ('{segment_url}') {{
+                        console.log('🔗 Loading segmentation overlay from:', '{segment_url}');
+                        nv.loadDrawingFromUrl('{segment_url}');
+                    }}
+                    
+                    if ({actual_slice_type} === 3) {{
+                        console.log('🖼️ Setting slice type to Multiplanar');
+                        nv.setSliceType(nv.sliceType.MULTIPLANAR);
+                        nv.opts.multiplanarShowRender = 'ALWAYS';
+                    }}
+                    
+                    // Try multiple rendering approaches
+                    console.log('🔄 Attempting multiple rendering approaches...');
+                    
+                    // Approach 1: Simple drawScene
                     nv.drawScene();
+                    console.log('✓ Called drawScene()');
+                    
+                    // Approach 2: Set intensity range and redraw
+                    const vol = nv.volumes[0];
+                    console.log('🔧 Setting intensity range for volume...');
+                    nv.setVolume(vol, 0);
+                    console.log('✓ Called setVolume()');
+                    
+                    // Approach 3: Force viewport update
+                    setTimeout(() => {{
+                        console.log('🔄 Delayed redraw attempt...');
+                        nv.drawScene();
+                        console.log('✓ Delayed drawScene() completed');
+                        
+                        // Check if anything is actually rendered
+                        const imageData = canvas.getContext('2d') ? 
+                            canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height) :
+                            'WebGL canvas - cannot read pixel data directly';
+                        console.log('🖼️ Canvas content check:', typeof imageData);
+                        
+                        // Log current slice position and crosshair
+                        console.log('📍 Current slice position:', nv.scene.crosshairPos);
+                        console.log('📍 Scene renderShader:', nv.scene.renderShader ? 'exists' : 'missing');
+                        
+                    }}, 1000);
+                    
+                }} else if (checkCount >= 20) {{ // Stop checking after 10 seconds
+                    console.log('❌ Timeout: Volume never loaded after 10 seconds');
+                    clearInterval(checkInterval);
                 }}
-            }}).catch(console.error);
+            }}, 500); // Check every 500ms
         }}
     </script>
 </body>
