@@ -103,14 +103,14 @@ with st.sidebar:
                 segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
                 segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     else:
-        st.subheader("Segment Image")
         slice_type = "3D Render"
         orientation = "Axial"
         nifti_opacity = 1.0
         nifti_gamma = 1.0
         show_overlay = False
-        segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
-        segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
+        with st.expander("Image Settings", expanded=False):
+            segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
+            segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
 
     with st.expander("Segment Colors", expanded=False):
         try:
