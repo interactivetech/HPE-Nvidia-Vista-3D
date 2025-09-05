@@ -61,7 +61,11 @@ with st.sidebar:
     
     st.header("Data Selection")
     data_sources = ['nifti', 'segments']
-    selected_source = st.selectbox("Select Data Source", data_sources)
+    data_source_display = {'nifti': 'NIfTI', 'segments': 'Segments'}
+    display_options = [data_source_display[source] for source in data_sources]
+    selected_display = st.selectbox("Select Data Source", display_options)
+    # Map back to the actual source name
+    selected_source = data_sources[display_options.index(selected_display)]
 
     patient_folders = get_server_data(selected_source, 'folders', ('',))
     selected_patient = st.selectbox("Select Patient", patient_folders)
@@ -70,7 +74,41 @@ with st.sidebar:
     if selected_patient:
         file_ext = ('.nii', '.nii.gz', '.dcm')
         filenames = get_server_data(f"{selected_source}/{selected_patient}", 'files', file_ext)
-        selected_file = st.selectbox("Select File", filenames)
+        
+        # Create display names without .nii.gz extensions
+        if filenames:
+            display_names = [filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '') for filename in filenames]
+            selected_display_name = st.selectbox("Select File", display_names)
+            # Map back to the actual filename
+            if selected_display_name:
+                selected_index = display_names.index(selected_display_name)
+                selected_file = filenames[selected_index]
+        
+        # Show voxels popdown for segments data source
+        if selected_source == 'segments' and selected_file:
+            voxels_folders = get_server_data(f"{selected_source}/{selected_patient}", 'folders', ('',))
+            if 'voxels' in voxels_folders:
+                voxels_files = get_server_data(f"{selected_source}/{selected_patient}/voxels", 'files', file_ext)
+                if voxels_files:
+                    # Filter voxels that are associated with the selected file
+                    # Assuming voxels are named similarly or contain the base name of the selected file
+                    selected_file_base = selected_file.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+                    associated_voxels = [vf for vf in voxels_files if selected_file_base in vf]
+                    
+                    if associated_voxels:
+                        with st.expander("Voxels", expanded=False):
+                            # Add Clear All button
+                            if st.button("Clear All", key="clear_all_voxels"):
+                                # Clear all voxel checkboxes by resetting their session state
+                                for voxel_file in associated_voxels:
+                                    clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+                                    if f"voxel_{clean_name}" in st.session_state:
+                                        st.session_state[f"voxel_{clean_name}"] = False
+                            
+                            for voxel_file in associated_voxels:
+                                # Extract the clean voxel name by removing specific prefix and extensions
+                                clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+                                st.checkbox(clean_name, value=False, key=f"voxel_{clean_name}")
 
     # --- Viewer Settings ---
     # Initialize all viewer settings with sensible defaults
@@ -131,8 +169,21 @@ with st.sidebar:
 
 # --- Main Viewer Area ---
 if selected_file:
+    # Check if any voxels are selected when in segments mode
+    selected_voxel_files = []
+    if selected_source == 'segments':
+        # Collect all selected voxels
+        for voxel_file in get_server_data(f"{selected_source}/{selected_patient}/voxels", 'files', ('.nii', '.nii.gz', '.dcm')):
+            clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+            if f"voxel_{clean_name}" in st.session_state and st.session_state[f"voxel_{clean_name}"]:
+                selected_voxel_files.append(voxel_file)
+    
     # --- Prepare URLs and Settings for Viewer ---
-    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
+    if selected_voxel_files:
+        # Display the first selected voxel as the main volume
+        base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/voxels/{selected_voxel_files[0]}"
+    else:
+        base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
     segment_url = ''
     if show_overlay:
         segment_filename = selected_file
@@ -148,7 +199,15 @@ if selected_file:
         main_volume_entry = f"{{ url: \"{base_file_url}\", colormap: \"custom_segmentation\" }}"
     
     volume_list_entries = [main_volume_entry]
-    if show_overlay and segment_url:
+    
+    # Add additional selected voxels as overlays (if more than one is selected)
+    if selected_voxel_files and len(selected_voxel_files) > 1:
+        for additional_voxel in selected_voxel_files[1:]:  # Skip the first one as it's already the main volume
+            additional_voxel_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/voxels/{additional_voxel}"
+            additional_entry = f"{{ url: \"{additional_voxel_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
+            volume_list_entries.append(additional_entry)
+    
+    if show_overlay and segment_url and not selected_voxel_files:  # Only show overlay if no voxels are selected
         overlay_entry = f"{{ url: \"{segment_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
         volume_list_entries.append(overlay_entry)
     
@@ -238,11 +297,14 @@ if selected_file:
                     nv.setGamma({segment_gamma});
                     mainVol.opacity = {segment_opacity};
                 }}
+                // Apply colormap to all additional volumes (overlays)
                 if (nv.volumes.length > 1) {{
-                    const overlayVol = nv.volumes[1];
-                    overlayVol.opacity = {segment_opacity};
-                    if (typeof customSegmentationColormap !== 'undefined') {{
-                        nv.setColormap(overlayVol.id, 'custom_segmentation');
+                    for (let i = 1; i < nv.volumes.length; i++) {{
+                        const overlayVol = nv.volumes[i];
+                        overlayVol.opacity = {segment_opacity};
+                        if (typeof customSegmentationColormap !== 'undefined') {{
+                            nv.setColormap(overlayVol.id, 'custom_segmentation');
+                        }}
                     }}
                 }}
                 
