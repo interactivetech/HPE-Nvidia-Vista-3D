@@ -59,7 +59,6 @@ def get_server_data(path: str, type: str, file_extensions: tuple):
 # --- Sidebar UI ---
 with st.sidebar:
     
-    st.header("Data Selection")
     data_sources = ['nifti', 'segments']
     data_source_display = {'nifti': 'NIfTI', 'segments': 'Segments'}
     display_options = [data_source_display[source] for source in data_sources]
@@ -141,6 +140,7 @@ with st.sidebar:
                 segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
                 segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     else:
+        # For segments data source, always use 3D Render
         slice_type = "3D Render"
         orientation = "Axial"
         nifti_opacity = 1.0
@@ -190,7 +190,11 @@ if selected_file:
         segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
     
     slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
-    actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
+    # For segments, always use pure 3D render (4), not multiplanar (3)
+    if selected_source == 'segments':
+        actual_slice_type = 4  # Pure 3D render
+    else:
+        actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
 
     # --- HTML and Javascript for NiiVue ---
     if selected_source != 'segments':
@@ -285,6 +289,7 @@ if selected_file:
                 {custom_colormap_js}
                 if (typeof customSegmentationColormap !== 'undefined') {{
                     nv.addColormap('custom_segmentation', customSegmentationColormap);
+                    console.log('Custom segmentation colormap added');
                 }}
                 if ('{selected_source}' !== 'segments') {{
                     nv.setColormap(mainVol.id, '{color_map}');
@@ -293,6 +298,10 @@ if selected_file:
                 }} else {{
                     if (typeof customSegmentationColormap !== 'undefined') {{
                         nv.setColormap(mainVol.id, 'custom_segmentation');
+                        console.log('Applied custom_segmentation colormap to main volume:', mainVol.id);
+                        console.log('Main volume min/max values:', mainVol.cal_min, mainVol.cal_max);
+                        // Force update the colormap
+                        mainVol.colormapLabel = 'custom_segmentation';
                     }}
                     nv.setGamma({segment_gamma});
                     mainVol.opacity = {segment_opacity};
@@ -304,23 +313,53 @@ if selected_file:
                         overlayVol.opacity = {segment_opacity};
                         if (typeof customSegmentationColormap !== 'undefined') {{
                             nv.setColormap(overlayVol.id, 'custom_segmentation');
+                            console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id);
+                            console.log('Overlay volume', i, 'min/max values:', overlayVol.cal_min, overlayVol.cal_max);
+                            // Force update the colormap
+                            overlayVol.colormapLabel = 'custom_segmentation';
                         }}
                     }}
                 }}
                 
-                nv.setSliceType({actual_slice_type});
-
+                // Set options first, then slice type
                 if ({actual_slice_type} === 3) {{
+                    // Multiplanar view with 4 panes
                     nv.opts.multiplanarShowRender = true;
                     nv.opts.multiplanarForceRender = true;
                     nv.opts.showCrosshairs = true;
+                    nv.setSliceType({actual_slice_type});
                     setTimeout(() => {{
                         nv.opts.show3Dcrosshair = true;
                         nv.drawScene();
                     }}, 500);
+                }} else if ({actual_slice_type} === 4) {{
+                    // Pure 3D render only - disable multiplanar first
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = false;
+                    nv.setSliceType({actual_slice_type});
+                    console.log('Set to pure 3D render mode (slice type 4)');
                 }} else {{
                     nv.opts.showCrosshairs = false;
+                    nv.setSliceType({actual_slice_type});
                 }}
+                
+                // Force a final redraw to ensure colormap is applied
+                setTimeout(() => {{
+                    nv.drawScene();
+                    console.log('Final scene redraw completed');
+                    
+                    // Double-check for segments: ensure pure 3D render
+                    if ('{selected_source}' === 'segments') {{
+                        nv.opts.multiplanarShowRender = false;
+                        nv.opts.multiplanarForceRender = false;
+                        nv.setSliceType(4);
+                        nv.drawScene();
+                        console.log('Enforced pure 3D render for segments');
+                    }}
+                }}, 100);
+                
                 nv.drawScene();
             }}).catch(console.error);
         }}
