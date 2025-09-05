@@ -16,28 +16,13 @@ from utils.image_cache import (
     ImageCacheManager
 )
 
-# Page configuration
-st.set_page_config(
-    page_title="Cache Management",
-    page_icon="💾",
-    layout="wide"
-)
+# Note: page config is handled by the main app
 
 st.title("💾 Image Cache Management")
 st.markdown("Manage the local cache for medical imaging files downloaded from remote servers.")
 
-# Navigation sidebar
+# Quick cache stats in sidebar
 with st.sidebar:
-    st.header("Navigation")
-    if st.button("🏠 Home", use_container_width=True):
-        st.switch_page("app.py")
-    
-    if st.button("🧠 NiiVue Viewer", use_container_width=True):
-        st.switch_page("pages/NiiVue.py")
-    
-    st.markdown("---")
-    
-    # Quick cache stats in sidebar
     stats = get_cache_stats()
     st.metric("Files Cached", stats['entries_count'])
     st.metric("Cache Size", f"{stats['current_size_mb']:.1f} MB")

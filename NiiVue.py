@@ -19,7 +19,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.image_cache import get_cached_file, get_cache_stats
 
 # --- Initial Setup ---
-st.set_page_config(layout="wide")
+# Note: page config is handled by the main app
 load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
 
@@ -234,9 +234,7 @@ def get_cached_file_url(remote_url: str) -> str:
         # Get the cached file path (this downloads and caches if needed)
         cached_path = get_cached_file(remote_url)
         
-        # Log cache hit/miss for debugging
-        stats = get_cache_stats()
-        st.sidebar.info(f"Cache: {stats['entries_count']} files, {stats['hit_rate']:.1%} hit rate")
+        # Cache stats are available but not displayed in sidebar
         
         # Check if local cache server is running
         if st.session_state.cache_server_url:
@@ -261,23 +259,6 @@ def get_cached_file_url(remote_url: str) -> str:
 
 # --- Sidebar UI ---
 with st.sidebar:
-    # Navigation
-    st.header("Navigation")
-    if st.button("🏠 Home", use_container_width=True):
-        st.switch_page("app.py")
-    
-    if st.button("💾 Cache Management", use_container_width=True):
-        st.switch_page("pages/cache.py")
-    
-    st.markdown("---")
-    
-    # Cache server status
-    if st.session_state.cache_server_url:
-        st.success(f"✅ Cache server: {st.session_state.cache_server_url}")
-    else:
-        st.error("❌ Cache server not running")
-    
-    st.markdown("---")
     
     st.header("Controls")
     
@@ -312,9 +293,9 @@ with st.sidebar:
 
     # NIfTI Image Controls
     if selected_source != 'segments':
-        st.subheader("NIfTI Image")
-        nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
-        nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
+        with st.expander("NIfTI Image Settings", expanded=False):
+            nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
+            nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
         
         # Overlay Controls
         show_overlay = False
@@ -323,9 +304,9 @@ with st.sidebar:
         if selected_source == 'nifti' and selected_file:
             show_overlay = st.checkbox("Show Segmentation Overlay", value=False)
             if show_overlay:
-                st.subheader("Segment Overlay")
-                segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
-                segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
+                with st.expander("Overlay Settings", expanded=False):
+                    segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
+                    segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     else:
         # For segments data source, only segment controls are relevant
         st.subheader("Segment Image")
@@ -390,22 +371,8 @@ if selected_file:
         segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
     
     # Get cached versions of the files
-    st.info("🔄 Loading and caching files...")
-    
-    # Debug information
-    st.write(f"**Original URL:** `{base_file_url}`")
-    
     cached_base_url = get_cached_file_url(base_file_url)
     cached_segment_url = get_cached_file_url(segment_url) if segment_url else ''
-    
-    # Debug information
-    st.write(f"**Cached URL:** `{cached_base_url}`")
-    
-    # Check if URLs are different (indicating cache is working)
-    if cached_base_url != base_file_url:
-        st.success("✅ Using cached file!")
-    else:
-        st.warning("⚠️ Using original URL (cache may not be working)")
 
     slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
     actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
@@ -507,7 +474,9 @@ if selected_file:
                 isColorbar: false,
                 loadingText: 'loading ...',
                 dragAndDropEnabled: false,
-                isResizeCanvas: true
+                isResizeCanvas: true,
+                crosshairWidth: 1,
+                crosshairColor: [1, 0, 0, 1]
             }});
             console.log('🔧 NiiVue instance created:', nv);
             
@@ -601,8 +570,35 @@ if selected_file:
                 // Set slice type
                 if ({actual_slice_type} === 3) {{
                     console.log('🖼️ Setting slice type to Multiplanar');
-                    nv.setSliceType(nv.sliceType.MULTIPLANAR);
-                    nv.opts.multiplanarShowRender = 'ALWAYS';
+                    nv.setSliceType(3); // Use numeric value for MULTIPLANAR
+                    
+                    // Enable 3D render panel in multiplanar view
+                    nv.opts.multiplanarShowRender = true;
+                    nv.opts.multiplanarForceRender = true;
+                    
+                    // Enable crosshairs for all panels including 3D render
+                    nv.opts.crosshairWidth = 1;
+                    nv.opts.crosshairColor = [1, 0, 0, 1];
+                    nv.opts.showCrosshairs = true;
+                    
+                    // Try different approach for 3D crosshairs - set after a delay
+                    setTimeout(() => {{
+                        console.log('🎯 Attempting to enable 3D crosshairs...');
+                        
+                        // Try setting crosshair properties directly
+                        if (nv.scene && nv.scene.crosshairs3D !== undefined) {{
+                            nv.scene.crosshairs3D = true;
+                            console.log('✅ Set crosshairs3D to true');
+                        }}
+                        
+                        // Try the opts approach
+                        nv.opts.show3Dcrosshair = true;
+                        nv.opts.crosshairGap = 11;
+                        
+                        // Force a redraw
+                        nv.drawScene();
+                        console.log('🔄 Forced redraw for 3D crosshairs');
+                    }}, 500);
                 }}
                 
                 // Force initial render
