@@ -48,6 +48,10 @@ def main():
     parser.add_argument("--force", action="store_true", help="Overwrite existing segmentation files.")
     args = parser.parse_args()
 
+    # Create output directories if they don't exist
+    NIFTI_INPUT_BASE_DIR.mkdir(parents=True, exist_ok=True)
+    SEGMENTATION_OUTPUT_BASE_DIR.mkdir(parents=True, exist_ok=True)
+
     patient_folders_to_process = []
     if args.patient_folder:
         if (NIFTI_INPUT_BASE_DIR / args.patient_folder).is_dir():
@@ -56,11 +60,7 @@ def main():
             print(f"Error: Specified patient folder not found: {NIFTI_INPUT_BASE_DIR / args.patient_folder}")
             return
     else:
-        if NIFTI_INPUT_BASE_DIR.exists():
-            patient_folders_to_process = [f.name for f in NIFTI_INPUT_BASE_DIR.iterdir() if f.is_dir()]
-        else:
-            print(f"Error: NIfTI input base directory not found: {NIFTI_INPUT_BASE_DIR}")
-            return
+        patient_folders_to_process = [f.name for f in NIFTI_INPUT_BASE_DIR.iterdir() if f.is_dir()]
 
     if not patient_folders_to_process:
         print("No patient folders found to process. Exiting.")

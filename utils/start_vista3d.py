@@ -216,10 +216,10 @@ class Vista3DManager:
             # Test local access first
             image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
             image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'http')
             image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
             
-            response = requests.get(image_server_url, verify=False, timeout=10)
+            response = requests.get(image_server_url, timeout=10)
             if response.status_code == 200:
                 logger.info("✅ External image server is accessible locally")
                 return True
@@ -372,10 +372,10 @@ class Vista3DManager:
         try:
             image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
             image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'http')
             image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
             
-            response = requests.get(image_server_url, verify=False, timeout=10)
+            response = requests.get(image_server_url, timeout=10)
             logger.info(f"External image server response: {response.status_code}")
         except requests.RequestException as e:
             logger.warning(f"Test 3 failed: {e}")
@@ -582,10 +582,10 @@ if __name__ == "__main__":
         try:
             image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
             image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
+            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'http')
             image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
             
-            response = requests.get(image_server_url, verify=False, timeout=10)
+            response = requests.get(image_server_url, timeout=10)
             if response.status_code == 200:
                 logger.info("✅ External image server is healthy and responding")
                 return True
@@ -637,7 +637,7 @@ if __name__ == "__main__":
         logger.info("  Stop container: docker stop vista3d")
         logger.info("  Access container shell: docker exec -it vista3d bash")
         logger.info("  Test Vista-3D endpoint: curl http://localhost:8000/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
-        logger.info(f"  Test external image server: curl -k https://localhost:{image_server_port}/")
+        logger.info(f"  Test external image server: curl http://localhost:{image_server_port}/")
         logger.info("  Start external image server manually: python3 utils/image_server.py")
         
         return True
@@ -714,3 +714,4 @@ External Image Server:
 
 if __name__ == "__main__":
     main()
+()

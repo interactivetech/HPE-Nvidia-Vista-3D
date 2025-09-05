@@ -86,7 +86,7 @@ def generate_self_signed_cert(cert_dir: Path, cert_file: Path, key_file: Path, h
 
 def get_server_config():
     """Get server configuration from environment variables."""
-    image_server_url = os.getenv("IMAGE_SERVER", "https://localhost:8888")
+    image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
     
     # Parse the URL to extract host and port
     parsed = urlparse(image_server_url)
@@ -162,7 +162,10 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
     return html
 
 # --- FastAPI Application ---
-app = FastAPI(title="Medical Imaging Server", description="HTTPS server for medical imaging files with directory browsing")
+app = FastAPI(title="Medical Imaging Server", description="HTTP server for medical imaging files with directory browsing")
+
+# Mount the assets directory to serve static files like niivue.umd.js
+app.mount("/assets", StaticFiles(directory=project_root / "assets"), name="assets")
 
 @app.get("/{full_path:path}")
 @app.head("/{full_path:path}")
@@ -220,11 +223,12 @@ app.add_middleware(
 # --- Main execution block for Uvicorn ---
 if __name__ == "__main__":
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="HTTPS Image Server")
+    parser = argparse.ArgumentParser(description="HTTP/S Image Server")
     parser.add_argument("--host", help="Host to bind to (default: from IMAGE_SERVER env var)")
     parser.add_argument("--port", type=int, help="Port to bind to (default: from IMAGE_SERVER env var)")
     parser.add_argument("--cert-dir", help="Directory to store SSL certificate and key files", default=str(project_root / "output" / "certs"))
     parser.add_argument("--disable-dir-listing", action="store_true", help="Disable directory listing for enhanced security (files will still be served)")
+    parser.add_argument("--https", action="store_true", help="Run as an HTTPS server with a self-signed certificate")
     
     args = parser.parse_args()
     
@@ -233,34 +237,49 @@ if __name__ == "__main__":
     host = args.host or default_host
     port = args.port or default_port
     
-    # Set up SSL certificate and key paths
-    cert_dir = Path(args.cert_dir)
-    cert_file = cert_dir / "server.crt"
-    key_file = cert_dir / "server.key"
-    
-    # Generate self-signed certificate if it doesn't exist
-    if not cert_file.exists() or not key_file.exists():
-        print("Self-signed certificate not found. Generating new one...")
-        generate_self_signed_cert(cert_dir, cert_file, key_file, host)
-    
     # Note: Files are served via the @app.get("/{full_path:path}") route above
     # This provides better control over directory listings and security
 
-    # Run Uvicorn with SSL
-    print(f"Starting HTTPS Image Server with FastAPI/Uvicorn...")
-    print(f"  URL: https://{host}:{port}")
-    print(f"  Serving from: {project_root.absolute()}")
-    print(f"  Certificate: {cert_file}")
-    print(f"  Private Key: {key_file}")
-    print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
-    print(f"  Press Ctrl+C to stop the server")
-    print("-" * 60)
+    if args.https:
+        # Run Uvicorn with SSL
+        # Set up SSL certificate and key paths
+        cert_dir = Path(args.cert_dir)
+        cert_file = cert_dir / "server.crt"
+        key_file = cert_dir / "server.key"
+        
+        # Generate self-signed certificate if it doesn't exist
+        if not cert_file.exists() or not key_file.exists():
+            print("Self-signed certificate not found. Generating new one...")
+            generate_self_signed_cert(cert_dir, cert_file, key_file, host)
 
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        ssl_keyfile=str(key_file),
-        ssl_certfile=str(cert_file),
-        log_level="info"
-    )
+        print(f"Starting HTTPS Image Server with FastAPI/Uvicorn...")
+        print(f"  URL: https://{host}:{port}")
+        print(f"  Serving from: {project_root.absolute()}")
+        print(f"  Certificate: {cert_file}")
+        print(f"  Private Key: {key_file}")
+        print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
+        print(f"  Press Ctrl+C to stop the server")
+        print("-" * 60)
+
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=port,
+            ssl_keyfile=str(key_file),
+            ssl_certfile=str(cert_file),
+            log_level="info"
+        )
+    else:
+        # Run Uvicorn without SSL (default)
+        print(f"Starting HTTP Image Server with FastAPI/Uvicorn...")
+        print(f"  URL: http://{host}:{port}")
+        print(f"  Serving from: {project_root.absolute()}")
+        print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
+        print(f"  Press Ctrl+C to stop the server")
+        print("-" * 60)
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=port,
+            log_level="info"
+        )
