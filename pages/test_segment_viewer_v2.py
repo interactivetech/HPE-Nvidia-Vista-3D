@@ -5,6 +5,16 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
+import sys
+from pathlib import Path
+import urllib3
+
+# Suppress SSL warnings for localhost requests
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Add utils to path for caching
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.image_cache import get_cached_file, get_cache_stats
 
 # New, clean NiiVue viewer focused on correct label colormap application
 # Uses a minimal JS flow aligned with NiiVue docs: https://niivue.com/docs/
@@ -14,12 +24,38 @@ load_dotenv()
 
 IMAGE_SERVER_URL = "https://localhost:8888"
 
-# Fixed test file (int16 labels created by utils/segment.py)
-TEST_REL_PATH = "output/segments/PA00000058/2.5_mm_STD_-_30%_ASIR_2.nii.gz"
+# Test file for caching verification
+TEST_REL_PATH = "output/nifti/PA00000002/2.5MM_ARTERIAL_3.nii.gz"
 # Build from the fixed HTTPS image server base
 TEST_FILE_URL = f"{IMAGE_SERVER_URL}/{TEST_REL_PATH}"
 
-st.title("NiiVue Label Viewer (v2)")
+st.title("NiiVue Label Viewer (v2) - Cache Test")
+
+def get_cached_file_url(remote_url: str) -> str:
+    """
+    Get a cached version of a file and return a URL for the viewer.
+    
+    Args:
+        remote_url: The remote URL of the file to cache
+        
+    Returns:
+        URL that can be used by the NiiVue viewer
+    """
+    try:
+        # Get the cached file path (this downloads and caches if needed)
+        cached_path = get_cached_file(remote_url)
+        
+        # Get cache stats for display
+        stats = get_cache_stats()
+        st.sidebar.info(f"Cache: {stats['entries_count']} files, {stats['hit_rate']:.1%} hit rate")
+        
+        # For this test, we'll use the original URL since NiiVue can load from HTTPS
+        # In a production setup, you'd serve the cached file via a local server
+        return remote_url
+        
+    except Exception as e:
+        st.error(f"Cache error: {e}")
+        return remote_url
 
 def list_server_dir(path: str):
     """Return (dirs, files) from the image server directory listing."""
@@ -91,8 +127,19 @@ if selected_patient and selected_file:
 if custom_url.strip().startswith("http"):
     TEST_FILE_URL = custom_url.strip()
 
+# Cache the file and get the URL for NiiVue
+st.info("🔄 Caching file for faster loading...")
+cached_url = get_cached_file_url(TEST_FILE_URL)
+
 st.write(f"Using test file: `{TEST_REL_PATH}`")
-st.code(f"URL: {TEST_FILE_URL}")
+st.code(f"Original URL: {TEST_FILE_URL}")
+st.code(f"Cached URL: {cached_url}")
+
+# Show cache status
+if cached_url != TEST_FILE_URL:
+    st.success("✅ File cached successfully!")
+else:
+    st.info("ℹ️ Using original URL (file is cached locally for faster access)")
 
 # Build label colormap based on selected color scheme
 if color_scheme == "Vista3D Rainbow":
@@ -334,9 +381,9 @@ html_template = """
     console.log('- labels length:', labelMap.labels ? labelMap.labels.length : 'undefined');
   }
 
-  // Load volume first with basic settings
+  // Load volume first with basic settings (using cached URL)
   const vol = {
-    url: "%%URL%%",
+    url: "%%CACHED_URL%%",
     opacity: %%OPACITY%%
   };
 
@@ -440,7 +487,7 @@ html = (
     html_template
     .replace("%%LABEL_MAP%%", colormap_label_json)
     .replace("%%TRY_EMBEDDED%%", str(use_embedded_lut).lower())
-    .replace("%%URL%%", TEST_FILE_URL)
+    .replace("%%CACHED_URL%%", cached_url)
     .replace("%%OPACITY%%", str(opacity))
     .replace("%%COLORMAP_NAME%%", colormap_name)
 )
@@ -448,16 +495,16 @@ html = (
 components.html(html, height=820, scrolling=False)
 
 # Basic file sanity + label summary
-st.subheader("Segmentation Summary (v2)")
+st.subheader("File Summary (Cache Test)")
 try:
     import io
     import gzip
     import numpy as np
     import nibabel as nib
-    resp = requests.get(TEST_FILE_URL, timeout=30, verify=False)
+    resp = requests.get(cached_url, timeout=30, verify=False)
     resp.raise_for_status()
     bio = io.BytesIO(resp.content)
-    if TEST_FILE_URL.endswith('.nii.gz'):
+    if cached_url.endswith('.nii.gz'):
         with gzip.GzipFile(fileobj=bio) as gz:
             nii = nib.Nifti1Image.from_bytes(gz.read())
     else:

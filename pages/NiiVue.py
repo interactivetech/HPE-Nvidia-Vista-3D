@@ -7,11 +7,173 @@ from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import json
+from pathlib import Path
+import threading
+import time
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+import socket
+
+# Import the image cache manager
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.image_cache import get_cached_file, get_cache_stats
 
 # --- Initial Setup ---
 st.set_page_config(layout="wide")
 load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
+
+# --- Local Cache Server Setup ---
+class CachedFileHandler(SimpleHTTPRequestHandler):
+    """Custom handler to serve cached files with proper CORS headers and MIME types."""
+    
+    def __init__(self, *args, **kwargs):
+        # Set the cache directory as the base path
+        self.cache_dir = Path.home() / '.cache' / 'vista3d'
+        super().__init__(*args, **kwargs)
+    
+    def guess_type(self, path):
+        """Override to set correct MIME type for NIfTI files."""
+        mimetype = super().guess_type(path)
+        
+        # Set proper MIME type for NIfTI files (matching original server)
+        if path.endswith('.nii.gz'):
+            return 'text/plain; charset=utf-8'
+        elif path.endswith('.nii'):
+            return 'text/plain; charset=utf-8'
+        
+        return mimetype
+    
+    def end_headers(self):
+        # Add CORS headers for NiiVue
+        try:
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            # Add specific headers for NIfTI files
+            self.send_header('Accept-Ranges', 'bytes')
+            super().end_headers()
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected, ignore
+            pass
+    
+    def do_OPTIONS(self):
+        # Handle preflight requests
+        self.send_response(200)
+        self.end_headers()
+    
+    def do_GET(self):
+        """Override GET to ensure proper headers for NIfTI files."""
+        try:
+            # Get the file path
+            path = self.translate_path(self.path)
+            
+            # Check if file exists
+            if not os.path.exists(path):
+                self.send_error(404, "File not found")
+                return
+            
+            # Set content type based on URL path extension (matching original server)
+            url_path = self.path.lstrip('/')
+            if url_path.endswith('.nii.gz'):
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Content-Disposition', 'inline')
+            elif url_path.endswith('.nii'):
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Content-Disposition', 'inline')
+            else:
+                # For other files, use the standard content type detection
+                mimetype = self.guess_type(path)
+                self.send_response(200)
+                self.send_header('Content-Type', mimetype)
+                self.send_header('Content-Disposition', 'inline')
+            
+            # CORS headers are already set in end_headers(), don't duplicate them here
+            
+            # Get file size and send headers
+            file_size = os.path.getsize(path)
+            self.send_header('Content-Length', str(file_size))
+            self.end_headers()
+            
+            # Send file content with error handling
+            try:
+                with open(path, 'rb') as f:
+                    # Read and send file in chunks to handle large files better
+                    while True:
+                        chunk = f.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        try:
+                            self.wfile.write(chunk)
+                        except (BrokenPipeError, ConnectionResetError):
+                            # Client disconnected, stop sending
+                            break
+            except (BrokenPipeError, ConnectionResetError):
+                # Client disconnected during file read, ignore
+                pass
+        except (BrokenPipeError, ConnectionResetError):
+            # Client disconnected during request processing, ignore
+            pass
+    
+    def translate_path(self, path):
+        """Translate URL path to file system path within cache directory."""
+        # Remove leading slash and get filename
+        filename = path.lstrip('/')
+        if not filename:
+            filename = 'index.html'
+        
+        # If it's a .nii.gz file, look for the corresponding .cached file
+        if filename.endswith('.nii.gz'):
+            # Extract the hash from the filename (assuming format: hash.nii.gz)
+            hash_name = filename.replace('.nii.gz', '')
+            cached_filename = f"{hash_name}.cached"
+            cache_path = self.cache_dir / cached_filename
+            if cache_path.exists():
+                return str(cache_path)
+        
+        # Look for the file directly in cache directory
+        cache_path = self.cache_dir / filename
+        if cache_path.exists():
+            return str(cache_path)
+        
+        # Fallback to parent implementation
+        return super().translate_path(path)
+
+def find_free_port(start_port=8889, end_port=8900):
+    """Find a free port in the given range."""
+    for port in range(start_port, end_port):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('localhost', port))
+                return port
+        except OSError:
+            continue
+    return None
+
+def start_cache_server():
+    """Start the local cache server in a separate thread."""
+    port = find_free_port()
+    if port is None:
+        return None
+    
+    try:
+        # Create server
+        server = HTTPServer(('localhost', port), CachedFileHandler)
+        
+        # Start server in daemon thread
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        
+        return f"http://localhost:{port}"
+    except Exception as e:
+        st.error(f"Failed to start cache server: {e}")
+        return None
+
+# Initialize cache server
+if 'cache_server_url' not in st.session_state:
+    st.session_state.cache_server_url = start_cache_server()
 
 # --- Helper Functions ---
 def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
@@ -56,9 +218,70 @@ def get_server_data(path: str, type: str, file_extensions: tuple):
         return sorted([item['name'] for item in items if not item['is_directory'] and item['name'].lower().endswith(file_extensions)])
     return []
 
+def get_cached_file_url(remote_url: str) -> str:
+    """
+    Get a cached version of a file and return a URL for the viewer.
+    
+    Downloads and caches the file locally, then serves it via the local cache server.
+    
+    Args:
+        remote_url: The remote URL of the file to cache
+        
+    Returns:
+        URL that can be used by the NiiVue viewer
+    """
+    try:
+        # Get the cached file path (this downloads and caches if needed)
+        cached_path = get_cached_file(remote_url)
+        
+        # Log cache hit/miss for debugging
+        stats = get_cache_stats()
+        st.sidebar.info(f"Cache: {stats['entries_count']} files, {stats['hit_rate']:.1%} hit rate")
+        
+        # Check if local cache server is running
+        if st.session_state.cache_server_url:
+            # Get the filename from the cached path and convert .cached to .nii.gz
+            filename = cached_path.name
+            if filename.endswith('.cached'):
+                # Convert .cached to .nii.gz for proper NiiVue detection
+                nifti_filename = filename.replace('.cached', '.nii.gz')
+                cached_url = f"{st.session_state.cache_server_url}/{nifti_filename}"
+            else:
+                cached_url = f"{st.session_state.cache_server_url}/{filename}"
+            return cached_url
+        else:
+            # Fallback to original URL if local server failed
+            st.warning("⚠️ Local cache server not available, using original URL")
+            return remote_url
+        
+    except Exception as e:
+        st.error(f"Cache error: {e}")
+        # Fallback to remote URL if caching fails
+        return remote_url
+
 # --- Sidebar UI ---
 with st.sidebar:
+    # Navigation
+    st.header("Navigation")
+    if st.button("🏠 Home", use_container_width=True):
+        st.switch_page("app.py")
+    
+    if st.button("💾 Cache Management", use_container_width=True):
+        st.switch_page("pages/cache.py")
+    
+    st.markdown("---")
+    
+    # Cache server status
+    if st.session_state.cache_server_url:
+        st.success(f"✅ Cache server: {st.session_state.cache_server_url}")
+    else:
+        st.error("❌ Cache server not running")
+    
+    st.markdown("---")
+    
     st.header("Controls")
+    
+    st.header("Data Selection")
     data_sources = ['nifti', 'segments']
     selected_source = st.selectbox("Select Data Source", data_sources)
 
@@ -165,23 +388,41 @@ if selected_file:
         # The segmentation files have the same filename as the original NIfTI files
         segment_filename = selected_file
         segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
+    
+    # Get cached versions of the files
+    st.info("🔄 Loading and caching files...")
+    
+    # Debug information
+    st.write(f"**Original URL:** `{base_file_url}`")
+    
+    cached_base_url = get_cached_file_url(base_file_url)
+    cached_segment_url = get_cached_file_url(segment_url) if segment_url else ''
+    
+    # Debug information
+    st.write(f"**Cached URL:** `{cached_base_url}`")
+    
+    # Check if URLs are different (indicating cache is working)
+    if cached_base_url != base_file_url:
+        st.success("✅ Using cached file!")
+    else:
+        st.warning("⚠️ Using original URL (cache may not be working)")
 
     slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
     actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
 
     # --- HTML and Javascript for NiiVue ---
-    # Prepare main volume with proper configuration
+    # Prepare main volume with proper configuration using cached URLs
     if selected_source != 'segments':
         # For NIfTI files, use basic configuration and apply colormap after loading
-        main_volume_entry = f"{{ url: \"{base_file_url}\", opacity: {nifti_opacity} }}"
+        main_volume_entry = f"{{ url: \"{cached_base_url}\", opacity: {nifti_opacity} }}"
     else:
         # For segments, use custom Vista3D colormap
-        main_volume_entry = f"{{ url: \"{base_file_url}\", colormap: \"custom_segmentation\" }}"
+        main_volume_entry = f"{{ url: \"{cached_base_url}\", colormap: \"custom_segmentation\" }}"
     
     # Prepare volume list including overlay if needed
     volume_list_entries = [main_volume_entry]
-    if show_overlay and segment_url:
-        overlay_entry = f"{{ url: \"{segment_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
+    if show_overlay and cached_segment_url:
+        overlay_entry = f"{{ url: \"{cached_segment_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
         volume_list_entries.append(overlay_entry)
     
     volume_list_js = "[" + ", ".join(volume_list_entries) + "]"
