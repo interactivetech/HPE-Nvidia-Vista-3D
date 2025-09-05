@@ -260,8 +260,6 @@ def get_cached_file_url(remote_url: str) -> str:
 # --- Sidebar UI ---
 with st.sidebar:
     
-    st.header("Controls")
-    
     st.header("Data Selection")
     data_sources = ['nifti', 'segments']
     selected_source = st.selectbox("Select Data Source", data_sources)
@@ -276,8 +274,6 @@ with st.sidebar:
         selected_file = st.selectbox("Select File", filenames)
 
     # --- Viewer Settings ---
-    st.header("Viewer Settings")
-
     # Only show slice type selector when not viewing segments directly
     if selected_source != 'segments':
         st.subheader("Slice Type")
