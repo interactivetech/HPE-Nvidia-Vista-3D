@@ -63,12 +63,23 @@ with st.sidebar:
         _, files = list_server_dir(files_path)
     default_file = "2.5_mm_STD_-_30%_ASIR_2.nii.gz" if "2.5_mm_STD_-_30%_ASIR_2.nii.gz" in files else (files[0] if files else "")
     selected_file = st.selectbox("Select file (server)", files or [""], index=(files.index(default_file) if default_file in files else 0))
+    
+    # Color scheme selection
+    color_scheme = st.radio(
+        "Color Scheme",
+        ["Vista3D Standard", "Vista3D Rainbow"],
+        index=0,
+        help="Choose between standard Vista3D colors or rainbow color mapping"
+    )
+    
     use_embedded_lut = st.radio(
         "Color Source",
         ["Vista3D JSON", "NIfTI embedded (if present)"],
         index=0,
     ).startswith("NIfTI")
     opacity = st.slider("Opacity", 0.0, 1.0, 1.0)
+    
+    
     custom_url = st.text_input("Or paste full image URL (overrides selection)", value="")
 
 # If a valid selection was made, update the test file URL
@@ -83,8 +94,13 @@ if custom_url.strip().startswith("http"):
 st.write(f"Using test file: `{TEST_REL_PATH}`")
 st.code(f"URL: {TEST_FILE_URL}")
 
-# Build label colormap from conf/vista3d_label_colors.json
-label_colors_path = "conf/vista3d_label_colors.json"
+# Build label colormap based on selected color scheme
+if color_scheme == "Vista3D Rainbow":
+    label_colors_path = "conf/vista3d_label_rainbow_colors.json"
+    colormap_name = "Vista3D_Rainbow"
+else:
+    label_colors_path = "conf/vista3d_label_colors.json"
+    colormap_name = "Vista3D"
 
 # Collect all label data first
 label_data = []
@@ -117,7 +133,7 @@ try:
     label_data.sort(key=lambda x: x["id"])
     
 except Exception as e:
-    st.error(f"Failed to load label colors: {e}")
+    st.error(f"Failed to load label colors from {label_colors_path}: {e}")
     label_data = [{"id": 0, "name": "Background", "color": [0, 0, 0], "alpha": 0}]
 
 # Build NiiVue colormap arrays
@@ -148,7 +164,7 @@ colormap_label_json = json.dumps(
     }
 )
 
-st.write(f"Built colormap for {len(label_data)} labels (IDs: {i_values[:10]}...)")
+st.write(f"Built {color_scheme} colormap for {len(label_data)} labels (IDs: {i_values[:10]}...)")
 
 # Debug: Show some bone entries
 st.subheader("Bone Color Mapping (Debug)")
@@ -174,6 +190,52 @@ html_template = """
   .ok { color: #0f0; }
   .warn { color: #ff0; }
   .err { color: #f55; }
+  
+  /* Viewer Controls Overlay */
+  #controls { 
+    position: absolute; 
+    top: 8px; 
+    right: 8px; 
+    background: rgba(0,0,0,0.8); 
+    padding: 12px; 
+    border-radius: 6px;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    min-width: 200px;
+  }
+  
+  #controls label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: bold;
+  }
+  
+  #controls select, #controls input[type="range"] {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 4px;
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 3px;
+  }
+  
+  #controls input[type="checkbox"] {
+    margin-right: 8px;
+  }
+  
+  .control-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .gamma-display {
+    color: #ccc;
+    font-size: 12px;
+    margin-left: 8px;
+  }
 </style>
 <div id="wrap">
   <div id="status">
@@ -182,6 +244,47 @@ html_template = """
     <div class="row" id="s-load">Load: ...</div>
     <div class="row" id="s-colormap">Colormap: ...</div>
   </div>
+  
+  <!-- Viewer Controls Overlay -->
+  <div id="controls">
+    <label for="colormap-select">Colormap:</label>
+    <select id="colormap-select">
+      <option value="gray">gray</option>
+      <option value="warm">warm</option>
+      <option value="cool">cool</option>
+      <option value="plasma">plasma</option>
+      <option value="viridis">viridis</option>
+      <option value="inferno">inferno</option>
+      <option value="magma">magma</option>
+      <option value="turbo">turbo</option>
+      <option value="rainbow">rainbow</option>
+      <option value="hsv">hsv</option>
+      <option value="hot">hot</option>
+      <option value="spring">spring</option>
+      <option value="summer">summer</option>
+      <option value="autumn">autumn</option>
+      <option value="winter">winter</option>
+      <option value="bone">bone</option>
+      <option value="copper">copper</option>
+      <option value="pink">pink</option>
+      <option value="jet">jet</option>
+      <option value="cubehelix">cubehelix</option>
+      <option value="Vista3D">Vista3D</option>
+      <option value="Vista3D_Rainbow">Vista3D Rainbow</option>
+    </select>
+    
+    <div class="control-row">
+      <input type="checkbox" id="invert-checkbox"> 
+      <label for="invert-checkbox">Invert</label>
+    </div>
+    
+    <label for="gamma-slider">Gamma:</label>
+    <div class="control-row">
+      <input type="range" id="gamma-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+      <span class="gamma-display" id="gamma-value">1.0</span>
+    </div>
+  </div>
+  
   <canvas id="gl"></canvas>
 </div>
 
@@ -212,6 +315,12 @@ html_template = """
   const labelMap = %%LABEL_MAP%%;
   const tryEmbedded = %%TRY_EMBEDDED%%;
   
+  // Get control elements
+  const colormapSelect = document.getElementById('colormap-select');
+  const invertCheckbox = document.getElementById('invert-checkbox');
+  const gammaSlider = document.getElementById('gamma-slider');
+  const gammaDisplay = document.getElementById('gamma-value');
+  
   // Validate colormap data
   console.log('Colormap validation:');
   console.log('- labelMap exists:', !!labelMap);
@@ -240,9 +349,10 @@ html_template = """
     console.log('Volume loaded successfully');
     console.log('Volume data range:', vol0.global_min, 'to', vol0.global_max);
     
-    // Apply Vista3D colormap using proper NiiVue method
+    // Add Vista3D colormap if available
+    const colormapName = "%%COLORMAP_NAME%%";
     if (labelMap && labelMap.R && labelMap.R.length > 0) {
-      console.log('Adding Vista3D colormap to NiiVue...');
+      console.log(`Adding ${colormapName} colormap to NiiVue...`);
       console.log('Colormap sample - first 10 entries:');
       for (let i = 0; i < Math.min(10, labelMap.I.length); i++) {
         console.log(`  ID ${labelMap.I[i]}: ${labelMap.labels[i]} → RGB(${labelMap.R[i]}, ${labelMap.G[i]}, ${labelMap.B[i]})`);
@@ -258,18 +368,66 @@ html_template = """
       }
       
       // Add the colormap to NiiVue's colormap collection
-      nv.addColormap('Vista3D', labelMap);
-      
-      // Apply the colormap to the volume
-      const volumeId = vol0.id;
-      console.log('Setting colormap Vista3D for volume ID:', volumeId);
-      nv.setColormap(volumeId, 'Vista3D');
-      
-      s3.textContent = `Colormap: Vista3D applied (${labelMap.R.length} colors)`;
-      console.log('Vista3D colormap successfully applied');
-    } else {
-      s3.textContent = 'Colormap: no valid colormap data';
+      nv.addColormap(colormapName, labelMap);
+      console.log(`${colormapName} colormap added to NiiVue collection`);
     }
+    
+    // Set default colormap to the selected Vista3D colormap if available, otherwise gray
+    const volumeId = vol0.id;
+    const defaultColormap = (labelMap && labelMap.R && labelMap.R.length > 0) ? colormapName : 'gray';
+    
+    colormapSelect.value = defaultColormap;
+    console.log(`Setting initial colormap '${defaultColormap}' for volume ID:`, volumeId);
+    
+    try {
+      nv.setColormap(volumeId, defaultColormap);
+      console.log(`Successfully applied initial colormap: ${defaultColormap}`);
+    } catch (e) {
+      console.warn(`Failed to apply colormap '${defaultColormap}', falling back to 'gray':`, e);
+      nv.setColormap(volumeId, 'gray');
+      colormapSelect.value = 'gray';
+    }
+    
+    s3.textContent = `Colormap: ${defaultColormap}`;
+    
+    // Set up event listeners for controls
+    function updateColormap() {
+      const selectedColormap = colormapSelect.value;
+      console.log(`Changing colormap to: ${selectedColormap}`);
+      
+      try {
+        nv.setColormap(volumeId, selectedColormap);
+        s3.textContent = `Colormap: ${selectedColormap} (γ=${gammaSlider.value}, invert=${invertCheckbox.checked})`;
+      } catch (e) {
+        console.warn(`Failed to apply colormap '${selectedColormap}':`, e);
+      }
+    }
+    
+    function updateGamma() {
+      const gamma = parseFloat(gammaSlider.value);
+      gammaDisplay.textContent = gamma.toFixed(1);
+      console.log(`Setting gamma to: ${gamma}`);
+      nv.setGamma(gamma);
+      s3.textContent = `Colormap: ${colormapSelect.value} (γ=${gamma}, invert=${invertCheckbox.checked})`;
+    }
+    
+    function updateInvert() {
+      const invert = invertCheckbox.checked;
+      console.log(`Setting colormap invert to: ${invert}`);
+      vol0.colormapInvert = invert;
+      nv.updateGLVolume(); // Required for inversion changes
+      s3.textContent = `Colormap: ${colormapSelect.value} (γ=${gammaSlider.value}, invert=${invert})`;
+    }
+    
+    // Add event listeners
+    colormapSelect.addEventListener('change', updateColormap);
+    gammaSlider.addEventListener('input', updateGamma);
+    invertCheckbox.addEventListener('change', updateInvert);
+    
+    // Initialize gamma display
+    gammaDisplay.textContent = gammaSlider.value;
+    
+    console.log('Viewer controls initialized and ready');
   } catch (e) {
     console.error('Load error details:', e);
     s2.textContent = 'Load: error - ' + e.message;
@@ -284,6 +442,7 @@ html = (
     .replace("%%TRY_EMBEDDED%%", str(use_embedded_lut).lower())
     .replace("%%URL%%", TEST_FILE_URL)
     .replace("%%OPACITY%%", str(opacity))
+    .replace("%%COLORMAP_NAME%%", colormap_name)
 )
 
 components.html(html, height=820, scrolling=False)

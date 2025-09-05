@@ -72,21 +72,54 @@ with st.sidebar:
         selected_file = st.selectbox("Select File", filenames)
 
     # --- Viewer Settings ---
+    st.header("Viewer Settings")
+    
+    # NIfTI Image Controls
     if selected_source != 'segments':
-        st.header("Viewer Settings")
+        st.subheader("NIfTI Image")
+        nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
+        nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
+        
+        # Overlay Controls
         show_overlay = False
-        overlay_opacity = 0.5
+        segment_opacity = 0.5
+        segment_gamma = 1.0
         if selected_source == 'nifti' and selected_file:
             show_overlay = st.checkbox("Show Segmentation Overlay", value=False)
             if show_overlay:
-                overlay_opacity = st.slider("Overlay Opacity", 0.0, 1.0, 0.5)
+                st.subheader("Segment Overlay")
+                segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
+                segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     else:
-        show_overlay = False # Default when hidden
-        overlay_opacity = 0.5 # Default when hidden
+        # For segments data source, only segment controls are relevant
+        st.subheader("Segment Image")
+        nifti_opacity = 1.0  # Not used
+        nifti_gamma = 1.0    # Not used
+        show_overlay = False
+        segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
+        segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
 
     if selected_source == 'segments':
         slice_type = "3D Render"
         orientation = "Axial" # This won't be used, but good to set a default
+        
+        # Show Segment Colors widget for segments data source
+        with st.expander("Segment Colors", expanded=False):
+            try:
+                with open('conf/vista3d_label_colors.json', 'r') as f:
+                    label_dict = json.load(f)
+                
+                for label_info in label_dict:
+                    label_name = label_info["name"]
+                    label_id = label_info["id"]
+                    color_rgb = label_info["color"]
+                    color_hex = f"#{color_rgb[0]:02x}{color_rgb[1]:02x}{color_rgb[2]:02x}"
+                    st.markdown(f"<div style=\"display: flex; align-items: center; margin-bottom: 5px;\">"
+                                f"<div style=\"width: 20px; height: 20px; background-color: {color_hex}; border: 1px solid #ccc; margin-right: 10px;\"></div>"
+                                f"<span>{label_name} (ID: {label_id})</span>"
+                                f"</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error loading segment colors: {e}")
     else:
         slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
         orientation = "Axial"
@@ -95,7 +128,26 @@ with st.sidebar:
 
     # Only show colormap selector when not viewing segments directly
     if selected_source != 'segments':
+        st.subheader("NIfTI Color Map")
         color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
+        
+        # Show Segment Colors widget at bottom for nifti data source (useful for overlays)
+        with st.expander("Segment Colors", expanded=False):
+            try:
+                with open('conf/vista3d_label_colors.json', 'r') as f:
+                    label_dict = json.load(f)
+                
+                for label_info in label_dict:
+                    label_name = label_info["name"]
+                    label_id = label_info["id"]
+                    color_rgb = label_info["color"]
+                    color_hex = f"#{color_rgb[0]:02x}{color_rgb[1]:02x}{color_rgb[2]:02x}"
+                    st.markdown(f"<div style=\"display: flex; align-items: center; margin-bottom: 5px;\">" 
+                                f"<div style=\"width: 20px; height: 20px; background-color: {color_hex}; border: 1px solid #ccc; margin-right: 10px;\"></div>" 
+                                f"<span>{label_name} (ID: {label_id})</span>" 
+                                f"</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error loading segment colors: {e}")
     else:
         color_map = 'gray'  # Default value, won't be used
 
@@ -105,29 +157,39 @@ if selected_file:
     base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
     segment_url = ''
     if show_overlay:
-        base_name = selected_file.replace('.nii.gz', '').replace('.nii', '')
-        segment_filename = f"{base_name}_colored_seg.nii.gz"
+        # The segmentation files have the same filename as the original NIfTI files
+        segment_filename = selected_file
         segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
 
     slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
     actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
 
     # --- HTML and Javascript for NiiVue ---
+    # Prepare main volume
     volume_list_entry_parts = [f"url: \"{base_file_url}\""]
-    # Only apply colormap when not viewing segments directly
+    # Apply appropriate colormap based on data source
     if selected_source != 'segments':
         volume_list_entry_parts.append(f"colormap: \"{color_map}\"")
     else:
-        # For segments, specify that this is RGB data
-        volume_list_entry_parts.append("colormap: \"rgb\"")
-    volume_list_entry = "{ " + ", ".join(volume_list_entry_parts) + " }"
+        # For segments, use custom Vista3D colormap by default
+        volume_list_entry_parts.append("colormap: \"custom_segmentation\"")
+    main_volume_entry = "{ " + ", ".join(volume_list_entry_parts) + " }"
+    
+    # Prepare volume list including overlay if needed
+    volume_list_entries = [main_volume_entry]
+    if show_overlay and segment_url:
+        # Use a standard colormap initially, we'll apply custom colormap after loading
+        overlay_entry = f"{{ url: \"{segment_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
+        volume_list_entries.append(overlay_entry)
+    
+    volume_list_js = "[" + ", ".join(volume_list_entries) + "]"
 
     # --- Prepare Custom Colormap for Segments ---
+    # ALWAYS load Vista3D colormap since segments should always use it
     custom_colormap_js = ""
-    if show_overlay or selected_source == 'segments':
-        try:
-            with open('conf/vista3d_label_colors.json', 'r') as f:
-                label_colors_list = json.load(f)
+    try:
+        with open('conf/vista3d_label_colors.json', 'r') as f:
+            label_colors_list = json.load(f)
 
             r_values = [0] * 256 # Assuming max ID is less than 256, adjust if needed
             g_values = [0] * 256
@@ -163,19 +225,19 @@ if selected_file:
             a_values = a_values[:max_id + 1]
             labels = labels[:max_id + 1]
 
-            custom_colormap_js = f"""
-                const customSegmentationColormap = {{
-                    R: [{ ",".join(map(str, r_values)) }],
-                    G: [{ ",".join(map(str, g_values)) }],
-                    B: [{ ",".join(map(str, b_values)) }],
-                    A: [{ ",".join(map(str, a_values)) }],
-                    labels: [{ ",".join(f'"{l}"' for l in labels) }]
-                }}; 
-                console.log('Custom colormap loaded:', customSegmentationColormap);
-                """
-        except Exception as e:
-            st.error(f"Error loading label_dict.json: {e}")
-            custom_colormap_js = "" # Ensure it's empty if error
+        custom_colormap_js = f"""
+            const customSegmentationColormap = {{
+                R: [{ ",".join(map(str, r_values)) }],
+                G: [{ ",".join(map(str, g_values)) }],
+                B: [{ ",".join(map(str, b_values)) }],
+                A: [{ ",".join(map(str, a_values)) }],
+                labels: [{ ",".join(f'"{l}"' for l in labels) }]
+            }}; 
+            console.log('Vista3D colormap loaded from vista3d_label_colors.json:', customSegmentationColormap);
+            """
+    except Exception as e:
+        st.error(f"Error loading vista3d_label_colors.json: {e}")
+        custom_colormap_js = "" # Ensure it's empty if error
 
     html_string = f"""<!DOCTYPE html>
 <html>
@@ -189,6 +251,7 @@ if selected_file:
 <body>
     <canvas id=\"niivue-canvas\"></canvas>
     <script src=\"{IMAGE_SERVER_URL}/assets/niivue.umd.js\"></script>
+    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js\"></script>
     <script>
         if (typeof niivue === 'undefined') {{
             console.error('Niivue library not loaded!');
@@ -198,7 +261,10 @@ if selected_file:
             console.log('🔧 Creating NiiVue instance...');
             const nv = new niivue.Niivue ({{
                 sliceType: {actual_slice_type},
-                isColorbar: true
+                isColorbar: false,
+                loadingText: 'loading ...',
+                dragAndDropEnabled: false,
+                isResizeCanvas: true
             }});
             console.log('🔧 NiiVue instance created:', nv);
             
@@ -206,110 +272,186 @@ if selected_file:
             nv.attachTo('niivue-canvas');
             console.log('🔧 Canvas attached, canvas element:', document.getElementById('niivue-canvas'));
 
-            const volumeList = [{volume_list_entry}];
+            const volumeList = {volume_list_js};
             
             console.log('🚀 Starting to load volumes:', volumeList);
             console.log('📁 File URL:', volumeList[0].url);
             console.log('🎨 Volume colormap:', volumeList[0].colormap);
             
-            // TEST: Verify we can access the file URL directly
-            console.log('🔗 Testing file accessibility...');
-            fetch(volumeList[0].url, {{ method: 'HEAD' }})
-                .then(response => {{
-                    console.log('✅ File accessible:', response.status, response.statusText);
-                    console.log('📂 Content-Type:', response.headers.get('content-type'));
-                    console.log('📏 Content-Length:', response.headers.get('content-length'));
+            // Define a function to handle successful volume loading
+            function handleVolumeLoaded() {{
+                console.log('📊 Volume matrix:', nv.volumes[0].matRAS);
+                console.log('📊 Volume colormap:', nv.volumes[0].colormap);
+                console.log('📊 Volume opacity:', nv.volumes[0].opacity);
+                
+                // Check canvas and WebGL context
+                const canvas = document.getElementById('niivue-canvas');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                console.log('🖼️ Canvas:', canvas);
+                console.log('🖼️ Canvas size:', canvas.width + 'x' + canvas.height);
+                console.log('🖼️ WebGL context:', gl);
+                console.log('🖼️ NiiVue scene:', nv.scene);
+                console.log('🖼️ NiiVue ready:', nv.isLoaded);
+                
+                // Apply colormap and settings
+                {custom_colormap_js}
+                
+                // Register Vista3D colormap - always available now
+                if (typeof customSegmentationColormap !== 'undefined') {{
+                    try {{
+                        console.log('🎨 Registering Vista3D colormap');
+                        nv.addColormap('custom_segmentation', customSegmentationColormap);
+                        console.log('✅ Vista3D colormap registered successfully');
+                    }} catch (colormapError) {{
+                        console.error('❌ Failed to register Vista3D colormap:', colormapError);
+                    }}
+                }} else {{
+                    console.error('❌ Vista3D colormap not loaded from vista3d_label_colors.json');
+                }}
+                
+                // Configure overlay volumes if they were loaded
+                if (nv.volumes.length > 1) {{
+                    console.log('🎨 Configuring overlay volumes...');
+                    
+                    // Configure each overlay volume (skip the first volume which is the main image)
+                    for (let i = 1; i < nv.volumes.length; i++) {{
+                        const overlayVol = nv.volumes[i];
+                        console.log(`🎨 Configuring overlay volume ${{i}}:`, overlayVol.id);
+                        
+                        // Set opacity
+                        overlayVol.opacity = {segment_opacity};
+                        
+                        // Apply Vista3D colormap for overlays
+                        if (typeof customSegmentationColormap !== 'undefined') {{
+                            try {{
+                                console.log('🎨 Applying Vista3D colormap to overlay');
+                                nv.setColormap(overlayVol.id, 'custom_segmentation');
+                                console.log('✅ Vista3D colormap applied to overlay successfully');
+                            }} catch (cmapError) {{
+                                console.error('❌ Failed to apply Vista3D colormap to overlay:', cmapError);
+                                console.log('🔄 Falling back to warm colormap');
+                                nv.setColormap(overlayVol.id, 'warm');
+                            }}
+                        }} else {{
+                            console.error('❌ Vista3D colormap not available for overlay');
+                            nv.setColormap(overlayVol.id, 'warm');
+                        }}
+                        
+                        console.log(`🎨 Overlay volume ${{i}} configuration:`, {{
+                            id: overlayVol.id,
+                            opacity: overlayVol.opacity,
+                            colormap: overlayVol.colormap
+                        }});
+                    }}
+                }} else {{
+                    console.log('📊 Single volume loaded (no overlays)');
+                }}
+                
+                // Apply Vista3D colormap to segments data source
+                if ('{selected_source}' === 'segments' && nv.volumes.length > 0) {{
+                    console.log('🎨 Applying Vista3D colormap to segments main volume');
+                    const mainVol = nv.volumes[0];
+                    if (typeof customSegmentationColormap !== 'undefined') {{
+                        try {{
+                            nv.setColormap(mainVol.id, 'custom_segmentation');
+                            console.log('✅ Vista3D colormap applied to main segments volume');
+                        }} catch (cmapError) {{
+                            console.error('❌ Failed to apply Vista3D colormap to main volume:', cmapError);
+                        }}
+                    }} else {{
+                        console.error('❌ Vista3D colormap not available for segments data source');
+                    }}
+                }}
+                
+                // Apply gamma settings
+                if ('{selected_source}' !== 'segments') {{
+                    // Set gamma for NIfTI image
+                    console.log('🎛️ Setting NIfTI gamma to {nifti_gamma}');
+                    nv.setGamma({nifti_gamma});
+                }} else {{
+                    // Set gamma for segment image
+                    console.log('🎛️ Setting segment gamma to {segment_gamma}');
+                    nv.setGamma({segment_gamma});
+                }}
+                
+                // Set gamma for overlay if present
+                if (nv.volumes.length > 1) {{
+                    // Note: NiiVue gamma is global, but we can set per-volume properties
+                    console.log('🎛️ Setting overlay gamma to {segment_gamma}');
+                    // For overlays, we'll need to handle gamma differently if needed
+                }}
+                
+                if ({actual_slice_type} === 3) {{
+                    console.log('🖼️ Setting slice type to Multiplanar');
+                    nv.setSliceType(nv.sliceType.MULTIPLANAR);
+                    nv.opts.multiplanarShowRender = 'ALWAYS';
+                }}
+                
+                // Try multiple rendering approaches
+                console.log('🔄 Attempting multiple rendering approaches...');
+                
+                // Approach 1: Simple drawScene
+                nv.drawScene();
+                console.log('✓ Called drawScene()');
+                
+                // Approach 2: Set intensity range and redraw
+                const vol = nv.volumes[0];
+                console.log('🔧 Setting intensity range for volume...');
+                nv.setVolume(vol, 0);
+                console.log('✓ Called setVolume()');
+                
+                // Approach 3: Force viewport update
+                setTimeout(() => {{
+                    console.log('🔄 Delayed redraw attempt...');
+                    nv.drawScene();
+                    console.log('✓ Delayed drawScene() completed');
+                    
+                    // Check if anything is actually rendered
+                    const imageData = canvas.getContext('2d') ? 
+                        canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height) :
+                        'WebGL canvas - cannot read pixel data directly';
+                    console.log('🖼️ Canvas content check:', typeof imageData);
+                    
+                    // Log current slice position and crosshair
+                    console.log('📍 Current slice position:', nv.scene.crosshairPos);
+                    console.log('📍 Scene renderShader:', nv.scene.renderShader ? 'exists' : 'missing');
+                    
+                }}, 1000);
+            }}
+            
+            // Load volumes with a simple approach
+            console.log('📋 Loading volumes with simplified approach');
+            
+            nv.loadVolumes(volumeList)
+                .then(() => {{
+                    console.log('✅ SUCCESS! Volumes loaded');
+                    console.log('📊 Volumes loaded:', nv.volumes.length);
+                    if (nv.volumes.length > 0) {{
+                        console.log('📊 Volume details:', nv.volumes[0]);
+                        console.log('📊 Volume dimensions:', nv.volumes[0].dims);
+                        console.log('📊 Volume data range:', {{min: nv.volumes[0].global_min, max: nv.volumes[0].global_max}});
+                        handleVolumeLoaded();
+                    }}
                 }})
                 .catch(error => {{
-                    console.error('❌ File accessibility test failed:', error);
+                    console.error('❌ Failed to load volumes:', error);
+                    
+                    // Simple fallback: try with individual volume loading
+                    console.log('🔄 Trying individual volume loading...');
+                    const promises = volumeList.map((vol, index) => {{
+                        console.log(`Loading volume ${{index + 1}}:`, vol.url);
+                        return nv.loadVolumes([vol]);
+                    }});
+                    
+                    Promise.all(promises)
+                        .then(() => {{
+                            console.log('✅ Individual loading successful');
+                            handleVolumeLoaded();
+                        }})
+                        .catch(fallbackError => {{
+                            console.error('❌ Individual loading also failed:', fallbackError);
+                        }});
                 }});
-            
-            // TRY APPROACH 1: Simple call like the backup version (no promises)
-            console.log('📋 TRYING: Simple loadVolumes call (like working backup)');
-            nv.loadVolumes(volumeList);
-            
-            // Check multiple times to see if/when it loads
-            let checkCount = 0;
-            const checkInterval = setInterval(() => {{
-                checkCount++;
-                console.log(`⏰ Check #${{checkCount}}: Volumes loaded:`, nv.volumes ? nv.volumes.length : 'none');
-                
-                if (nv.volumes && nv.volumes.length > 0) {{
-                    console.log('✅ SUCCESS! Volume loaded:');
-                    console.log('📊 Volume details:', nv.volumes[0]);
-                    console.log('📊 Volume dimensions:', nv.volumes[0].dims);
-                    console.log('📊 Volume data range:', {{min: nv.volumes[0].global_min, max: nv.volumes[0].global_max}});
-                    console.log('📊 Volume matrix:', nv.volumes[0].matRAS);
-                    console.log('📊 Volume colormap:', nv.volumes[0].colormap);
-                    console.log('📊 Volume opacity:', nv.volumes[0].opacity);
-                    
-                    clearInterval(checkInterval);
-                    
-                    // Check canvas and WebGL context
-                    const canvas = document.getElementById('niivue-canvas');
-                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                    console.log('🖼️ Canvas:', canvas);
-                    console.log('🖼️ Canvas size:', canvas.width + 'x' + canvas.height);
-                    console.log('🖼️ WebGL context:', gl);
-                    console.log('🖼️ NiiVue scene:', nv.scene);
-                    console.log('🖼️ NiiVue ready:', nv.isLoaded);
-                    
-                    // Apply colormap and settings
-                    {custom_colormap_js}
-                    if (typeof customSegmentationColormap !== 'undefined' && '{selected_source}' !== 'segments') {{
-                        console.log('🎨 Setting label colormap for overlay');
-                        nv.setColormapLabel(customSegmentationColormap);
-                    }} else if ('{selected_source}' === 'segments') {{
-                        console.log('🎨 Segments loaded - no colormap manipulation needed');
-                    }}
-                    
-                    if ('{segment_url}') {{
-                        console.log('🔗 Loading segmentation overlay from:', '{segment_url}');
-                        nv.loadDrawingFromUrl('{segment_url}');
-                    }}
-                    
-                    if ({actual_slice_type} === 3) {{
-                        console.log('🖼️ Setting slice type to Multiplanar');
-                        nv.setSliceType(nv.sliceType.MULTIPLANAR);
-                        nv.opts.multiplanarShowRender = 'ALWAYS';
-                    }}
-                    
-                    // Try multiple rendering approaches
-                    console.log('🔄 Attempting multiple rendering approaches...');
-                    
-                    // Approach 1: Simple drawScene
-                    nv.drawScene();
-                    console.log('✓ Called drawScene()');
-                    
-                    // Approach 2: Set intensity range and redraw
-                    const vol = nv.volumes[0];
-                    console.log('🔧 Setting intensity range for volume...');
-                    nv.setVolume(vol, 0);
-                    console.log('✓ Called setVolume()');
-                    
-                    // Approach 3: Force viewport update
-                    setTimeout(() => {{
-                        console.log('🔄 Delayed redraw attempt...');
-                        nv.drawScene();
-                        console.log('✓ Delayed drawScene() completed');
-                        
-                        // Check if anything is actually rendered
-                        const imageData = canvas.getContext('2d') ? 
-                            canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height) :
-                            'WebGL canvas - cannot read pixel data directly';
-                        console.log('🖼️ Canvas content check:', typeof imageData);
-                        
-                        // Log current slice position and crosshair
-                        console.log('📍 Current slice position:', nv.scene.crosshairPos);
-                        console.log('📍 Scene renderShader:', nv.scene.renderShader ? 'exists' : 'missing');
-                        
-                    }}, 1000);
-                    
-                }} else if (checkCount >= 20) {{ // Stop checking after 10 seconds
-                    console.log('❌ Timeout: Volume never loaded after 10 seconds');
-                    clearInterval(checkInterval);
-                }}
-            }}, 500); // Check every 500ms
         }}
     </script>
 </body>
@@ -319,3 +461,4 @@ if selected_file:
     components.html(html_string, height=1000, scrolling=False)
 else:
     st.info("Select a data source, patient, and file to begin.")
+

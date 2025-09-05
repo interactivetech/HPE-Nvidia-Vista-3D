@@ -1,14 +1,6 @@
 import streamlit as st
 from pathlib import Path
-import json
 
-# Load label dictionaries
-PROJECT_ROOT = Path(__file__).parent
-LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
-LABEL_COLORS_PATH = PROJECT_ROOT / "conf" / "label_colors.json"
-
-with open(LABEL_DICT_PATH, 'r') as f:
-    LABEL_DICT = json.load(f)
 
 st.set_page_config(
     page_title="NIfTI Vessel Segmentation and Viewer",
@@ -26,15 +18,3 @@ with st.sidebar:
     image_path = Path(__file__).parent / "assets" / "CT-Image-Planes-768x768.jpeg"
     st.image(str(image_path), caption="CT Image Planes (Axial, Sagittal, Coronal)", use_container_width=True)
 
-    # Pop down for segment colors
-    with st.expander("Segment Colors"):
-        st.write("Colors used for segmentation visualization:")
-        for label_info in LABEL_DICT:
-            label_name = label_info["name"]
-            label_id = label_info["id"]
-            color_rgb = label_info["color"]
-            color_hex = f"#{color_rgb[0]:02x}{color_rgb[1]:02x}{color_rgb[2]:02x}"
-            st.markdown(f"<div style=\"display: flex; align-items: center; margin-bottom: 5px;\">" 
-                        f"<div style=\"width: 20px; height: 20px; background-color: {color_hex}; border: 1px solid #ccc; margin-right: 10px;\"></div>" 
-                        f"<span>{label_name} (ID: {label_id})</span>" 
-                        f"</div>", unsafe_allow_html=True)
