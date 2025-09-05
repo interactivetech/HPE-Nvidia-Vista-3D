@@ -19,6 +19,11 @@ nav = render_navigation()
 current_page = nav.get_current_page()
 
 if current_page == 'home':
+    # Sidebar image only on Home page
+    st.sidebar.image(
+        str(Path(__file__).parent / 'assets' / 'CT-Image-Planes-768x768.jpeg'),
+        use_container_width=True,
+    )
     st.title("Vessel Segmentation Viewer")
     st.markdown("Welcome to the NIfTI Vessel Segmentation and Viewer application.")
     st.markdown("Use the sidebar to navigate to different tools and features.")

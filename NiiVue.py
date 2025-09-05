@@ -140,12 +140,15 @@ with st.sidebar:
                 segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
                 segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     else:
-        # For segments data source, always use 3D Render
+        # For segments data source, ALWAYS use 3D Render only - no other view options
         slice_type = "3D Render"
         orientation = "Axial"
         nifti_opacity = 1.0
         nifti_gamma = 1.0
         show_overlay = False
+        
+        # Display info that only 3D render is available for segments
+        
         with st.expander("Image Settings", expanded=False):
             segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
             segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
@@ -258,7 +261,7 @@ if selected_file:
     <meta charset="utf-8">
     <style>
         body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }}
-        #niivue-canvas {{ width: 100%; height: 100%; display: block; }}
+        #niivue-canvas {{ width: 100%; height: 100%; display: block; pointer-events: auto; }}
     </style>
 </head>
 <body>
@@ -274,10 +277,14 @@ if selected_file:
             const nv = new niivue.Niivue ({{
                 isColorbar: false,
                 loadingText: 'loading ...',
-                dragAndDropEnabled: false,
+                dragAndDropEnabled: true,
                 isResizeCanvas: true,
                 crosshairWidth: 1,
-                crosshairColor: [1, 0, 0, 1]
+                crosshairColor: [1, 0, 0, 1],
+                sliceType: {actual_slice_type},
+                multiplanarShowRender: {str(actual_slice_type == 3).lower()},
+                multiplanarForceRender: {str(actual_slice_type == 3).lower()},
+                showCrosshairs: {str(actual_slice_type not in [3, 4]).lower()}
             }});
             nv.attachTo('niivue-canvas');
 
@@ -303,7 +310,7 @@ if selected_file:
                         // Force update the colormap
                         mainVol.colormapLabel = 'custom_segmentation';
                     }}
-                    nv.setGamma({segment_gamma});
+                    // Gamma not applied in pure 3D label render to avoid interaction issues
                     mainVol.opacity = {segment_opacity};
                 }}
                 // Apply colormap to all additional volumes (overlays)
@@ -321,28 +328,22 @@ if selected_file:
                     }}
                 }}
                 
-                // Set options first, then slice type
+                // Ensure correct view mode after volumes load
                 if ({actual_slice_type} === 3) {{
-                    // Multiplanar view with 4 panes
+                    // Multiplanar view with 4 panes (includes 3D render tile)
                     nv.opts.multiplanarShowRender = true;
                     nv.opts.multiplanarForceRender = true;
-                    nv.opts.showCrosshairs = true;
-                    nv.setSliceType({actual_slice_type});
-                    setTimeout(() => {{
-                        nv.opts.show3Dcrosshair = true;
-                        nv.drawScene();
-                    }}, 500);
+                    nv.opts.show3Dcrosshair = true;
+                    nv.setSliceType(3);
+                    console.log('Set to multiplanar view (3)');
                 }} else if ({actual_slice_type} === 4) {{
-                    // Pure 3D render only - disable multiplanar first
+                    // Pure 3D render only for segments
                     nv.opts.multiplanarShowRender = false;
                     nv.opts.multiplanarForceRender = false;
                     nv.opts.showCrosshairs = false;
                     nv.opts.show3Dcrosshair = false;
-                    nv.setSliceType({actual_slice_type});
-                    console.log('Set to pure 3D render mode (slice type 4)');
-                }} else {{
-                    nv.opts.showCrosshairs = false;
-                    nv.setSliceType({actual_slice_type});
+                    nv.setSliceType(4);
+                    console.log('Set to pure 3D render (4) for segments');
                 }}
                 
                 // Force a final redraw to ensure colormap is applied
@@ -350,13 +351,10 @@ if selected_file:
                     nv.drawScene();
                     console.log('Final scene redraw completed');
                     
-                    // Double-check for segments: ensure pure 3D render
+                    // Final check for segments: ensure pure 3D render
                     if ('{selected_source}' === 'segments') {{
-                        nv.opts.multiplanarShowRender = false;
-                        nv.opts.multiplanarForceRender = false;
-                        nv.setSliceType(4);
+                        console.log('Final segments enforcement - ensuring 3D render only');
                         nv.drawScene();
-                        console.log('Enforced pure 3D render for segments');
                     }}
                 }}, 100);
                 
