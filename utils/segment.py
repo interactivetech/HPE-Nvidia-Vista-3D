@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration
-IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
+IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 VISTA3D_INFERENCE_URL = "http://localhost:8000/v1/vista3d/inference"
 PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', '.'))
 NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "output" / "nifti"
@@ -101,7 +101,12 @@ def main():
 
             try:
                 relative_path_to_nifti = nifti_file_path.relative_to(PROJECT_ROOT)
-                vista3d_input_url = f"https://host.docker.internal:8888/{relative_path_to_nifti}"
+                
+                # When the inference server is running in a container, it needs to access the image server
+                # running on the host. 'host.docker.internal' is a special DNS name for that.
+                docker_accessible_url = IMAGE_SERVER_URL.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal')
+                
+                vista3d_input_url = f"{docker_accessible_url.rstrip('/')}/{relative_path_to_nifti}"
                 payload = {"image": vista3d_input_url, "prompts": {"classes": target_vessel_ids}}
                 headers = {"Content-Type": "application/json"}
 
