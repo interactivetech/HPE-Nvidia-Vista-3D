@@ -283,7 +283,7 @@ class ImageCacheManager:
         
         Args:
             cache_dir (Optional[str]): Directory to store cached files. 
-                                     Defaults to ~/.cache/vista3d if None.
+                                     Defaults to output/cache if None.
             max_cache_size_mb (int): Maximum total cache size in megabytes.
                                    Triggers LRU eviction when exceeded.
                                    Default: 1024 (1GB).
@@ -1125,9 +1125,10 @@ THREAD SAFETY:
 
 STORAGE ORGANIZATION:
 --------------------
-- Default cache directory: ~/.cache/vista3d
+- Default cache directory: output/cache
 - Cached files: {md5_hash}.cached
-- Metadata: cache_metadata.json
+- Metadata: output/cache/cache_metadata.json
+- Logs: output/cache/logs/cache_YYYYMMDD.log
 - Temporary download files: {random}.tmp
 
 This cache system is production-ready and optimized for medical imaging

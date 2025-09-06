@@ -56,6 +56,7 @@ def get_server_data(path: str, type: str, file_extensions: tuple):
         return sorted([item['name'] for item in items if not item['is_directory'] and item['name'].lower().endswith(file_extensions)])
     return []
 
+
 # --- Sidebar UI ---
 with st.sidebar:
     

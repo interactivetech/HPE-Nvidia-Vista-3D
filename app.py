@@ -132,9 +132,9 @@ if current_page == 'home':
     st.markdown("Welcome to the NIfTI Vessel Segmentation and Viewer application.")
     st.markdown("Use the sidebar to navigate to different tools and features.")
     
-    # Server Data Analysis Section
+    # Image Data Analysis Section on main page
     st.markdown("---")
-    st.header("🧬 Image Server Data")
+    st.header("🧬 Image Data")
     
     if check_image_server_status():
         with st.spinner("Analyzing server data..."):
