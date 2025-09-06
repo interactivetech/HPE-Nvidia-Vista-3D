@@ -35,6 +35,7 @@ from pathlib import Path
 import sys
 from typing import Dict, Any, List, Optional
 import json
+from datetime import datetime
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -55,6 +56,7 @@ from utils.image_cache import (
 
 st.title("💾 Image Cache Management")
 st.markdown("Manage the local cache for medical imaging files downloaded from remote servers.")
+st.info("📁 **Cache Location:** All cache data, metadata, and logs are stored in `output/cache/` directory for better organization and project portability.")
 
 # =============================================================================
 # SIDEBAR: Quick Cache Statistics
@@ -169,6 +171,18 @@ def render_cache_statistics() -> None:
     # Cache directory information
     st.subheader("📁 Cache Information")
     st.info(f"**Cache Directory:** `{stats['cache_dir']}`")
+    
+    # Show logs directory information
+    cache_dir = Path(stats['cache_dir'])
+    logs_dir = cache_dir / "logs"
+    if logs_dir.exists():
+        log_files = list(logs_dir.glob("*.log"))
+        if log_files:
+            st.info(f"**Logs Directory:** `{logs_dir}` ({len(log_files)} log files)")
+        else:
+            st.info(f"**Logs Directory:** `{logs_dir}` (no log files yet)")
+    else:
+        st.warning(f"**Logs Directory:** `{logs_dir}` (not found)")
     
     # Performance visualization
     render_performance_chart(stats)
@@ -451,6 +465,103 @@ def display_file_summary(entries_data: List[Dict[str, Any]]) -> None:
         st.metric("Average Size", f"{avg_size:.1f} MB")
 
 
+def render_log_files() -> None:
+    """
+    Render log files section showing cache operation logs.
+    
+    Displays information about cache log files including file count,
+    sizes, and provides ability to view recent log entries.
+    """
+    st.header("📝 Cache Logs")
+    st.markdown("View cache operation logs and system activity.")
+    
+    try:
+        # Get cache directory and logs subdirectory
+        stats = get_cache_stats()
+        cache_dir = Path(stats['cache_dir'])
+        logs_dir = cache_dir / "logs"
+        
+        if not logs_dir.exists():
+            st.warning("Logs directory not found. Cache logging may not be properly configured.")
+            return
+        
+        # Get all log files
+        log_files = list(logs_dir.glob("*.log"))
+        
+        if not log_files:
+            st.info("No log files found yet. Logs will appear here as cache operations are performed.")
+            return
+        
+        # Sort by modification time (newest first)
+        log_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        # Display log files summary
+        st.subheader("📊 Log Files Summary")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total Log Files", len(log_files))
+        
+        with col2:
+            total_size = sum(f.stat().st_size for f in log_files)
+            st.metric("Total Log Size", f"{total_size / 1024:.1f} KB")
+        
+        with col3:
+            if log_files:
+                latest_log = log_files[0]
+                latest_time = datetime.fromtimestamp(latest_log.stat().st_mtime)
+                st.metric("Latest Log", latest_time.strftime('%Y-%m-%d %H:%M'))
+        
+        # Display log files table
+        st.subheader("📋 Log Files")
+        
+        log_data = []
+        for log_file in log_files:
+            stat = log_file.stat()
+            log_data.append({
+                'Filename': log_file.name,
+                'Size (KB)': round(stat.st_size / 1024, 1),
+                'Modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                'Path': str(log_file)
+            })
+        
+        import pandas as pd
+        df = pd.DataFrame(log_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # Allow viewing recent log entries
+        if log_files:
+            st.subheader("🔍 View Recent Log Entries")
+            
+            selected_log = st.selectbox(
+                "Select log file to view:",
+                log_files,
+                format_func=lambda x: f"{x.name} ({x.stat().st_size / 1024:.1f} KB)"
+            )
+            
+            if selected_log:
+                try:
+                    with open(selected_log, 'r') as f:
+                        lines = f.readlines()
+                    
+                    # Show last 50 lines by default
+                    num_lines = st.slider("Number of lines to show:", 10, min(200, len(lines)), 50)
+                    recent_lines = lines[-num_lines:]
+                    
+                    st.text_area(
+                        f"Last {num_lines} lines from {selected_log.name}:",
+                        value=''.join(recent_lines),
+                        height=300
+                    )
+                    
+                except Exception as e:
+                    st.error(f"Error reading log file: {e}")
+    
+    except Exception as e:
+        st.error(f"Error accessing log files: {e}")
+
+
 # =============================================================================
 # MAIN APPLICATION LAYOUT
 # =============================================================================
@@ -469,12 +580,16 @@ with col2:
 # Full-width section: File details
 render_file_details()
 
+# Full-width section: Log files
+render_log_files()
+
 # =============================================================================
 # FOOTER
 # =============================================================================
 
 st.markdown("---")
 st.markdown("💡 **Tip:** The cache automatically manages file expiration and size limits. You can adjust these settings in the Configuration section above.")
+st.markdown("📂 **Directory Structure:** Cache files are stored in `output/cache/`, metadata in `output/cache/cache_metadata.json`, and operation logs in `output/cache/logs/`.")
 
 
 # =============================================================================

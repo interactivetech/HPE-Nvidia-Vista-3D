@@ -82,8 +82,7 @@ import logging
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging - will be updated in ImageCacheManager.__init__
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -227,9 +226,10 @@ class ImageCacheManager:
         For multi-threaded environments, external synchronization is required.
         
     Storage Organization:
-        - Cache directory: ~/.cache/vista3d (default)
+        - Cache directory: output/cache (default)
         - Cached files: {hash}.cached
-        - Metadata: cache_metadata.json
+        - Metadata: output/cache/cache_metadata.json
+        - Logs: output/cache/logs/cache_YYYYMMDD.log
         - Temporary files: {random}.tmp (during downloads)
         
     Performance Characteristics:
@@ -310,8 +310,17 @@ class ImageCacheManager:
             ... )
         """
         self.project_root = Path(__file__).parent.parent
-        self.cache_dir = Path(cache_dir or os.path.expanduser("~/.cache/vista3d"))
+        # Default cache directory is now in project's output/cache directory
+        default_cache_dir = self.project_root / "output" / "cache"
+        self.cache_dir = Path(cache_dir or default_cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create logs subdirectory for cache operation logs
+        self.logs_dir = self.cache_dir / "logs"
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Configure logging to use the logs directory
+        self._setup_logging()
         
         self.max_cache_size_bytes = max_cache_size_mb * 1024 * 1024
         self.default_ttl_seconds = default_ttl_hours * 3600
@@ -341,6 +350,51 @@ class ImageCacheManager:
     # PRIVATE HELPER METHODS
     # =========================================================================
     
+    def _setup_logging(self):
+        """
+        Configure logging to use the cache logs directory.
+        
+        Sets up file-based logging for cache operations with rotation
+        to prevent log files from growing too large.
+        """
+        from logging.handlers import RotatingFileHandler
+        
+        # Create a logger for this cache instance
+        self.logger = logging.getLogger(f"{__name__}.{id(self)}")
+        self.logger.setLevel(logging.INFO)
+        
+        # Remove any existing handlers to avoid duplicates
+        for handler in self.logger.handlers[:]:
+            self.logger.removeHandler(handler)
+        
+        # Create log file path with timestamp
+        log_file = self.logs_dir / f"cache_{datetime.now().strftime('%Y%m%d')}.log"
+        
+        # Set up rotating file handler (max 10MB, keep 5 files)
+        file_handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
+        file_handler.setLevel(logging.INFO)
+        
+        # Create formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        file_handler.setFormatter(formatter)
+        
+        # Add handler to logger
+        self.logger.addHandler(file_handler)
+        
+        # Also log to console for development
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.WARNING)  # Only warnings and errors to console
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        self.logger.info(f"Cache logging initialized. Logs directory: {self.logs_dir}")
+    
     def _load_metadata(self):
         """
         Load cache metadata from persistent storage.
@@ -358,9 +412,9 @@ class ImageCacheManager:
                         for url, entry_data in data.get('entries', {}).items()
                     }
                     self.stats.update(data.get('stats', {}))
-                logger.info(f"Loaded cache metadata: {len(self.entries)} entries")
+                self.logger.info(f"Loaded cache metadata: {len(self.entries)} entries")
             except Exception as e:
-                logger.warning(f"Failed to load cache metadata: {e}")
+                self.logger.warning(f"Failed to load cache metadata: {e}")
                 self.entries = {}
     
     def _save_metadata(self):
@@ -373,7 +427,7 @@ class ImageCacheManager:
             with open(self.metadata_file, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            logger.error(f"Failed to save cache metadata: {e}")
+            self.logger.error(f"Failed to save cache metadata: {e}")
     
     def _get_cache_key(self, url: str) -> str:
         """Generate a cache key for the URL."""
@@ -402,14 +456,14 @@ class ImageCacheManager:
                 local_path = Path(entry.local_path)
                 if local_path.exists():
                     local_path.unlink()
-                    logger.info(f"Removed expired cache file: {local_path}")
+                    self.logger.info(f"Removed expired cache file: {local_path}")
         
         for url in expired_urls:
             del self.entries[url]
         
         if expired_urls:
             self._save_metadata()
-            logger.info(f"Cleaned up {len(expired_urls)} expired entries")
+            self.logger.info(f"Cleaned up {len(expired_urls)} expired entries")
     
     def _evict_lru(self, required_space: int):
         """Evict least recently used entries to make space."""
@@ -434,12 +488,12 @@ class ImageCacheManager:
                 local_path.unlink()
                 freed_space += entry.file_size
                 evicted_count += 1
-                logger.info(f"Evicted cache file: {local_path}")
+                self.logger.info(f"Evicted cache file: {local_path}")
             
             del self.entries[url]
         
         self.stats['evictions'] += evicted_count
-        logger.info(f"Evicted {evicted_count} entries, freed {freed_space} bytes")
+        self.logger.info(f"Evicted {evicted_count} entries, freed {freed_space} bytes")
     
     def _get_current_cache_size(self) -> int:
         """Calculate current cache size in bytes."""
@@ -564,7 +618,7 @@ class ImageCacheManager:
         if cached_path:
             return cached_path
         
-        logger.info(f"Downloading and caching: {url}")
+        self.logger.info(f"Downloading and caching: {url}")
         
         # Make space for new file
         self._make_space(1024 * 1024)  # Reserve 1MB initially
@@ -616,7 +670,7 @@ class ImageCacheManager:
                 self.stats['total_bytes_cached'] += downloaded_size
                 
                 self._save_metadata()
-                logger.info(f"Cached file: {local_path} ({downloaded_size} bytes)")
+                self.logger.info(f"Cached file: {local_path} ({downloaded_size} bytes)")
                 
                 return local_path
                 
@@ -626,7 +680,7 @@ class ImageCacheManager:
                     temp_path.unlink()
         
         except Exception as e:
-            logger.error(f"Failed to download and cache {url}: {e}")
+            self.logger.error(f"Failed to download and cache {url}: {e}")
             raise
     
     def get_file(self, url: str, ttl_seconds: Optional[int] = None) -> Path:
@@ -699,7 +753,7 @@ class ImageCacheManager:
                 local_path.unlink()
             del self.entries[url]
             self._save_metadata()
-            logger.info(f"Invalidated cache for: {url}")
+            self.logger.info(f"Invalidated cache for: {url}")
     
     def clear_cache(self):
         """
@@ -737,7 +791,7 @@ class ImageCacheManager:
             'last_cleanup': time.time()
         }
         self._save_metadata()
-        logger.info("Cleared all cache")
+        self.logger.info("Cleared all cache")
     
     def cleanup(self):
         """
