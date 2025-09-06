@@ -7,7 +7,7 @@ from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import json
-from pathlib import Path
+ 
 
 # --- Initial Setup ---
 load_dotenv()
@@ -59,12 +59,7 @@ def get_server_data(path: str, type: str, file_extensions: tuple):
 # --- Sidebar UI ---
 with st.sidebar:
     
-    data_sources = ['nifti', 'segments']
-    data_source_display = {'nifti': 'NIfTI', 'segments': 'Segments'}
-    display_options = [data_source_display[source] for source in data_sources]
-    selected_display = st.selectbox("Select Data Source", display_options)
-    # Map back to the actual source name
-    selected_source = data_sources[display_options.index(selected_display)]
+    selected_source = 'nifti'
 
     patient_folders = get_server_data(selected_source, 'folders', ('',))
     selected_patient = st.selectbox("Select Patient", patient_folders)
@@ -83,31 +78,7 @@ with st.sidebar:
                 selected_index = display_names.index(selected_display_name)
                 selected_file = filenames[selected_index]
         
-        # Show voxels popdown for segments data source
-        if selected_source == 'segments' and selected_file:
-            voxels_folders = get_server_data(f"{selected_source}/{selected_patient}", 'folders', ('',))
-            if 'voxels' in voxels_folders:
-                voxels_files = get_server_data(f"{selected_source}/{selected_patient}/voxels", 'files', file_ext)
-                if voxels_files:
-                    # Filter voxels that are associated with the selected file
-                    # Assuming voxels are named similarly or contain the base name of the selected file
-                    selected_file_base = selected_file.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                    associated_voxels = [vf for vf in voxels_files if selected_file_base in vf]
-                    
-                    if associated_voxels:
-                        with st.expander("Voxels", expanded=False):
-                            # Add Clear All button
-                            if st.button("Clear All", key="clear_all_voxels"):
-                                # Clear all voxel checkboxes by resetting their session state
-                                for voxel_file in associated_voxels:
-                                    clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                                    if f"voxel_{clean_name}" in st.session_state:
-                                        st.session_state[f"voxel_{clean_name}"] = False
-                            
-                            for voxel_file in associated_voxels:
-                                # Extract the clean voxel name by removing specific prefix and extensions
-                                clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                                st.checkbox(clean_name, value=False, key=f"voxel_{clean_name}")
+        
 
     # --- Viewer Settings ---
     # Initialize all viewer settings with sensible defaults
@@ -116,44 +87,30 @@ with st.sidebar:
     color_map = "gray"
     nifti_opacity = 1.0
     nifti_gamma = 1.0
+    show_nifti = True
     show_overlay = False
     segment_opacity = 0.5
     segment_gamma = 1.0
 
-    if selected_source != 'segments':
-        st.subheader("Slice Type")
-        slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
-        orientation = "Axial"
-        if slice_type == "Single View":
-            orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
+    st.markdown("Select Slice")
+    slice_type = st.selectbox("", ["3D Render", "Multiplanar", "Single View"], index=0, label_visibility="collapsed")
+    orientation = "Axial"
+    if slice_type == "Single View":
+        orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
 
-        st.subheader("NIfTI Color Map")
+    show_nifti = st.checkbox("Show NIfTI", value=True)
+
+    with st.expander("NIfTI Image Settings", expanded=False):
         color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
+        nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
+        nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
+    
+    show_overlay = st.checkbox("Show Voxels", value=False)
+    with st.expander("Voxel Image Settings", expanded=False):
+        segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
+        segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
 
-        with st.expander("NIfTI Image Settings", expanded=False):
-            nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
-            nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
-        
-        show_overlay = st.checkbox("Show Segmentation Overlay", value=False)
-        if show_overlay:
-            with st.expander("Overlay Settings", expanded=False):
-                segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
-                segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
-    else:
-        # For segments data source, ALWAYS use 3D Render only - no other view options
-        slice_type = "3D Render"
-        orientation = "Axial"
-        nifti_opacity = 1.0
-        nifti_gamma = 1.0
-        show_overlay = False
-        
-        # Display info that only 3D render is available for segments
-        
-        with st.expander("Image Settings", expanded=False):
-            segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
-            segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
-
-    with st.expander("Segment Colors", expanded=False):
+    with st.expander("Voxel Legend", expanded=False):
         try:
             with open('conf/vista3d_label_colors.json', 'r') as f:
                 label_dict = json.load(f)
@@ -172,53 +129,34 @@ with st.sidebar:
 
 # --- Main Viewer Area ---
 if selected_file:
-    # Check if any voxels are selected when in segments mode
-    selected_voxel_files = []
-    if selected_source == 'segments':
-        # Collect all selected voxels
-        for voxel_file in get_server_data(f"{selected_source}/{selected_patient}/voxels", 'files', ('.nii', '.nii.gz', '.dcm')):
-            clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-            if f"voxel_{clean_name}" in st.session_state and st.session_state[f"voxel_{clean_name}"]:
-                selected_voxel_files.append(voxel_file)
-    
     # --- Prepare URLs and Settings for Viewer ---
-    if selected_voxel_files:
-        # Display the first selected voxel as the main volume
-        base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/voxels/{selected_voxel_files[0]}"
-    else:
-        base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
+    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
     segment_url = ''
     if show_overlay:
         segment_filename = selected_file
         segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
     
     slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
-    # For segments, always use pure 3D render (4), not multiplanar (3)
-    if selected_source == 'segments':
-        actual_slice_type = 4  # Pure 3D render
-    else:
-        actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
+    actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
 
     # --- HTML and Javascript for NiiVue ---
-    if selected_source != 'segments':
+    volume_list_entries = []
+    if show_nifti:
         main_volume_entry = f"{{ url: \"{base_file_url}\", opacity: {nifti_opacity} }}"
-    else:
-        main_volume_entry = f"{{ url: \"{base_file_url}\", colormap: \"custom_segmentation\" }}"
+        volume_list_entries.append(main_volume_entry)
     
-    volume_list_entries = [main_volume_entry]
     
-    # Add additional selected voxels as overlays (if more than one is selected)
-    if selected_voxel_files and len(selected_voxel_files) > 1:
-        for additional_voxel in selected_voxel_files[1:]:  # Skip the first one as it's already the main volume
-            additional_voxel_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/voxels/{additional_voxel}"
-            additional_entry = f"{{ url: \"{additional_voxel_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
-            volume_list_entries.append(additional_entry)
-    
-    if show_overlay and segment_url and not selected_voxel_files:  # Only show overlay if no voxels are selected
+    if show_overlay and segment_url:
         overlay_entry = f"{{ url: \"{segment_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
         volume_list_entries.append(overlay_entry)
     
+    if not volume_list_entries:
+        st.info("Nothing to display. Enable 'Show NIfTI' or Voxels.")
+    
     volume_list_js = "[" + ", ".join(volume_list_entries) + "]"
+    main_is_nifti = show_nifti
+    overlay_start_index = 1 if main_is_nifti else 0
+    color_map_js = json.dumps(color_map)
 
     custom_colormap_js = ""
     try:
@@ -294,90 +232,53 @@ if selected_file:
             
             nv.loadVolumes(volumeList).then(() => {{
                 console.log('Volumes loaded');
-                const mainVol = nv.volumes[0];
-                
-                if ('{selected_source}' === 'segments') {{
-                    // Force pure 3D render immediately and exit handler early
-                    nv.opts.multiplanarShowRender = false;
-                    nv.opts.multiplanarForceRender = false;
-                    nv.opts.showCrosshairs = false;
-                    nv.opts.show3Dcrosshair = false;
-                    nv.setSliceType(4);
-                    nv.drawScene();
-                    console.log('Segments: enforced pure 3D render with early return');
-                    return;
-                }}
+                const hasVolumes = nv.volumes.length > 0;
+                const mainVol = hasVolumes ? nv.volumes[0] : null;
 
-                if ('{selected_source}' !== 'segments') {{
-                    nv.setColormap(mainVol.id, '{color_map}');
+                if ({str(main_is_nifti).lower()} && mainVol) {{
+                    nv.setColormap(mainVol.id, {color_map_js});
                     nv.setGamma({nifti_gamma});
                     mainVol.opacity = {nifti_opacity};
-                }} else {{
-                    if (typeof customSegmentationColormap !== 'undefined') {{
-                        nv.setColormap(mainVol.id, 'custom_segmentation');
-                        console.log('Applied custom_segmentation colormap to main volume:', mainVol.id);
-                        console.log('Main volume min/max values:', mainVol.cal_min, mainVol.cal_max);
-                        console.log('Main volume data range:', Math.min(...mainVol.img), 'to', Math.max(...mainVol.img));
-                    }}
-                    nv.setGamma({segment_gamma});
-                    mainVol.opacity = {segment_opacity};
                 }}
-                // Apply colormap to all additional volumes (overlays)
-                if (nv.volumes.length > 1) {{
-                    for (let i = 1; i < nv.volumes.length; i++) {{
+
+                // Apply colormap to overlays
+                if (nv.volumes.length > {overlay_start_index}) {{
+                    for (let i = {overlay_start_index}; i < nv.volumes.length; i++) {{
                         const overlayVol = nv.volumes[i];
                         overlayVol.opacity = {segment_opacity};
                         if (typeof customSegmentationColormap !== 'undefined') {{
                             nv.setColormap(overlayVol.id, 'custom_segmentation');
                             console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id);
-                            console.log('Overlay volume', i, 'min/max values:', overlayVol.cal_min, overlayVol.cal_max);
-                            console.log('Overlay volume data range:', Math.min(...overlayVol.img), 'to', Math.max(...overlayVol.img));
                         }}
                     }}
                 }}
-                
-                if ('{selected_source}' === 'segments') {{
-                    // Force pure 3D render for segments
+
+                // Honor requested slice type
+                nv.setSliceType({actual_slice_type});
+                if ({actual_slice_type} === 3) {{
+                    // Multiplanar view with 4 panes
+                    nv.opts.multiplanarShowRender = true;
+                    nv.opts.multiplanarForceRender = true;
+                    nv.opts.showCrosshairs = true;
+                    setTimeout(() => {{
+                        nv.opts.show3Dcrosshair = true;
+                        nv.drawScene();
+                    }}, 500);
+                }} else {{
+                    // Ensure multiplanar flags are disabled when not in multiplanar mode
                     nv.opts.multiplanarShowRender = false;
                     nv.opts.multiplanarForceRender = false;
                     nv.opts.showCrosshairs = false;
                     nv.opts.show3Dcrosshair = false;
-                    nv.setSliceType(4);
-                    nv.drawScene();
-                }} else {{
-                    // Non-segments: honor requested slice type
-                    nv.setSliceType({actual_slice_type});
-                    if ({actual_slice_type} === 3) {{
-                        // Multiplanar view with 4 panes
-                        nv.opts.multiplanarShowRender = true;
-                        nv.opts.multiplanarForceRender = true;
-                        nv.opts.showCrosshairs = true;
-                        setTimeout(() => {{
-                            nv.opts.show3Dcrosshair = true;
-                            nv.drawScene();
-                        }}, 500);
-                    }} else {{
-                        nv.opts.showCrosshairs = false;
-                    }}
-                    nv.drawScene();
                 }}
-                
-                // Force a final redraw to ensure colormap is applied
+                nv.drawScene();
+
+                // Final redraw to ensure colormap is applied
                 setTimeout(() => {{
                     nv.drawScene();
                     console.log('Final scene redraw completed');
-                    
-                    // Double-check for segments: ensure pure 3D render
-                    if ('{selected_source}' === 'segments') {{
-                        nv.opts.multiplanarShowRender = false;
-                        nv.opts.multiplanarForceRender = false;
-                        nv.setSliceType(4);
-                        nv.drawScene();
-                        console.log('Enforced pure 3D render for segments');
-                    }}
                 }}, 100);
-                
-                nv.drawScene();
+
             }}).catch(console.error);
         }}
     </script>
@@ -386,4 +287,4 @@ if selected_file:
 
     components.html(html_string, height=1000, scrolling=False)
 else:
-    st.info("Select a data source, patient, and file to begin.")
+    st.info("Select a patient and file to begin.")
