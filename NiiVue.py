@@ -277,27 +277,37 @@ if selected_file:
             const nv = new niivue.Niivue ({{
                 isColorbar: false,
                 loadingText: 'loading ...',
-                dragAndDropEnabled: true,
+                dragAndDropEnabled: false,
                 isResizeCanvas: true,
                 crosshairWidth: 1,
-                crosshairColor: [1, 0, 0, 1],
-                sliceType: {actual_slice_type},
-                multiplanarShowRender: {str(actual_slice_type == 3).lower()},
-                multiplanarForceRender: {str(actual_slice_type == 3).lower()},
-                showCrosshairs: {str(actual_slice_type not in [3, 4]).lower()}
+                crosshairColor: [1, 0, 0, 1]
             }});
             nv.attachTo('niivue-canvas');
 
             const volumeList = {volume_list_js};
             
+            {custom_colormap_js}
+            if (typeof customSegmentationColormap !== 'undefined') {{
+                nv.addColormap('custom_segmentation', customSegmentationColormap);
+                console.log('Custom segmentation colormap added');
+            }}
+            
             nv.loadVolumes(volumeList).then(() => {{
                 console.log('Volumes loaded');
                 const mainVol = nv.volumes[0];
-                {custom_colormap_js}
-                if (typeof customSegmentationColormap !== 'undefined') {{
-                    nv.addColormap('custom_segmentation', customSegmentationColormap);
-                    console.log('Custom segmentation colormap added');
+                
+                if ('{selected_source}' === 'segments') {{
+                    // Force pure 3D render immediately and exit handler early
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = false;
+                    nv.setSliceType(4);
+                    nv.drawScene();
+                    console.log('Segments: enforced pure 3D render with early return');
+                    return;
                 }}
+
                 if ('{selected_source}' !== 'segments') {{
                     nv.setColormap(mainVol.id, '{color_map}');
                     nv.setGamma({nifti_gamma});
@@ -307,10 +317,9 @@ if selected_file:
                         nv.setColormap(mainVol.id, 'custom_segmentation');
                         console.log('Applied custom_segmentation colormap to main volume:', mainVol.id);
                         console.log('Main volume min/max values:', mainVol.cal_min, mainVol.cal_max);
-                        // Force update the colormap
-                        mainVol.colormapLabel = 'custom_segmentation';
+                        console.log('Main volume data range:', Math.min(...mainVol.img), 'to', Math.max(...mainVol.img));
                     }}
-                    // Gamma not applied in pure 3D label render to avoid interaction issues
+                    nv.setGamma({segment_gamma});
                     mainVol.opacity = {segment_opacity};
                 }}
                 // Apply colormap to all additional volumes (overlays)
@@ -322,28 +331,35 @@ if selected_file:
                             nv.setColormap(overlayVol.id, 'custom_segmentation');
                             console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id);
                             console.log('Overlay volume', i, 'min/max values:', overlayVol.cal_min, overlayVol.cal_max);
-                            // Force update the colormap
-                            overlayVol.colormapLabel = 'custom_segmentation';
+                            console.log('Overlay volume data range:', Math.min(...overlayVol.img), 'to', Math.max(...overlayVol.img));
                         }}
                     }}
                 }}
                 
-                // Ensure correct view mode after volumes load
-                if ({actual_slice_type} === 3) {{
-                    // Multiplanar view with 4 panes (includes 3D render tile)
-                    nv.opts.multiplanarShowRender = true;
-                    nv.opts.multiplanarForceRender = true;
-                    nv.opts.show3Dcrosshair = true;
-                    nv.setSliceType(3);
-                    console.log('Set to multiplanar view (3)');
-                }} else if ({actual_slice_type} === 4) {{
-                    // Pure 3D render only for segments
+                if ('{selected_source}' === 'segments') {{
+                    // Force pure 3D render for segments
                     nv.opts.multiplanarShowRender = false;
                     nv.opts.multiplanarForceRender = false;
                     nv.opts.showCrosshairs = false;
                     nv.opts.show3Dcrosshair = false;
                     nv.setSliceType(4);
-                    console.log('Set to pure 3D render (4) for segments');
+                    nv.drawScene();
+                }} else {{
+                    // Non-segments: honor requested slice type
+                    nv.setSliceType({actual_slice_type});
+                    if ({actual_slice_type} === 3) {{
+                        // Multiplanar view with 4 panes
+                        nv.opts.multiplanarShowRender = true;
+                        nv.opts.multiplanarForceRender = true;
+                        nv.opts.showCrosshairs = true;
+                        setTimeout(() => {{
+                            nv.opts.show3Dcrosshair = true;
+                            nv.drawScene();
+                        }}, 500);
+                    }} else {{
+                        nv.opts.showCrosshairs = false;
+                    }}
+                    nv.drawScene();
                 }}
                 
                 // Force a final redraw to ensure colormap is applied
@@ -351,10 +367,13 @@ if selected_file:
                     nv.drawScene();
                     console.log('Final scene redraw completed');
                     
-                    // Final check for segments: ensure pure 3D render
+                    // Double-check for segments: ensure pure 3D render
                     if ('{selected_source}' === 'segments') {{
-                        console.log('Final segments enforcement - ensuring 3D render only');
+                        nv.opts.multiplanarShowRender = false;
+                        nv.opts.multiplanarForceRender = false;
+                        nv.setSliceType(4);
                         nv.drawScene();
+                        console.log('Enforced pure 3D render for segments');
                     }}
                 }}, 100);
                 
