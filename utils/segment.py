@@ -21,7 +21,7 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 VISTA3D_INFERENCE_URL = "http://localhost:8000/v1/vista3d/inference"
 PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', '.'))
-NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "output" / "nifti"
+NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "output"
 PATIENT_OUTPUT_BASE_DIR = PROJECT_ROOT / "output"
 
 # Load label dictionaries
@@ -136,8 +136,10 @@ def main():
     print("--- Vista3D Batch Segmentation Script ---")
 
     for patient_folder_name in tqdm(patient_folders_to_process, desc="Processing patients"):
-        patient_nifti_path = NIFTI_INPUT_BASE_DIR / patient_folder_name
-        print(f"\nProcessing patient folder: {patient_nifti_path}")
+        # The patient folder is now the base for nifti, segments, etc.
+        patient_base_path = NIFTI_INPUT_BASE_DIR / patient_folder_name
+        patient_nifti_path = patient_base_path / "nifti"
+        print(f"\nProcessing patient folder: {patient_base_path}")
 
         vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower()
         target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()] if vessels_of_interest_env != "all" else list(NAME_TO_ID_MAP.keys())
@@ -151,22 +153,23 @@ def main():
             if v in NAME_TO_ID_MAP:
                 target_vessel_ids.append(NAME_TO_ID_MAP[v])
         
-        # Create new folder structure for this patient
-        print(f"  Creating folder structure for patient: {patient_folder_name}")
+        # Create folder structure (will ensure segments and voxels directories exist)
+        print(f"  Ensuring folder structure for patient: {patient_folder_name}")
         patient_dirs = create_patient_folder_structure(patient_folder_name)
-        print(f"  Patient directories created: {patient_dirs['base']}")
+        print(f"  Patient directories ensured: {patient_dirs['base']}")
 
         all_nifti_files = get_nifti_files_in_folder(patient_nifti_path)
         if not all_nifti_files:
-            print(f"No NIfTI files found in {patient_nifti_path}. Skipping patient.")
+            # Also check if the 'nifti' folder itself is missing
+            if not patient_nifti_path.exists():
+                print(f"No 'nifti' directory found in {patient_base_path}. Skipping patient.")
+            else:
+                print(f"No NIfTI files found in {patient_nifti_path}. Skipping patient.")
             continue
 
         for nifti_file_path in tqdm(all_nifti_files, desc="Processing NIfTI files"):
-            # Copy original NIfTI file to new nifti folder structure
-            nifti_dest_path = patient_dirs['nifti'] / nifti_file_path.name
-            if not nifti_dest_path.exists() or args.force:
-                shutil.copy2(nifti_file_path, nifti_dest_path)
-                print(f"  Copied {nifti_file_path.name} to {nifti_dest_path}")
+            # The NIfTI file is already in its final destination.
+            # The copy step is no longer needed.
             
             # Define segmentation output path in new structure
             segmentation_output_path = patient_dirs['segments'] / nifti_file_path.name
@@ -176,15 +179,15 @@ def main():
                 continue
 
             try:
-                # Use the copied file in the new structure for inference
-                relative_path_to_nifti = nifti_dest_path.relative_to(PROJECT_ROOT)
+                # Use the original nifti file path for inference
+                relative_path_to_nifti = nifti_file_path.relative_to(PROJECT_ROOT)
                 
                 # When the inference server is running in a container, it needs to access the image server
                 # running on the host. 'host.docker.internal' is a special DNS name for that.
                 docker_accessible_url = IMAGE_SERVER_URL.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal')
                 
                 vista3d_input_url = f"{docker_accessible_url.rstrip('/')}/{relative_path_to_nifti}"
-                payload = {"image": vista3d_input_url, "prompts": {"classes": target_vessel_ids}}
+                payload = {"image": vista3d_input_url, "prompts": {"classes": target_vessels}}
                 headers = {"Content-Type": "application/json"}
 
                 print(f"\n  Processing: {nifti_file_path.name}")

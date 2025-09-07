@@ -267,12 +267,12 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=35):
         else:
             dicom_data_path = Path(project_root) / dicom_folder
             
-        nifti_destination_path = Path(project_root) / "output/nifti"
+        nifti_base_path = Path(project_root) / "output"
         
         print(f"🔬 Enhanced DICOM to NIFTI Conversion (dcm2niix + NiiVue)")
         print(f"📁 Project Root: {project_root}")
         print(f"📁 DICOM Source: {dicom_data_path}")
-        print(f"📁 NIFTI Destination: {nifti_destination_path}")
+        print(f"📁 NIFTI Destination Base: {nifti_base_path}")
         print("-" * 70)
         
         # Check if DICOM directory exists
@@ -283,8 +283,8 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=35):
         if not check_patient_folders_exist(dicom_data_path):
             raise FileNotFoundError(f"No patient folders (subdirectories) found in: {dicom_data_path}")
         
-        # Create NIFTI destination directory if it doesn't exist
-        nifti_destination_path.mkdir(parents=True, exist_ok=True)
+        # Create NIFTI base directory if it doesn't exist
+        nifti_base_path.mkdir(parents=True, exist_ok=True)
         
         # Get list of DICOM directories for progress tracking
         dicom_directories = [d for d in os.listdir(dicom_data_path) 
@@ -302,7 +302,8 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=35):
         with tqdm(total=len(dicom_directories), desc="🔄 Processing patients", unit="patient") as patient_pbar:
             for dicom_directory in dicom_directories:
                 input_directory = Path(dicom_data_path) / dicom_directory
-                output_directory = Path(nifti_destination_path) / dicom_directory
+                # New output structure: output/<patient_id>/nifti/
+                output_directory = nifti_base_path / dicom_directory / "nifti"
             
                 # Check if already processed
                 if output_directory.exists() and not force_overwrite:
