@@ -135,7 +135,6 @@ def fetch_available_voxel_labels(patient_id: str, filename: str) -> Tuple[Set[in
 
 # --- Sidebar UI ---
 with st.sidebar:
-    
     # Patient folders are now directly in the output directory
     patient_folders = get_server_data('', 'folders', ('',))
     selected_patient = st.selectbox("Select Patient", patient_folders)
@@ -180,6 +179,29 @@ with st.sidebar:
         color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
         nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
         nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
+        
+        # CT Window/Level settings
+        st.markdown("**CT Window/Level Settings**")
+        window_center = st.slider("Window Center (Level)", -2500, 2500, 0, key="window_center")
+        window_width = st.slider("Window Width", 50, 5000, 1000, key="window_width")
+        
+        # Preset windowing options
+        window_preset = st.selectbox("Window Preset", 
+                                   ["Custom", "Standard (W:1000, L:0)", "Soft Tissue (W:400, L:40)", 
+                                    "Bone (W:1500, L:300)", "Lung (W:1500, L:-600)", "Air/Background (W:500, L:-1000)"], 
+                                   key="window_preset")
+        
+        if window_preset != "Custom":
+            if "Standard" in window_preset:
+                window_center, window_width = 0, 1000
+            elif "Soft Tissue" in window_preset:
+                window_center, window_width = 40, 400
+            elif "Bone" in window_preset:
+                window_center, window_width = 300, 1500
+            elif "Lung" in window_preset:
+                window_center, window_width = -600, 1500
+            elif "Air/Background" in window_preset:
+                window_center, window_width = -1000, 500
     
     show_overlay = st.checkbox("Show Voxels", value=False)
     
@@ -305,79 +327,11 @@ with st.sidebar:
                 st.session_state.selected_individual_voxels = []
     
     with st.expander("Voxel Image Settings", expanded=False):
-        segment_opacity = st.slider("Voxel Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
+        segment_opacity = st.slider("Voxel Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
         segment_gamma = st.slider("Voxel Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     
     # Display current voxel selection status
-    if show_overlay:
-        voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
-        
-        if voxel_mode == "all":
-            pass
-            
-        elif voxel_mode == "label_sets":
-            if hasattr(st.session_state, 'selected_label_sets') and st.session_state.selected_label_sets:
-                try:
-                    with open('conf/vista3d_label_sets.json', 'r') as f:
-                        label_sets = json.load(f)
-                    with open('conf/vista3d_label_dict.json', 'r') as f:
-                        label_dict = json.load(f)
-                    
-                    # Get individual labels from selected sets (only available ones)
-                    individual_labels = []
-                    for set_name in st.session_state.selected_label_sets:
-                        if set_name in label_sets:
-                            for label_name in label_sets[set_name]['labels']:
-                                if label_name in label_dict:
-                                    label_id = label_dict[label_name]
-                                    # Only include if available
-                                    if label_id in available_label_ids:
-                                        individual_labels.append({
-                                            'name': label_name,
-                                            'id': label_id
-                                        })
-                    
-                    st.markdown("**Current Selection:**")
-                    st.markdown("• **Mode**: Label Sets")
-                    st.markdown("• **Source**: Voxels directory")
-                    st.markdown("• **Selected Sets**: " + ", ".join([s.replace('_', ' ').title() for s in st.session_state.selected_label_sets]))
-                    st.markdown(f"• **Available Labels**: {len(individual_labels)}")
-                    
-                    if individual_labels:
-                        st.markdown("**Individual Overlays:**")
-                        for label in individual_labels[:10]:  # Show first 10 to avoid clutter
-                            st.markdown(f"  • {label['name']} (ID: {label['id']})")
-                        if len(individual_labels) > 10:
-                            st.markdown(f"  *... and {len(individual_labels) - 10} more*")
-                    else:
-                        st.markdown("**No available labels found for selected sets**")
-                            
-                except Exception as e:
-                    st.error(f"Error loading individual labels: {e}")
-            else:
-                st.markdown("**Current Selection:**")
-                st.markdown("• **Mode**: Label Sets")
-                st.markdown("• **Source**: Base segmentation file (no sets selected)")
-                st.info("Select label sets to display individual voxels.")
-                
-        elif voxel_mode == "individual_voxels":
-            if hasattr(st.session_state, 'selected_individual_voxels') and st.session_state.selected_individual_voxels:
-                st.markdown("**Current Selection:**")
-                st.markdown("• **Mode**: Individual Voxels")
-                st.markdown("• **Source**: Voxels directory")
-                st.markdown(f"• **Selected Voxels**: {len(st.session_state.selected_individual_voxels)}")
-                
-                st.markdown("**Individual Overlays:**")
-                for voxel_name in st.session_state.selected_individual_voxels[:10]:  # Show first 10
-                    st.markdown(f"  • {voxel_name}")
-                if len(st.session_state.selected_individual_voxels) > 10:
-                    st.markdown(f"  *... and {len(st.session_state.selected_individual_voxels) - 10} more*")
-            else:
-                st.markdown("**Current Selection:**")
-                st.markdown("• **Mode**: Individual Voxels")
-                st.markdown("• **Source**: Base segmentation file (no voxels selected)")
-                st.info("Select individual voxels to display.")
-    else:
+    if not show_overlay:
         st.info("Enable 'Show Voxels' to display overlays.")
 
     with st.expander("Voxel Legend", expanded=False):
@@ -405,6 +359,7 @@ if selected_file:
     base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
     segment_url = ''
     selected_label_ids = []
+    
     
     # Store individual label overlays
     individual_label_overlays = []
@@ -571,35 +526,6 @@ if selected_file:
     # For "all segmentation" mode, we use the same colormap as individual voxels
     # No need to analyze the segmentation file since we use the standard colormap
     
-    # Debug information
-    if st.checkbox("Show Debug Info", value=False):
-        st.write("**Debug Information:**")
-        st.write(f"Base File URL: {base_file_url}")
-        if show_overlay:
-            ct_scan_folder_name = segment_filename.replace('.nii.gz', '').replace('.nii', '')
-            st.write(f"CT Scan Folder: {ct_scan_folder_name}")
-            st.write(f"Voxels Directory: output/{selected_patient}/voxels/{ct_scan_folder_name}/")
-        st.write(f"Volume List JS: {volume_list_js}")
-        st.write(f"Individual Label Overlays: {individual_label_overlays}")
-        if individual_label_overlays:
-            st.write("**Overlay Colors:**")
-            for i, overlay in enumerate(individual_label_overlays):
-                if overlay.get('color'):
-                    color = overlay['color']
-                    color_hex = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
-                    st.write(f"  {i+1}. {overlay['label_name']} (ID: {overlay['label_id']}): {color_hex}")
-        st.write(f"Show Overlay: {show_overlay}")
-        st.write(f"Voxel Mode: {getattr(st.session_state, 'voxel_mode', 'not set')}")
-        # Overlay names and URLs for clarity
-        try:
-            overlay_names = [ov.get('label_name') for ov in individual_label_overlays]
-            overlay_urls = [ov.get('url') for ov in individual_label_overlays]
-            if overlay_names:
-                st.write(f"Overlay Names: {overlay_names}")
-            if overlay_urls:
-                st.write(f"Overlay URLs: {overlay_urls}")
-        except Exception:
-            pass
 
     custom_colormap_js = ""
     try:
@@ -691,13 +617,27 @@ if selected_file:
                     nv.setColormap(mainVol.id, {color_map_js});
                     nv.setGamma({nifti_gamma});
                     mainVol.opacity = {nifti_opacity};
+                    
+                    // Apply CT windowing settings
+                    const windowCenter = {window_center};
+                    const windowWidth = {window_width};
+                    const windowMin = windowCenter - windowWidth / 2;
+                    const windowMax = windowCenter + windowWidth / 2;
+                    
+                    // Set the volume's display range for proper CT windowing
+                    mainVol.cal_min = windowMin;
+                    mainVol.cal_max = windowMax;
+                    
+                    console.log('Applied CT windowing - Center:', windowCenter, 'Width:', windowWidth, 'Range:', windowMin, 'to', windowMax);
                 }}
 
                 // Apply individual colors to overlays
                 if (nv.volumes.length > {overlay_start_index}) {{
                     for (let i = {overlay_start_index}; i < nv.volumes.length; i++) {{
                         const overlayVol = nv.volumes[i];
-                        overlayVol.opacity = {segment_opacity};
+                        // Set opacity to 50% for Single View mode, otherwise use slider value
+                        const isSingleView = {actual_slice_type} !== 3 && {actual_slice_type} !== 4;
+                        overlayVol.opacity = isSingleView ? 0.5 : {segment_opacity};
                         
                         // Get the corresponding overlay color info
                         const overlayIndex = i - {overlay_start_index};
@@ -747,6 +687,20 @@ if selected_file:
                         nv.opts.show3Dcrosshair = true;
                         nv.drawScene();
                     }}, 500);
+                }} else if ({actual_slice_type} === 4) {{
+                    // 3D Render mode - disable any container/boundary settings
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = false;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                    nv.opts.isRadiologicalConvention = false;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                    // Disable any 3D container or boundary rendering
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
                 }} else {{
                     // Ensure multiplanar flags are disabled when not in multiplanar mode
                     nv.opts.multiplanarShowRender = false;
@@ -759,12 +713,25 @@ if selected_file:
                 // Final redraw to ensure colormap is applied
                 setTimeout(() => {{
                     nv.drawScene();
-                    console.log('Final scene redraw completed');
                 }}, 100);
 
             }}).catch((error) => {{
                 console.error('Error loading volumes:', error);
                 console.error('Volume list that failed:', volumeList);
+                console.error('Error details:', {{
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                }});
+                
+                // Try to provide more helpful error information
+                if (error.message && error.message.includes('fetch')) {{
+                    console.error('Network error - check if image server is running and file exists');
+                }} else if (error.message && error.message.includes('parse')) {{
+                    console.error('File parsing error - check if file is valid NIfTI format');
+                }} else {{
+                    console.error('Unknown error during volume loading');
+                }}
             }});
         }}
     </script>

@@ -3,7 +3,7 @@
 Script to analyze the image server data and generate a comprehensive report.
 Supports both old and new folder structures:
 
-NEW STRUCTURE:
+CURRENT STRUCTURE:
 - output/{patient_id}/nifti/         (CT scan files)
 - output/{patient_id}/segments/      (full segmentation files)
 - output/{patient_id}/voxels/{ct_scan_name}/  (individual voxel files)
@@ -36,6 +36,84 @@ import time
 
 # Disable SSL warnings for self-signed certificates
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def parse_file_size(size_str: str) -> int:
+    """Parse file size string and return size in bytes."""
+    if not size_str or size_str.strip() == "":
+        return 0
+    
+    try:
+        size_str = size_str.strip()
+        
+        # Handle formats like "1 (0 B)" or "2 (1.5 MB)" - extract content from parentheses
+        if '(' in size_str and ')' in size_str:
+            # Extract the part in parentheses
+            start = size_str.find('(') + 1
+            end = size_str.find(')')
+            if start > 0 and end > start:
+                size_str = size_str[start:end].strip()
+        
+        # If we still have a format like "1 39.2 MB", extract the part with units
+        parts = size_str.split()
+        if len(parts) > 1:
+            # Look for any part that contains size units and take it plus the previous part
+            for i in range(len(parts)):
+                part = parts[i].upper()
+                if any(unit in part for unit in ['TB', 'GB', 'MB', 'KB', 'B']):
+                    # Take this part and the previous part (which should be the number)
+                    if i > 0:
+                        size_str = ' '.join(parts[i-1:i+1])
+                    else:
+                        size_str = parts[i]
+                    break
+        
+        size_str = size_str.upper()
+        
+        # Handle different size units
+        multipliers = {
+            'TB': 1024 * 1024 * 1024 * 1024,
+            'GB': 1024 * 1024 * 1024,
+            'MB': 1024 * 1024,
+            'KB': 1024,
+            'B': 1
+        }
+        
+        for unit, multiplier in multipliers.items():
+            if size_str.endswith(unit):
+                try:
+                    number_str = size_str[:-len(unit)].strip()
+                    number = float(number_str)
+                    return int(number * multiplier)
+                except (ValueError, TypeError):
+                    continue
+        
+        # Try to parse as plain number (assume bytes)
+        try:
+            return int(float(size_str))
+        except (ValueError, TypeError):
+            return 0
+            
+    except Exception:
+        # If anything goes wrong, return 0
+        return 0
+
+def format_file_size(size_bytes: int) -> str:
+    """Format file size in bytes to human readable format."""
+    if size_bytes == 0:
+        return "0 B"
+    
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    size = float(size_bytes)
+    unit_index = 0
+    
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    
+    if unit_index == 0:
+        return f"{int(size)} {units[unit_index]}"
+    else:
+        return f"{size:.1f} {units[unit_index]}"
 
 def load_environment_config():
     """Load environment configuration from .env file."""
@@ -83,15 +161,18 @@ def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
                 
                 # Extract size info if present
                 size_info = ""
+                size_bytes = 0
                 size_span = item.find('span', style=re.compile(r'color.*#666'))
                 if size_span:
                     size_info = size_span.get_text().strip()
+                    size_bytes = parse_file_size(size_info)
                 
                 items.append({
                     'name': name,
                     'href': href,
                     'is_directory': is_directory,
                     'size': size_info,
+                    'size_bytes': size_bytes,
                     'full_text': text
                 })
     
@@ -141,20 +222,28 @@ def is_patient_folder(folder_name: str) -> bool:
     """Check if a folder name matches the patient pattern (PA00000002)."""
     return bool(re.match(r'^PA\d{8}$', folder_name))
 
-def get_ct_scan_files(patient_folder_contents: List[Dict[str, str]]) -> List[str]:
-    """Extract CT scan files (nii.gz) from patient folder contents."""
+def get_ct_scan_files(patient_folder_contents: List[Dict[str, str]]) -> List[Dict[str, any]]:
+    """Extract CT scan files (nii.gz) from patient folder contents with size info."""
     ct_scans = []
     for item in patient_folder_contents:
         if not item['is_directory'] and item['name'].endswith('.nii.gz'):
-            ct_scans.append(item['name'])
+            ct_scans.append({
+                'name': item['name'],
+                'size_bytes': item.get('size_bytes', 0),
+                'size_display': item.get('size', 'Unknown')
+            })
     return ct_scans
 
-def get_voxel_files(segments_folder_contents: List[Dict[str, str]]) -> List[str]:
-    """Extract voxel files from segments folder contents."""
+def get_voxel_files(segments_folder_contents: List[Dict[str, str]]) -> List[Dict[str, any]]:
+    """Extract voxel files from segments folder contents with size info."""
     voxel_files = []
     for item in segments_folder_contents:
         if not item['is_directory'] and item['name'].endswith('.nii.gz'):
-            voxel_files.append(item['name'])
+            voxel_files.append({
+                'name': item['name'],
+                'size_bytes': item.get('size_bytes', 0),
+                'size_display': item.get('size', 'Unknown')
+            })
     return voxel_files
 
 # Removed get_voxel_folder_contents - now handled directly in analyze_patient_data
@@ -173,7 +262,7 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
         nifti_folder_path = f"{patient_id}/nifti"
         segments_folder_path = f"{patient_id}/segments"
         voxel_folder_path = f"{patient_id}/voxels"
-        structure_type = "new"
+        structure_type = "current"
     
     print(f"    Using {structure_type} folder structure")
     
@@ -185,8 +274,11 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
             'patient_id': patient_id,
             'ct_scans': [],
             'total_ct_scans': 0,
+            'total_ct_size_bytes': 0,
             'voxel_data': {},
             'total_voxel_files': 0,
+            'total_voxel_size_bytes': 0,
+            'total_patient_size_bytes': 0,
             'error': f'Could not access nifti folder ({structure_type} structure)',
             'structure_type': structure_type
         }
@@ -194,40 +286,60 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
     # Get CT scan files
     ct_scans = get_ct_scan_files(nifti_contents)
     
+    # Calculate total CT scan size
+    total_ct_size_bytes = sum(scan.get('size_bytes', 0) for scan in ct_scans)
+    
     # Get segments folder contents for this patient
     segments_contents = get_folder_contents(base_url, segments_folder_path, verify_ssl)
     
     voxel_data = {}
     total_voxel_files = 0
+    total_voxel_size_bytes = 0
     
     # Get voxel folder contents (different logic for new vs old structure)
     if use_old_structure:
         voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path, verify_ssl)
     else:
-        # In new structure, voxels are organized by CT scan subfolders
+        # In current structure, voxels are organized by CT scan subfolders
         voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path, verify_ssl)
     
     if segments_contents:
         # For each CT scan, check for corresponding voxel data
-        for ct_scan in ct_scans:
-            # Check for direct voxel file (segmentation result)
-            voxel_file_name = ct_scan  # Same name as CT scan
-            voxel_files = get_voxel_files(segments_contents)
+        for ct_scan_info in ct_scans:
+            ct_scan_name = ct_scan_info['name']
             
-            # Check if there's a voxel file with the same name
-            has_voxel_file = voxel_file_name in voxel_files
+            # Check for direct voxel file (segmentation result)
+            voxel_files = get_voxel_files(segments_contents)
+            voxel_file_names = [vf['name'] for vf in voxel_files]
+            has_voxel_file = ct_scan_name in voxel_file_names
+            
+            # Find the segmentation file size if it exists
+            segmentation_size_bytes = 0
+            if has_voxel_file:
+                for vf in voxel_files:
+                    if vf['name'] == ct_scan_name:
+                        segmentation_size_bytes = vf['size_bytes']
+                        break
             
             # Count voxel files for this specific scan
             scan_voxel_files = []
+            scan_voxel_size_bytes = 0
+            
             if voxel_folder_contents:
                 if use_old_structure:
                     # Old structure: Find voxel files that start with the scan name
-                    scan_base_name = ct_scan.replace('.nii.gz', '')
-                    scan_voxel_files = [item['name'] for item in voxel_folder_contents 
-                                      if not item['is_directory'] and item['name'].startswith(scan_base_name + '_')]
+                    scan_base_name = ct_scan_name.replace('.nii.gz', '')
+                    for item in voxel_folder_contents:
+                        if not item['is_directory'] and item['name'].startswith(scan_base_name + '_'):
+                            scan_voxel_files.append({
+                                'name': item['name'],
+                                'size_bytes': item.get('size_bytes', 0),
+                                'size_display': item.get('size', 'Unknown')
+                            })
+                            scan_voxel_size_bytes += item.get('size_bytes', 0)
                 else:
-                    # New structure: Look for CT scan subfolder in voxels directory
-                    scan_base_name = ct_scan.replace('.nii.gz', '').replace('.nii', '')
+                    # Current structure: Look for CT scan subfolder in voxels directory
+                    scan_base_name = ct_scan_name.replace('.nii.gz', '').replace('.nii', '')
                     ct_scan_voxel_folder = None
                     
                     # Find the subfolder for this CT scan
@@ -241,26 +353,43 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
                         ct_scan_voxel_path = f"{voxel_folder_path}/{ct_scan_voxel_folder}"
                         ct_scan_voxel_contents = get_folder_contents(base_url, ct_scan_voxel_path, verify_ssl)
                         if ct_scan_voxel_contents:
-                            scan_voxel_files = [item['name'] for item in ct_scan_voxel_contents 
-                                              if not item['is_directory'] and item['name'].endswith('.nii.gz')]
+                            for item in ct_scan_voxel_contents:
+                                if not item['is_directory'] and item['name'].endswith('.nii.gz'):
+                                    scan_voxel_files.append({
+                                        'name': item['name'],
+                                        'size_bytes': item.get('size_bytes', 0),
+                                        'size_display': item.get('size', 'Unknown')
+                                    })
+                                    scan_voxel_size_bytes += item.get('size_bytes', 0)
             
-            voxel_data[ct_scan] = {
+            voxel_data[ct_scan_name] = {
                 'has_voxel_file': has_voxel_file,
-                'voxel_file_name': voxel_file_name if has_voxel_file else None,
+                'voxel_file_name': ct_scan_name if has_voxel_file else None,
                 'voxel_folder_files': scan_voxel_files,
-                'voxel_count': len(scan_voxel_files)
+                'voxel_count': len(scan_voxel_files),
+                'segmentation_size_bytes': segmentation_size_bytes,
+                'voxel_size_bytes': scan_voxel_size_bytes,
+                'total_size_bytes': segmentation_size_bytes + scan_voxel_size_bytes
             }
             
             total_voxel_files += len(scan_voxel_files)
             if has_voxel_file:
                 total_voxel_files += 1
+            
+            total_voxel_size_bytes += segmentation_size_bytes + scan_voxel_size_bytes
+    
+    # Calculate total patient data size
+    total_patient_size_bytes = total_ct_size_bytes + total_voxel_size_bytes
     
     return {
         'patient_id': patient_id,
         'ct_scans': ct_scans,
         'total_ct_scans': len(ct_scans),
+        'total_ct_size_bytes': total_ct_size_bytes,
         'voxel_data': voxel_data,
         'total_voxel_files': total_voxel_files,
+        'total_voxel_size_bytes': total_voxel_size_bytes,
+        'total_patient_size_bytes': total_patient_size_bytes,
         'structure_type': structure_type,
         'error': None
     }
@@ -303,11 +432,14 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     """Generate a comprehensive report from the analysis data."""
     
     total_patients = len(analysis_data)
-    total_ct_scans = sum(patient['total_ct_scans'] for patient in analysis_data)
+    total_ct_scans = sum(patient.get('total_ct_scans', 0) for patient in analysis_data)
+    total_ct_size_bytes = sum(patient.get('total_ct_size_bytes', 0) for patient in analysis_data)
+    total_voxel_size_bytes = sum(patient.get('total_voxel_size_bytes', 0) for patient in analysis_data)
+    total_data_size_bytes = sum(patient.get('total_patient_size_bytes', 0) for patient in analysis_data)
     
     # Calculate statistics
-    patients_with_data = len([p for p in analysis_data if p['total_ct_scans'] > 0])
-    patients_with_voxels = len([p for p in analysis_data if p['total_voxel_files'] > 0])
+    patients_with_data = len([p for p in analysis_data if p.get('total_ct_scans', 0) > 0])
+    patients_with_voxels = len([p for p in analysis_data if p.get('total_voxel_files', 0) > 0])
     
     # Generate report
     report_lines = []
@@ -325,31 +457,41 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     report_lines.append(f"Patients with Voxel Data: {patients_with_voxels}")
     report_lines.append(f"Total CT Scans: {total_ct_scans}")
     report_lines.append("")
+    report_lines.append("💾 DATA SIZE SUMMARY")
+    report_lines.append("-" * 40)
+    report_lines.append(f"Total CT Scan Data: {format_file_size(total_ct_size_bytes)}")
+    report_lines.append(f"Total Voxel Data: {format_file_size(total_voxel_size_bytes)}")
+    report_lines.append(f"Total Data Size: {format_file_size(total_data_size_bytes)}")
+    report_lines.append("")
     
     # Detailed patient breakdown
     report_lines.append("👥 DETAILED PATIENT BREAKDOWN")
     report_lines.append("-" * 40)
     
     for patient in analysis_data:
-        structure_info = f" ({patient.get('structure_type', 'unknown')} structure)" if patient.get('structure_type') else ""
-        report_lines.append(f"\n🏷️  Patient ID: {patient['patient_id']}{structure_info}")
+        data_size_info = f" - {format_file_size(patient.get('total_patient_size_bytes', 0))}" if patient.get('total_patient_size_bytes', 0) > 0 else ""
+        report_lines.append(f"\n🏷️  Patient ID: {patient['patient_id']}{data_size_info}")
         
         if patient['error']:
             report_lines.append(f"   ❌ Error: {patient['error']}")
             continue
         
-        report_lines.append(f"   📊 CT Scans: {patient['total_ct_scans']}")
-        report_lines.append(f"   🧬 Voxel Files: {patient['total_voxel_files']}")
+        report_lines.append(f"   📊 CT Scans: {patient.get('total_ct_scans', 0)} ({format_file_size(patient.get('total_ct_size_bytes', 0))})")
+        report_lines.append(f"   🧬 Voxel Files: {patient.get('total_voxel_files', 0)} ({format_file_size(patient.get('total_voxel_size_bytes', 0))})")
+        report_lines.append(f"   💾 Total Data: {format_file_size(patient.get('total_patient_size_bytes', 0))}")
         
-        if patient['ct_scans']:
+        if patient.get('ct_scans'):
             report_lines.append("   📋 CT Scan Details:")
-            for ct_scan in patient['ct_scans']:
-                voxel_info = patient['voxel_data'].get(ct_scan, {})
+            for ct_scan_info in patient['ct_scans']:
+                ct_scan_name = ct_scan_info.get('name', 'Unknown')
+                ct_scan_size = ct_scan_info.get('size_bytes', 0)
+                voxel_info = patient.get('voxel_data', {}).get(ct_scan_name, {})
                 has_voxel_file = voxel_info.get('has_voxel_file', False)
                 voxel_count = voxel_info.get('voxel_count', 0)
+                total_scan_size = voxel_info.get('total_size_bytes', 0)
                 
                 # Remove .nii.gz extension for display
-                scan_display_name = ct_scan.replace('.nii.gz', '')
+                scan_display_name = ct_scan_name.replace('.nii.gz', '')
                 
                 voxel_status = "✅" if has_voxel_file or voxel_count > 0 else "❌"
                 voxel_details = []
@@ -359,12 +501,13 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
                     voxel_details.append(f"{voxel_count} voxels")
                 
                 voxel_text = f" ({', '.join(voxel_details)})" if voxel_details else " (no voxel data)"
-                report_lines.append(f"      {voxel_status} {scan_display_name}{voxel_text}")
+                size_text = f" [{format_file_size(ct_scan_size)} + {format_file_size(total_scan_size - ct_scan_size)} = {format_file_size(total_scan_size)}]"
+                report_lines.append(f"      {voxel_status} {scan_display_name}{voxel_text}{size_text}")
     
     # File structure overview
     report_lines.append("\n📁 FILE STRUCTURE OVERVIEW")
     report_lines.append("-" * 40)
-    report_lines.append("NEW STRUCTURE:")
+    report_lines.append(f"TOTAL DATA SIZE: {format_file_size(total_data_size_bytes)}")
     report_lines.append("output/")
     report_lines.append("├── PA00000002/")
     report_lines.append("│   ├── nifti/")
@@ -431,22 +574,22 @@ def main():
         print("   3. SSL certificates are properly configured")
         sys.exit(1)
     
-    # Get output folder contents to find patients (new structure)
+    # Get output folder contents to find patients (current structure)
     if not args.quiet:
         print("\n🔍 Scanning for patients...")
     
-    # First try the new structure (output/ folder with patient directories)
+    # First try the current structure (output/ folder with patient directories)
     output_contents = get_folder_contents(image_server_url, "", args.verify_ssl)
     patient_folders = []
     
     if output_contents:
-        # Filter for patient folders in the new structure
+        # Filter for patient folders in the current structure
         patient_folders = [item for item in output_contents if item['is_directory'] and is_patient_folder(item['name'])]
     
-    # If no patients found in new structure, fall back to old structure
+    # If no patients found in current structure, fall back to old structure
     if not patient_folders:
         if not args.quiet:
-            print("  No patients found in new structure, checking old structure...")
+            print("  No patients found in current structure, checking old structure...")
         
         nifti_contents = get_folder_contents(image_server_url, "nifti", args.verify_ssl)
         if nifti_contents:
@@ -457,7 +600,7 @@ def main():
     
     if not patient_folders:
         print("❌ No patient folders found (expected format: PA00000002)")
-        print("   Checked both new structure (output/{patient}/) and old structure (output/nifti/{patient}/)")
+        print("   Checked both current structure (output/{patient}/) and old structure (output/nifti/{patient}/)")
         sys.exit(1)
     
     if not patient_folders:
@@ -475,8 +618,24 @@ def main():
         
         # Check if this patient uses old structure
         use_old_structure = patient_folder.get('old_structure', False)
-        patient_data = analyze_patient_data(image_server_url, patient_folder['name'], args.verify_ssl, use_old_structure)
-        analysis_data.append(patient_data)
+        try:
+            patient_data = analyze_patient_data(image_server_url, patient_folder['name'], args.verify_ssl, use_old_structure)
+            analysis_data.append(patient_data)
+        except Exception as e:
+            print(f"❌ Error analyzing patient {patient_folder['name']}: {e}")
+            # Add error data for this patient
+            analysis_data.append({
+                'patient_id': patient_folder['name'],
+                'ct_scans': [],
+                'total_ct_scans': 0,
+                'total_ct_size_bytes': 0,
+                'voxel_data': {},
+                'total_voxel_files': 0,
+                'total_voxel_size_bytes': 0,
+                'total_patient_size_bytes': 0,
+                'error': f'Analysis failed: {str(e)}',
+                'structure_type': 'unknown'
+            })
     
     # Generate and display report
     if not args.quiet:

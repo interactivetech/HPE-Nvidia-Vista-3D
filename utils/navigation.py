@@ -34,7 +34,7 @@ Example Usage:
     
     # Create custom navigation
     nav = Navigation()
-    nav.add_item("admin", "Admin Panel", "⚙️", "admin")
+    nav.add_item("admin", "Admin Panel", "admin")
     nav.render_sidebar()
     ```
 
@@ -56,35 +56,40 @@ class NavigationItem:
     Attributes:
         key (str): Unique identifier for the navigation item (used for Streamlit button keys)
         label (str): Human-readable label displayed in the navigation
-        icon (str): Emoji or icon character displayed before the label
+        icon (str): Emoji, icon character, or image path displayed before the label
         page_key (str): Target page identifier used for routing
+        is_image (bool): Whether the icon is an image file path
     
     Example:
-        >>> item = NavigationItem("viewer", "Medical Viewer", "🩻", "niivue")
+        >>> item = NavigationItem("viewer", "Medical Viewer", "niivue")
         >>> print(item.display_text)
-        "🩻 Medical Viewer"
+        "Medical Viewer"
+        
+        >>> item = NavigationItem("about", "About", "home", "assets/HPE.png", is_image=True)
     """
     
-    def __init__(self, key: str, label: str, icon: str, page_key: str):
+    def __init__(self, key: str, label: str, page_key: str, icon: str = "", is_image: bool = False):
         """
         Initialize a navigation item.
         
         Args:
             key: Unique identifier for the navigation item
             label: Display label for the navigation button
-            icon: Emoji or icon character (e.g., "🩻", "ℹ️")
             page_key: Page identifier for routing (e.g., "home", "niivue")
+            icon: Emoji, icon character, or image path (e.g., "🩻", "ℹ️", "assets/HPE.png") - optional
+            is_image: Whether the icon is an image file path
         
         Raises:
-            ValueError: If any parameter is empty or None
+            ValueError: If required parameters are empty or None
         """
-        if not all([key, label, icon, page_key]):
-            raise ValueError("All parameters (key, label, icon, page_key) must be non-empty")
+        if not all([key, label, page_key]):
+            raise ValueError("Required parameters (key, label, page_key) must be non-empty")
             
         self.key = key
         self.label = label
         self.icon = icon
         self.page_key = page_key
+        self.is_image = is_image
         
     @property
     def display_text(self) -> str:
@@ -92,14 +97,20 @@ class NavigationItem:
         Get the formatted display text with icon and label.
         
         Returns:
-            str: Formatted text in the format "{icon} {label}"
+            str: Formatted text with icon and label if icon exists, otherwise just the label
         
         Example:
-            >>> item = NavigationItem("cache", "Cache Management", "💾", "cache")
+            >>> item = NavigationItem("cache", "Cache Management", "cache", "💾")
             >>> item.display_text
             "💾 Cache Management"
+            
+            >>> item = NavigationItem("about", "About", "home")
+            >>> item.display_text
+            "About"
         """
-        return f"{self.icon} {self.label}"
+        if self.icon:
+            return f"{self.icon} {self.label}"
+        return self.label
     
     def __repr__(self) -> str:
         """Return string representation of the navigation item."""
@@ -119,9 +130,8 @@ class Navigation:
     and the page is rerun to reflect the change.
     
     Default Navigation Items:
-        - About (ℹ️): Application information and welcome page
-        - NiiVue Viewer (🩻): Medical image viewer interface
-        - Cache Management (💾): File cache management tools
+        - About: Application information and welcome page
+        - NiiVue Viewer: Medical image viewer interface
     
     Attributes:
         items (List[NavigationItem]): List of navigation items
@@ -130,7 +140,7 @@ class Navigation:
         >>> nav = Navigation()
         >>> nav.render_sidebar()  # Renders navigation in Streamlit sidebar
         >>> current = nav.get_current_page()  # Get current active page
-        >>> nav.add_item("settings", "Settings", "⚙️", "settings")  # Add new item
+        >>> nav.add_item("settings", "Settings", "settings")  # Add new item
     """
     
     def __init__(self):
@@ -141,9 +151,8 @@ class Navigation:
         Streamlit session state if not already present.
         """
         self.items: List[NavigationItem] = [
-            NavigationItem("about", "About", "ℹ️", "home"),
-            NavigationItem("niivue", "NiiVue Viewer", "🩻", "niivue"),
-            NavigationItem("sunburst", "Data Hierarchy", "📊", "sunburst"),
+            NavigationItem("about", "About", "home"),
+            NavigationItem("niivue", "NiiVue Viewer", "niivue"),
         ]
         
         # Initialize session state for navigation if not exists
@@ -184,9 +193,22 @@ class Navigation:
             >>> nav.render_sidebar()  # Renders all navigation buttons
         """
         with st.sidebar:
+            # Add HPE-NVIDIA logo at the top - full width
+            st.image("assets/Logo-HPE-NVIDIA.png", use_container_width=True)
+            
             for item in self.items:
-                if st.button(item.display_text, key=item.key, use_container_width=True):
-                    self.navigate_to(item.page_key)
+                if item.is_image and item.icon:
+                    # For image icons, create a container with image and button
+                    col1, col2 = st.columns([0.2, 0.8])
+                    with col1:
+                        st.image(item.icon, width=40)
+                    with col2:
+                        if st.button(item.label, key=item.key, use_container_width=True):
+                            self.navigate_to(item.page_key)
+                else:
+                    # For text-only buttons (no icons), use just the label
+                    if st.button(item.label, key=item.key, use_container_width=True):
+                        self.navigate_to(item.page_key)
     
     def get_current_page(self) -> str:
         """
@@ -219,29 +241,31 @@ class Navigation:
         """
         return st.session_state.current_page == page
     
-    def add_item(self, key: str, label: str, icon: str, page_key: str) -> None:
+    def add_item(self, key: str, label: str, page_key: str, icon: str = "", is_image: bool = False) -> None:
         """
         Add a new navigation item to the navigation menu.
         
         Args:
             key: Unique identifier for the navigation item
             label: Display label for the button
-            icon: Emoji or icon character
             page_key: Target page for navigation
+            icon: Emoji, icon character, or image path (optional)
+            is_image: Whether the icon is an image file path
             
         Raises:
             ValueError: If any parameter is empty or if key already exists
             
         Example:
             >>> nav = Navigation()
-            >>> nav.add_item("settings", "Settings", "⚙️", "settings")
-            >>> nav.add_item("help", "Help", "❓", "help")
+            >>> nav.add_item("settings", "Settings", "settings")
+            >>> nav.add_item("help", "Help", "help", "❓")
+            >>> nav.add_item("logo", "Logo", "logo", "assets/logo.png", is_image=True)
         """
         # Check if key already exists
         if self.get_item_by_key(key) is not None:
             raise ValueError(f"Navigation item with key '{key}' already exists")
             
-        new_item = NavigationItem(key, label, icon, page_key)
+        new_item = NavigationItem(key, label, page_key, icon, is_image)
         self.items.append(new_item)
     
     def remove_item(self, key: str) -> bool:
@@ -335,6 +359,7 @@ class Navigation:
             >>> print(f"Total navigation items: {count}")
         """
         return len(self.items)
+    
 
 
 # Factory Functions
@@ -352,7 +377,7 @@ def create_navigation() -> Navigation:
         
     Example:
         >>> nav = create_navigation()
-        >>> nav.add_item("admin", "Admin", "⚙️", "admin")
+        >>> nav.add_item("admin", "Admin", "admin")
         >>> nav.render_sidebar()
     """
     return Navigation()
@@ -402,7 +427,8 @@ Quick Reference:
    ```python
    from utils.navigation import Navigation
    nav = Navigation()
-   nav.add_item("custom", "Custom Page", "🔧", "custom")
+   nav.add_item("custom", "Custom Page", "custom")
+   nav.add_item("logo", "Logo Page", "logo", "assets/logo.png", is_image=True)
    nav.render_sidebar()
    ```
 

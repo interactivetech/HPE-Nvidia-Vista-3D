@@ -171,7 +171,7 @@ def main():
             # The NIfTI file is already in its final destination.
             # The copy step is no longer needed.
             
-            # Define segmentation output path in new structure
+            # Define segmentation output path in current structure
             segmentation_output_path = patient_dirs['segments'] / nifti_file_path.name
 
             if not args.force and segmentation_output_path.exists():

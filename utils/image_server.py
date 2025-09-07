@@ -355,7 +355,7 @@ async def get_available_voxel_labels(
 @app.get("/{full_path:path}")
 @app.head("/{full_path:path}")
 async def serve_files(request: Request, full_path: str):
-    """Serve files and directory listings"""
+    """Serve files and directory listings with proper range request support"""
     
     # Handle root path
     if full_path == "":
@@ -379,9 +379,9 @@ async def serve_files(request: Request, full_path: str):
     if not absolute_path.exists():
         raise HTTPException(status_code=404, detail="Not found")
     
-    # If it's a file, serve it
+    # If it's a file, serve it with range request support
     if absolute_path.is_file():
-        return FileResponse(absolute_path)
+        return await serve_file_with_range(request, absolute_path)
     
     # If it's a directory, generate listing
     elif absolute_path.is_dir():
@@ -394,6 +394,70 @@ async def serve_files(request: Request, full_path: str):
     
     else:
         raise HTTPException(status_code=404, detail="Not found")
+
+async def serve_file_with_range(request: Request, file_path: Path):
+    """Serve a file with proper range request support for large files"""
+    import re
+    
+    # Get file size
+    file_size = file_path.stat().st_size
+    
+    # Check for range header
+    range_header = request.headers.get('range')
+    
+    if not range_header:
+        # No range requested, serve entire file
+        return FileResponse(
+            file_path,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range"
+            }
+        )
+    
+    # Parse range header
+    range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+    if not range_match:
+        raise HTTPException(status_code=416, detail="Range Not Satisfiable")
+    
+    start = int(range_match.group(1))
+    end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+    
+    # Validate range
+    if start >= file_size or end >= file_size or start > end:
+        raise HTTPException(status_code=416, detail="Range Not Satisfiable")
+    
+    # Calculate content length
+    content_length = end - start + 1
+    
+    # Read the requested range
+    def iter_file_range():
+        with open(file_path, 'rb') as f:
+            f.seek(start)
+            remaining = content_length
+            while remaining > 0:
+                chunk_size = min(8192, remaining)
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+    
+    return StreamingResponse(
+        iter_file_range(),
+        status_code=206,
+        headers={
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(content_length),
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range"
+        },
+        media_type="application/octet-stream"
+    )
 
 origins = ["*"]
 
