@@ -12,7 +12,7 @@ from typing import List, Dict, Optional
 
 # Add utils to path for imports
 sys.path.append(str(Path(__file__).parent / 'utils'))
-from navigation import render_navigation
+from assets.navigation import render_navigation
 from assets.nvidia_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
 from assets.niivue_badge import render_niivue_badge as _render_niivue_badge

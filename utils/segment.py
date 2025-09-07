@@ -11,6 +11,7 @@ import zipfile
 import io
 import numpy as np
 import traceback
+import shutil
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -21,7 +22,7 @@ IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 VISTA3D_INFERENCE_URL = "http://localhost:8000/v1/vista3d/inference"
 PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', '.'))
 NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / "output" / "nifti"
-SEGMENTATION_OUTPUT_BASE_DIR = PROJECT_ROOT / "output" / "segments"
+PATIENT_OUTPUT_BASE_DIR = PROJECT_ROOT / "output"
 
 # Load label dictionaries
 LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
@@ -42,6 +43,72 @@ def get_nifti_files_in_folder(folder_path: Path):
         return []
     return [folder_path / f for f in os.listdir(folder_path) if f.endswith(('.nii', '.nii.gz'))]
 
+def create_patient_folder_structure(patient_id: str):
+    """Create the new folder structure for a patient."""
+    patient_base_dir = PATIENT_OUTPUT_BASE_DIR / patient_id
+    nifti_dir = patient_base_dir / "nifti"
+    segments_dir = patient_base_dir / "segments"
+    voxels_dir = patient_base_dir / "voxels"
+    
+    # Create all directories
+    nifti_dir.mkdir(parents=True, exist_ok=True)
+    segments_dir.mkdir(parents=True, exist_ok=True)
+    voxels_dir.mkdir(parents=True, exist_ok=True)
+    
+    return {
+        'base': patient_base_dir,
+        'nifti': nifti_dir,
+        'segments': segments_dir,
+        'voxels': voxels_dir
+    }
+
+def create_individual_voxel_files(segmentation_img, ct_scan_name: str, voxels_base_dir: Path, target_vessel_ids: list):
+    """Create individual voxel files for each label in the segmentation."""
+    # Create folder for this CT scan's voxels
+    ct_scan_folder_name = ct_scan_name.replace('.nii.gz', '').replace('.nii', '')
+    ct_voxels_dir = voxels_base_dir / ct_scan_folder_name
+    ct_voxels_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get the segmentation data
+    data = segmentation_img.get_fdata().astype(np.int16)
+    affine = segmentation_img.affine
+    header = segmentation_img.header
+    
+    # Find unique labels in the segmentation (excluding background/0)
+    unique_labels = np.unique(data)
+    unique_labels = unique_labels[unique_labels != 0]  # Remove background
+    
+    print(f"    Found {len(unique_labels)} unique labels in segmentation: {unique_labels}")
+    
+    created_files = []
+    
+    # Create individual voxel files for each label
+    for label_id in unique_labels:
+        if label_id in LABEL_DICT:
+            label_info = LABEL_DICT[label_id]
+            label_name = label_info['name'].lower().replace(' ', '_').replace('-', '_')
+            
+            # Create binary mask for this label
+            label_data = np.zeros_like(data, dtype=np.int16)
+            label_data[data == label_id] = label_id
+            
+            # Only create file if there are voxels for this label
+            if np.any(label_data > 0):
+                # Create new NIfTI image for this label
+                label_img = nib.Nifti1Image(label_data, affine, header)
+                
+                # Save individual voxel file
+                voxel_filename = f"{label_name}.nii.gz"
+                voxel_path = ct_voxels_dir / voxel_filename
+                nib.save(label_img, voxel_path)
+                
+                voxel_count = np.sum(label_data > 0)
+                print(f"      Created {voxel_filename} with {voxel_count} voxels (label ID: {label_id})")
+                created_files.append(voxel_filename)
+    
+    print(f"    Created {len(created_files)} individual voxel files in {ct_voxels_dir}")
+    return created_files
+
 def main():
     parser = argparse.ArgumentParser(description="Vista3D Batch Segmentation Script")
     parser.add_argument("patient_folder", type=str, nargs='?', default=None, help="Name of the patient folder to process.")
@@ -50,7 +117,7 @@ def main():
 
     # Create output directories if they don't exist
     NIFTI_INPUT_BASE_DIR.mkdir(parents=True, exist_ok=True)
-    SEGMENTATION_OUTPUT_BASE_DIR.mkdir(parents=True, exist_ok=True)
+    PATIENT_OUTPUT_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
     patient_folders_to_process = []
     if args.patient_folder:
@@ -84,8 +151,10 @@ def main():
             if v in NAME_TO_ID_MAP:
                 target_vessel_ids.append(NAME_TO_ID_MAP[v])
         
-        patient_segmentation_output_path = SEGMENTATION_OUTPUT_BASE_DIR / patient_folder_name
-        patient_segmentation_output_path.mkdir(parents=True, exist_ok=True)
+        # Create new folder structure for this patient
+        print(f"  Creating folder structure for patient: {patient_folder_name}")
+        patient_dirs = create_patient_folder_structure(patient_folder_name)
+        print(f"  Patient directories created: {patient_dirs['base']}")
 
         all_nifti_files = get_nifti_files_in_folder(patient_nifti_path)
         if not all_nifti_files:
@@ -93,14 +162,22 @@ def main():
             continue
 
         for nifti_file_path in tqdm(all_nifti_files, desc="Processing NIfTI files"):
-            output_path = patient_segmentation_output_path / nifti_file_path.name
+            # Copy original NIfTI file to new nifti folder structure
+            nifti_dest_path = patient_dirs['nifti'] / nifti_file_path.name
+            if not nifti_dest_path.exists() or args.force:
+                shutil.copy2(nifti_file_path, nifti_dest_path)
+                print(f"  Copied {nifti_file_path.name} to {nifti_dest_path}")
+            
+            # Define segmentation output path in new structure
+            segmentation_output_path = patient_dirs['segments'] / nifti_file_path.name
 
-            if not args.force and output_path.exists():
+            if not args.force and segmentation_output_path.exists():
                 print(f"\n  Skipping {nifti_file_path.name} as segmentation already exists. Use --force to overwrite.")
                 continue
 
             try:
-                relative_path_to_nifti = nifti_file_path.relative_to(PROJECT_ROOT)
+                # Use the copied file in the new structure for inference
+                relative_path_to_nifti = nifti_dest_path.relative_to(PROJECT_ROOT)
                 
                 # When the inference server is running in a container, it needs to access the image server
                 # running on the host. 'host.docker.internal' is a special DNS name for that.
@@ -165,8 +242,19 @@ def main():
                 
                 print(f"    Data type of raw_nifti_img data: {raw_nifti_img.get_fdata().dtype}")
                 print(f"    NIfTI header datatype: {raw_nifti_img.header['datatype']}")
-                nib.save(raw_nifti_img, output_path)
-                print(f"    Successfully saved segmentation: {output_path.name}")
+                # Save full segmentation to segments folder
+                nib.save(raw_nifti_img, segmentation_output_path)
+                print(f"    Successfully saved segmentation: {segmentation_output_path.name}")
+                
+                # Create individual voxel files
+                print(f"    Creating individual voxel files...")
+                created_voxels = create_individual_voxel_files(
+                    raw_nifti_img, 
+                    nifti_file_path.name, 
+                    patient_dirs['voxels'], 
+                    target_vessel_ids
+                )
+                print(f"    Created {len(created_voxels)} individual voxel files")
 
             except requests.exceptions.RequestException as e:
                 print(f"\n  Error during inference for {nifti_file_path.name}: {e}")
