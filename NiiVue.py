@@ -58,32 +58,77 @@ def get_server_data(path: str, type: str, file_extensions: tuple):
     return []
 
 def fetch_available_voxel_labels(patient_id: str, filename: str) -> Tuple[Set[int], Dict[int, str]]:
-    """Query image server for available non-zero voxel label IDs for this patient's voxels file.
+    """Query image server for available voxel files for this patient/CT scan.
     Returns (available_label_ids, id_to_name_map). On error returns (empty set, {})."""
     if not patient_id or not filename:
         return set(), {}
     try:
-        url = f"{IMAGE_SERVER_URL.rstrip('/')}/segments/{patient_id}/voxels/{filename}/labels"
-        resp = requests.get(url, timeout=10)
+        # Convert filename to folder name for voxels directory
+        ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
+        
+        # Check the voxels directory for this CT scan
+        voxels_folder_url = f"{IMAGE_SERVER_URL.rstrip('/')}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
+        
+        # Debug: Print the URL being checked
+        print(f"DEBUG: Checking voxels URL: {voxels_folder_url}")
+        
+        resp = requests.get(voxels_folder_url, timeout=10)
+        print(f"DEBUG: Response status: {resp.status_code}")
+        
         if resp.status_code != 200:
+            print(f"DEBUG: Failed to access voxels directory. Status: {resp.status_code}")
             return set(), {}
-        data = resp.json() or {}
-        labels = data.get("labels", [])
-        resolved_voxels_filename = data.get("voxel_filename")
-        ids: Set[int] = set()
-        id_to_name: Dict[int, str] = {}
-        for item in labels:
-            try:
-                lid = int(item.get("id"))
-                ids.add(lid)
-                name = item.get("name") or str(lid)
-                id_to_name[lid] = name
-            except Exception:
-                continue
-        # cache resolved voxel filename in session for URL building
-        if resolved_voxels_filename:
-            st.session_state.resolved_voxels_filename = resolved_voxels_filename
-        return ids, id_to_name
+        
+        # Parse directory listing to find individual voxel files
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        voxel_files = []
+        for link in soup.find_all('a'):
+            href = link.get('href')
+            if href and href.endswith('.nii.gz') and not href.startswith('..'):
+                voxel_files.append(href)
+        
+        print(f"DEBUG: Found {len(voxel_files)} voxel files: {voxel_files}")
+        
+        # Load label dictionaries to map filenames back to label IDs
+        try:
+            with open('conf/vista3d_label_colors.json', 'r') as f:
+                label_colors_list = json.load(f)
+            
+            # Create filename to ID mapping
+            filename_to_id = {}
+            id_to_name = {}
+            expected_filenames = []
+            for item in label_colors_list:
+                label_id = item['id']
+                label_name = item['name']
+                # Convert name to expected filename format
+                expected_filename = label_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
+                filename_to_id[expected_filename] = label_id
+                id_to_name[label_id] = label_name
+                expected_filenames.append(expected_filename)
+            
+            print(f"DEBUG: Expected filenames (first 10): {expected_filenames[:10]}")
+            print(f"DEBUG: Total expected filenames: {len(expected_filenames)}")
+            
+            # Find which label IDs are available based on existing voxel files
+            available_ids = set()
+            matched_files = []
+            for voxel_file in voxel_files:
+                # Extract just the filename from the full path
+                filename_only = voxel_file.split('/')[-1]
+                if filename_only in filename_to_id:
+                    available_ids.add(filename_to_id[filename_only])
+                    matched_files.append(filename_only)
+            
+            print(f"DEBUG: Matched {len(matched_files)} files to label IDs: {matched_files}")
+            print(f"DEBUG: Available label IDs: {available_ids}")
+            
+            return available_ids, id_to_name
+            
+        except Exception:
+            # Fallback: assume all files represent some label
+            return set(), {}
+            
     except Exception:
         return set(), {}
 
@@ -120,7 +165,7 @@ with st.sidebar:
     nifti_gamma = 1.0
     show_nifti = True
     show_overlay = False
-    segment_opacity = 0.5
+    segment_opacity = 1.0
     segment_gamma = 1.0
 
     st.markdown("Select Slice")
@@ -152,14 +197,13 @@ with st.sidebar:
         current_patient = selected_patient or ""
         current_filename = selected_file or ""
         available_label_ids, id_to_name_map = fetch_available_voxel_labels(current_patient, current_filename)
-        # If none available, surface a clear notice with the endpoint URL and any resolved voxels filename
-        labels_endpoint_url = f"{IMAGE_SERVER_URL.rstrip('/')}/segments/{current_patient}/voxels/{current_filename}/labels"
-        resolved_voxels_filename_sidebar = st.session_state.get('resolved_voxels_filename')
+        # If none available, surface a clear notice with the voxels directory URL
+        ct_scan_folder_name = current_filename.replace('.nii.gz', '').replace('.nii', '') if current_filename else ''
+        voxels_directory_url = f"{IMAGE_SERVER_URL.rstrip('/')}/output/{current_patient}/voxels/{ct_scan_folder_name}/"
         if voxel_mode in ["Label Sets", "Individual Voxels"] and current_patient and current_filename and not available_label_ids:
             st.warning("No voxels available for this patient/file.")
-            st.caption(f"Endpoint: {labels_endpoint_url}")
-            if resolved_voxels_filename_sidebar:
-                st.caption(f"Resolved voxels file: {resolved_voxels_filename_sidebar}")
+            st.caption(f"Voxels directory: {voxels_directory_url}")
+            st.caption("Individual voxel files should be located in this directory.")
 
         if voxel_mode == "All":
             st.info("Will display the complete base segmentation file.")
@@ -200,9 +244,17 @@ with st.sidebar:
                         label_count = len(available_names)
                         total_labels += label_count
                         st.markdown(f"• **{set_name.replace('_', ' ').title()}**: {set_info['description']}")
-                        st.markdown(f"  *{label_count} labels*")
+                        st.markdown(f"  *{label_count} available labels*")
+                        
+                        # Show which specific labels are available for this set
+                        if available_names:
+                            st.markdown(f"  Available: {', '.join(available_names[:5])}")
+                            if len(available_names) > 5:
+                                st.markdown(f"  *... and {len(available_names) - 5} more*")
+                        else:
+                            st.markdown(f"  *No labels available for this set*")
                     
-                    st.markdown(f"**Total labels selected: {total_labels}**")
+                    st.markdown(f"**Total available labels: {total_labels}**")
                     st.info("Each selected anatomical structure will be displayed as a separate overlay from the voxels directory.")
                 else:
                     st.info("No label sets selected. Select sets to display individual voxels.")
@@ -253,8 +305,8 @@ with st.sidebar:
                 st.session_state.selected_individual_voxels = []
     
     with st.expander("Voxel Image Settings", expanded=False):
-        segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
-        segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
+        segment_opacity = st.slider("Voxel Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
+        segment_gamma = st.slider("Voxel Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
     
     # Display current voxel selection status
     if show_overlay:
@@ -271,22 +323,25 @@ with st.sidebar:
                     with open('conf/vista3d_label_dict.json', 'r') as f:
                         label_dict = json.load(f)
                     
-                    # Get individual labels from selected sets
+                    # Get individual labels from selected sets (only available ones)
                     individual_labels = []
                     for set_name in st.session_state.selected_label_sets:
                         if set_name in label_sets:
                             for label_name in label_sets[set_name]['labels']:
                                 if label_name in label_dict:
-                                    individual_labels.append({
-                                        'name': label_name,
-                                        'id': label_dict[label_name]
-                                    })
+                                    label_id = label_dict[label_name]
+                                    # Only include if available
+                                    if label_id in available_label_ids:
+                                        individual_labels.append({
+                                            'name': label_name,
+                                            'id': label_id
+                                        })
                     
                     st.markdown("**Current Selection:**")
                     st.markdown("• **Mode**: Label Sets")
                     st.markdown("• **Source**: Voxels directory")
                     st.markdown("• **Selected Sets**: " + ", ".join([s.replace('_', ' ').title() for s in st.session_state.selected_label_sets]))
-                    st.markdown(f"• **Total Labels**: {len(individual_labels)}")
+                    st.markdown(f"• **Available Labels**: {len(individual_labels)}")
                     
                     if individual_labels:
                         st.markdown("**Individual Overlays:**")
@@ -294,6 +349,8 @@ with st.sidebar:
                             st.markdown(f"  • {label['name']} (ID: {label['id']})")
                         if len(individual_labels) > 10:
                             st.markdown(f"  *... and {len(individual_labels) - 10} more*")
+                    else:
+                        st.markdown("**No available labels found for selected sets**")
                             
                 except Exception as e:
                     st.error(f"Error loading individual labels: {e}")
@@ -363,11 +420,12 @@ if selected_file:
         voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         
         if voxel_mode == "all":
-            # Show base segmentation file
+            # Show base segmentation file with dynamic colormap
             individual_label_overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}"
+                'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}",
+                'is_all_segmentation': True  # Flag to indicate this needs special handling
             }]
             
         elif voxel_mode == "label_sets":
@@ -378,8 +436,13 @@ if selected_file:
                         label_sets = json.load(f)
                     with open('conf/vista3d_label_dict.json', 'r') as f:
                         label_dict = json.load(f)
+                    with open('conf/vista3d_label_colors.json', 'r') as f:
+                        label_colors_list = json.load(f)
                     
                     # Collect individual labels from selected sets
+                    # Convert CT scan name to folder name (remove .nii.gz extension)
+                    ct_scan_folder_name = segment_filename.replace('.nii.gz', '').replace('.nii', '')
+                    
                     for set_name in st.session_state.selected_label_sets:
                         if set_name in label_sets:
                             for label_name in label_sets[set_name]['labels']:
@@ -388,10 +451,20 @@ if selected_file:
                                     # Only include overlays for labels that exist in voxels file
                                     if label_id in available_label_ids_for_file:
                                         selected_label_ids.append(label_id)
+                                        # Convert label name to filename format
+                                        voxel_filename = label_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
+                                        # Get color for this label
+                                        label_color = None
+                                        for item in label_colors_list:
+                                            if item['id'] == label_id:
+                                                label_color = item['color']
+                                                break
+                                        
                                         individual_label_overlays.append({
                                             'label_id': label_id,
                                             'label_name': label_name,
-                                            'url': f"{IMAGE_SERVER_URL}/filtered-segments/{selected_patient}/voxels/{resolved_voxels_filename}?label_ids={label_id}"
+                                            'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/voxels/{ct_scan_folder_name}/{voxel_filename}",
+                                            'color': label_color
                                         })
                     
                     # Remove duplicates and sort
@@ -415,17 +488,33 @@ if selected_file:
                 try:
                     with open('conf/vista3d_label_dict.json', 'r') as f:
                         label_dict = json.load(f)
+                    with open('conf/vista3d_label_colors.json', 'r') as f:
+                        label_colors_list = json.load(f)
                     
                     # Create individual overlays for selected voxels
+                    # Convert CT scan name to folder name (remove .nii.gz extension)
+                    ct_scan_folder_name = segment_filename.replace('.nii.gz', '').replace('.nii', '')
+                    
                     for voxel_name in st.session_state.selected_individual_voxels:
                         if voxel_name in label_dict:
                             label_id = label_dict[voxel_name]
                             if label_id in available_label_ids_for_file:
                                 selected_label_ids.append(label_id)
+                                # Convert voxel name to filename format
+                                voxel_filename = voxel_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
+                                
+                                # Get color for this label
+                                label_color = None
+                                for item in label_colors_list:
+                                    if item['id'] == label_id:
+                                        label_color = item['color']
+                                        break
+                                
                                 individual_label_overlays.append({
                                     'label_id': label_id,
                                     'label_name': voxel_name,
-                                    'url': f"{IMAGE_SERVER_URL}/filtered-segments/{selected_patient}/voxels/{resolved_voxels_filename}?label_ids={label_id}"
+                                    'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/voxels/{ct_scan_folder_name}/{voxel_filename}",
+                                    'color': label_color
                                 })
                     
                     # Remove duplicates and sort
@@ -476,12 +565,29 @@ if selected_file:
     overlay_start_index = 1 if main_is_nifti else 0
     color_map_js = json.dumps(color_map)
     
+    # Prepare individual overlay color information for JavaScript
+    overlay_colors_js = json.dumps(individual_label_overlays)
+    
+    # For "all segmentation" mode, we use the same colormap as individual voxels
+    # No need to analyze the segmentation file since we use the standard colormap
+    
     # Debug information
     if st.checkbox("Show Debug Info", value=False):
         st.write("**Debug Information:**")
         st.write(f"Base File URL: {base_file_url}")
+        if show_overlay:
+            ct_scan_folder_name = segment_filename.replace('.nii.gz', '').replace('.nii', '')
+            st.write(f"CT Scan Folder: {ct_scan_folder_name}")
+            st.write(f"Voxels Directory: output/{selected_patient}/voxels/{ct_scan_folder_name}/")
         st.write(f"Volume List JS: {volume_list_js}")
         st.write(f"Individual Label Overlays: {individual_label_overlays}")
+        if individual_label_overlays:
+            st.write("**Overlay Colors:**")
+            for i, overlay in enumerate(individual_label_overlays):
+                if overlay.get('color'):
+                    color = overlay['color']
+                    color_hex = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
+                    st.write(f"  {i+1}. {overlay['label_name']} (ID: {overlay['label_id']}): {color_hex}")
         st.write(f"Show Overlay: {show_overlay}")
         st.write(f"Voxel Mode: {getattr(st.session_state, 'voxel_mode', 'not set')}")
         # Overlay names and URLs for clarity
@@ -560,7 +666,9 @@ if selected_file:
             nv.attachTo('niivue-canvas');
 
             const volumeList = {volume_list_js};
+            const overlayColors = {overlay_colors_js};
             console.log('Prepared volumeList:', volumeList);
+            console.log('Overlay colors:', overlayColors);
             if (!Array.isArray(volumeList) || volumeList.some(v => !v || typeof v.url !== 'string')) {{
                 console.error('Invalid volumeList shape. Expected [{{ url: string }}, ...]. Got:', volumeList);
             }}
@@ -570,6 +678,9 @@ if selected_file:
                 nv.addColormap('custom_segmentation', customSegmentationColormap);
                 console.log('Custom segmentation colormap added');
             }}
+            
+            // For "all segmentation" mode, use the same colormap as individual voxels
+            // This ensures consistent colors between individual voxels and all segmentation mode
             
             nv.loadVolumes(volumeList).then(() => {{
                 console.log('Volumes loaded successfully');
@@ -582,15 +693,45 @@ if selected_file:
                     mainVol.opacity = {nifti_opacity};
                 }}
 
-                // Apply colormap to overlays
+                // Apply individual colors to overlays
                 if (nv.volumes.length > {overlay_start_index}) {{
                     for (let i = {overlay_start_index}; i < nv.volumes.length; i++) {{
                         const overlayVol = nv.volumes[i];
                         overlayVol.opacity = {segment_opacity};
                         
-                        if (typeof customSegmentationColormap !== 'undefined') {{
-                            nv.setColormap(overlayVol.id, 'custom_segmentation');
-                            console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
+                        // Get the corresponding overlay color info
+                        const overlayIndex = i - {overlay_start_index};
+                        
+                        // Check if this is the "all segmentation" mode
+                        if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].is_all_segmentation) {{
+                            // Use the same colormap as individual voxels for consistency
+                            if (typeof customSegmentationColormap !== 'undefined') {{
+                                nv.setColormap(overlayVol.id, 'custom_segmentation');
+                                console.log('Applied custom_segmentation colormap to all segmentation overlay');
+                            }}
+                        }} else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {{
+                            const color = overlayColors[overlayIndex].color;
+                            const labelName = overlayColors[overlayIndex].label_name;
+                            
+                            // Create a custom colormap for this specific overlay
+                            const customColormap = {{
+                                R: [0, color[0]],
+                                G: [0, color[1]], 
+                                B: [0, color[2]],
+                                A: [0, 255],
+                                labels: ['Background', labelName]
+                            }};
+                            
+                            const colormapName = `custom_${{overlayIndex}}`;
+                            nv.addColormap(colormapName, customColormap);
+                            nv.setColormap(overlayVol.id, colormapName);
+                            console.log(`Applied custom color to overlay ${{overlayIndex}}: ${{labelName}}`, color);
+                        }} else {{
+                            // Fallback to generic segmentation colormap
+                            if (typeof customSegmentationColormap !== 'undefined') {{
+                                nv.setColormap(overlayVol.id, 'custom_segmentation');
+                                console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
+                            }}
                         }}
                     }}
                 }}

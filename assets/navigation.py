@@ -143,6 +143,7 @@ class Navigation:
         self.items: List[NavigationItem] = [
             NavigationItem("about", "About", "ℹ️", "home"),
             NavigationItem("niivue", "NiiVue Viewer", "🩻", "niivue"),
+            NavigationItem("sunburst", "Data Hierarchy", "📊", "sunburst"),
         ]
         
         # Initialize session state for navigation if not exists

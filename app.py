@@ -195,6 +195,61 @@ if current_page == 'home':
                             st.write(f"• {scan['name']}: {scan['voxel_count']} voxels")
                     else:
                         st.write("No scan details available")
+            
+            # Sunburst Chart Visualization
+            st.markdown("---")
+            st.header("📊 Data Hierarchy Visualization")
+            st.markdown("Interactive Sunburst diagram showing the hierarchical structure of patients, CT scans, and voxel segmentation data.")
+            
+            with st.spinner("Generating Sunburst chart..."):
+                try:
+                    # Import the sunburst chart module
+                    sys.path.append(str(Path(__file__).parent / 'utils'))
+                    from sunburst_chart import generate_sunburst_data, create_html_template
+                    
+                    # Generate Sunburst data
+                    sunburst_data = generate_sunburst_data(analysis_data)
+                    
+                    # Create HTML visualization
+                    html_content = create_html_template(sunburst_data)
+                    
+                    # Display the chart
+                    st.components.v1.html(html_content, height=700, scrolling=True)
+                    
+                    # Show chart summary statistics
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric(
+                            label="Total Scans",
+                            value=sunburst_data['metadata']['total_scans'],
+                            help="Total number of scans in the hierarchy"
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            label="Scan Types",
+                            value=len(sunburst_data['data']['children']),
+                            help="Number of scan type categories"
+                        )
+                    
+                    with col3:
+                        st.metric(
+                            label="Voxel Categories",
+                            value=sum(len(scan_type['children']) for scan_type in sunburst_data['data']['children']),
+                            help="Number of voxel data categories"
+                        )
+                    
+                    with col4:
+                        st.metric(
+                            label="Individual Scans",
+                            value=sum(len(voxel_cat['children']) for scan_type in sunburst_data['data']['children'] for voxel_cat in scan_type['children']),
+                            help="Number of individual scan records"
+                        )
+                
+                except Exception as e:
+                    st.error(f"❌ Error generating Sunburst chart: {str(e)}")
+                    st.info("💡 The Sunburst chart requires the image server to be running and accessible.")
         
         elif error:
             st.error(f"❌ Analysis failed: {error}")
@@ -204,6 +259,139 @@ if current_page == 'home':
     else:
         st.warning("⚠️ Image server is offline. Start the server to view data analysis.")
         st.code("python utils/image_server.py", language="bash")
+        
+        # Show example of what the chart would look like
+        st.markdown("---")
+        st.header("📊 Data Hierarchy Visualization")
+        st.markdown("""
+        The Sunburst diagram visualizes the hierarchical structure of medical imaging data in concentric circles:
+        
+        1. **Center** - Root level (Medical Imaging Data)
+        2. **Second Ring** - Scan type categories (Arterial, Venous, High Resolution, etc.)
+        3. **Third Ring** - Voxel data categories (High/Medium/Low voxel counts)
+        4. **Outer Ring** - Individual scans with patient IDs and details
+        
+        **Arc Size**: The size of each arc represents the proportion of data in that category.
+        
+        **Interactive Features**:
+        - Click on any segment to zoom into that category
+        - Hover over segments to see detailed information
+        - Breadcrumb navigation shows your current position
+        - Reset button to return to the full view
+        - Color-coded categories for easy identification
+        """)
+elif current_page == 'sunburst':
+    # Sunburst Chart Visualization
+    st.title("🩻 Medical Imaging Data Hierarchy")
+    st.markdown("Interactive Sunburst diagram showing the hierarchical structure of patients, CT scans, and voxel segmentation data.")
+    
+    if check_image_server_status():
+        with st.spinner("Generating Sunburst chart..."):
+            try:
+                # Import the sunburst chart module
+                sys.path.append(str(Path(__file__).parent / 'utils'))
+                from sunburst_chart import run_server_analysis, generate_sunburst_data, create_html_template
+                
+                # Get analysis data
+                analysis_data, error = run_server_analysis()
+                
+                if analysis_data and not error:
+                    # Generate Sunburst data
+                    sunburst_data = generate_sunburst_data(analysis_data)
+                    
+                    # Create HTML visualization
+                    html_content = create_html_template(sunburst_data)
+                    
+                    # Display the chart
+                    st.components.v1.html(html_content, height=800, scrolling=True)
+                    
+                    # Show summary statistics
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric(
+                            label="Total Scans",
+                            value=sunburst_data['metadata']['total_scans'],
+                            help="Total number of scans in the hierarchy"
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            label="Scan Types",
+                            value=len(sunburst_data['data']['children']),
+                            help="Number of scan type categories"
+                        )
+                    
+                    with col3:
+                        st.metric(
+                            label="Voxel Categories",
+                            value=sum(len(scan_type['children']) for scan_type in sunburst_data['data']['children']),
+                            help="Number of voxel data categories"
+                        )
+                    
+                    with col4:
+                        st.metric(
+                            label="Individual Scans",
+                            value=sum(len(voxel_cat['children']) for scan_type in sunburst_data['data']['children'] for voxel_cat in scan_type['children']),
+                            help="Number of individual scan records"
+                        )
+                    
+                    # Download options
+                    st.subheader("📥 Download Options")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Download JSON data
+                        json_data = json.dumps(sunburst_data, indent=2)
+                        st.download_button(
+                            label="📊 Download Sunburst Data (JSON)",
+                            data=json_data,
+                            file_name="sunburst_data.json",
+                            mime="application/json"
+                        )
+                    
+                    with col2:
+                        # Download HTML visualization
+                        st.download_button(
+                            label="🌐 Download HTML Visualization",
+                            data=html_content,
+                            file_name="medical_imaging_sunburst.html",
+                            mime="text/html"
+                        )
+                
+                elif error:
+                    st.error(f"❌ Error generating Sunburst chart: {error}")
+                else:
+                    st.warning("⚠️ No data available for Sunburst chart")
+            
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+                st.code("Make sure the image server is running: python utils/image_server.py", language="bash")
+    
+    else:
+        st.warning("⚠️ Image server is offline. Start the server to view the Sunburst chart.")
+        st.code("python utils/image_server.py", language="bash")
+        
+        # Show example of what the chart would look like
+        st.subheader("📊 What the Sunburst Chart Shows")
+        st.markdown("""
+        The Sunburst diagram visualizes the hierarchical structure of medical imaging data in concentric circles:
+        
+        1. **Center** - Root level (Medical Imaging Data)
+        2. **Second Ring** - Scan type categories (Arterial, Venous, High Resolution, etc.)
+        3. **Third Ring** - Voxel data categories (High/Medium/Low voxel counts)
+        4. **Outer Ring** - Individual scans with patient IDs and details
+        
+        **Arc Size**: The size of each arc represents the proportion of data in that category.
+        
+        **Interactive Features**:
+        - Click on any segment to zoom into that category
+        - Hover over segments to see detailed information
+        - Breadcrumb navigation shows your current position
+        - Reset button to return to the full view
+        - Color-coded categories for easy identification
+        """)
+
 elif current_page == 'niivue':
     # Import and run NiiVue content
     sys.path.append(str(Path(__file__).parent))
