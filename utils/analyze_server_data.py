@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
 Script to analyze the image server data and generate a comprehensive report.
-Scans output/nifti and output/segments folders to count:
-- Number of patients (PA00000002 format folders)
-- Number of CT scans per patient (nii.gz files)
-- Number of voxel files per CT scan in segments folder
+Supports both old and new folder structures:
+
+NEW STRUCTURE:
+- output/{patient_id}/nifti/         (CT scan files)
+- output/{patient_id}/segments/      (full segmentation files)
+- output/{patient_id}/voxels/{ct_scan_name}/  (individual voxel files)
+
+OLD STRUCTURE (legacy):
+- output/nifti/{patient_id}/         (CT scan files)
+- output/segments/{patient_id}/      (segmentation files)
+- output/segments/{patient_id}/voxels/  (voxel files)
 
 Usage:
     python utils/analyze_server_data.py
@@ -150,18 +157,27 @@ def get_voxel_files(segments_folder_contents: List[Dict[str, str]]) -> List[str]
             voxel_files.append(item['name'])
     return voxel_files
 
-def get_voxel_folder_contents(base_url: str, patient_id: str, verify_ssl: bool = False) -> Optional[List[Dict[str, str]]]:
-    """Get contents of the voxels folder for a patient."""
-    voxel_folder_path = f"segments/{patient_id}/voxels"
-    
-    return get_folder_contents(base_url, voxel_folder_path, verify_ssl)
+# Removed get_voxel_folder_contents - now handled directly in analyze_patient_data
 
-def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = False) -> Dict:
+def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = False, use_old_structure: bool = False) -> Dict:
     """Analyze data for a single patient."""
     print(f"  📊 Analyzing patient: {patient_id}")
     
+    # Determine folder paths based on structure
+    if use_old_structure:
+        nifti_folder_path = f"nifti/{patient_id}"
+        segments_folder_path = f"segments/{patient_id}"
+        voxel_folder_path = f"segments/{patient_id}/voxels"
+        structure_type = "old"
+    else:
+        nifti_folder_path = f"{patient_id}/nifti"
+        segments_folder_path = f"{patient_id}/segments"
+        voxel_folder_path = f"{patient_id}/voxels"
+        structure_type = "new"
+    
+    print(f"    Using {structure_type} folder structure")
+    
     # Get nifti folder contents for this patient
-    nifti_folder_path = f"nifti/{patient_id}"
     nifti_contents = get_folder_contents(base_url, nifti_folder_path, verify_ssl)
     
     if not nifti_contents:
@@ -171,21 +187,25 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
             'total_ct_scans': 0,
             'voxel_data': {},
             'total_voxel_files': 0,
-            'error': 'Could not access nifti folder'
+            'error': f'Could not access nifti folder ({structure_type} structure)',
+            'structure_type': structure_type
         }
     
     # Get CT scan files
     ct_scans = get_ct_scan_files(nifti_contents)
     
     # Get segments folder contents for this patient
-    segments_folder_path = f"segments/{patient_id}"
     segments_contents = get_folder_contents(base_url, segments_folder_path, verify_ssl)
     
     voxel_data = {}
     total_voxel_files = 0
     
-    # Get voxel folder contents once for the patient
-    voxel_folder_contents = get_voxel_folder_contents(base_url, patient_id, verify_ssl)
+    # Get voxel folder contents (different logic for new vs old structure)
+    if use_old_structure:
+        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path, verify_ssl)
+    else:
+        # In new structure, voxels are organized by CT scan subfolders
+        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path, verify_ssl)
     
     if segments_contents:
         # For each CT scan, check for corresponding voxel data
@@ -200,10 +220,29 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
             # Count voxel files for this specific scan
             scan_voxel_files = []
             if voxel_folder_contents:
-                # Find voxel files that start with the scan name (without .nii.gz)
-                scan_base_name = ct_scan.replace('.nii.gz', '')
-                scan_voxel_files = [item['name'] for item in voxel_folder_contents 
-                                  if not item['is_directory'] and item['name'].startswith(scan_base_name + '_')]
+                if use_old_structure:
+                    # Old structure: Find voxel files that start with the scan name
+                    scan_base_name = ct_scan.replace('.nii.gz', '')
+                    scan_voxel_files = [item['name'] for item in voxel_folder_contents 
+                                      if not item['is_directory'] and item['name'].startswith(scan_base_name + '_')]
+                else:
+                    # New structure: Look for CT scan subfolder in voxels directory
+                    scan_base_name = ct_scan.replace('.nii.gz', '').replace('.nii', '')
+                    ct_scan_voxel_folder = None
+                    
+                    # Find the subfolder for this CT scan
+                    for item in voxel_folder_contents:
+                        if item['is_directory'] and item['name'] == scan_base_name:
+                            ct_scan_voxel_folder = item['name']
+                            break
+                    
+                    # If found, get contents of the CT scan voxel subfolder
+                    if ct_scan_voxel_folder:
+                        ct_scan_voxel_path = f"{voxel_folder_path}/{ct_scan_voxel_folder}"
+                        ct_scan_voxel_contents = get_folder_contents(base_url, ct_scan_voxel_path, verify_ssl)
+                        if ct_scan_voxel_contents:
+                            scan_voxel_files = [item['name'] for item in ct_scan_voxel_contents 
+                                              if not item['is_directory'] and item['name'].endswith('.nii.gz')]
             
             voxel_data[ct_scan] = {
                 'has_voxel_file': has_voxel_file,
@@ -222,6 +261,7 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
         'total_ct_scans': len(ct_scans),
         'voxel_data': voxel_data,
         'total_voxel_files': total_voxel_files,
+        'structure_type': structure_type,
         'error': None
     }
 
@@ -291,7 +331,8 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     report_lines.append("-" * 40)
     
     for patient in analysis_data:
-        report_lines.append(f"\n🏷️  Patient ID: {patient['patient_id']}")
+        structure_info = f" ({patient.get('structure_type', 'unknown')} structure)" if patient.get('structure_type') else ""
+        report_lines.append(f"\n🏷️  Patient ID: {patient['patient_id']}{structure_info}")
         
         if patient['error']:
             report_lines.append(f"   ❌ Error: {patient['error']}")
@@ -323,21 +364,30 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     # File structure overview
     report_lines.append("\n📁 FILE STRUCTURE OVERVIEW")
     report_lines.append("-" * 40)
+    report_lines.append("NEW STRUCTURE:")
     report_lines.append("output/")
-    report_lines.append("├── nifti/")
-    report_lines.append("│   ├── PA00000002/")
-    report_lines.append("│   │   ├── 01_2.5MM_ARTERIAL.nii.gz")
-    report_lines.append("│   │   ├── 02_VENOUS_PHASE.nii.gz")
-    report_lines.append("│   │   └── ...")
-    report_lines.append("│   └── ...")
-    report_lines.append("└── segments/")
-    report_lines.append("    ├── PA00000002/")
-    report_lines.append("    │   ├── 01_2.5MM_ARTERIAL.nii.gz  (segmentation)")
-    report_lines.append("    │   ├── 01_2.5MM_ARTERIAL_voxel/  (voxel files)")
-    report_lines.append("    │   │   ├── voxel_file_1.nii.gz")
-    report_lines.append("    │   │   └── ...")
-    report_lines.append("    │   └── ...")
-    report_lines.append("    └── ...")
+    report_lines.append("├── PA00000002/")
+    report_lines.append("│   ├── nifti/")
+    report_lines.append("│   │   ├── 1.25_mm_4.nii.gz")
+    report_lines.append("│   │   ├── 1.25_mm_4.json")
+    report_lines.append("│   │   └── 2.5_mm_STD_-_30%_ASIR_2.nii.gz")
+    report_lines.append("│   ├── segments/")
+    report_lines.append("│   │   ├── 1.25_mm_4.nii.gz  (full segmentation)")
+    report_lines.append("│   │   └── 2.5_mm_STD_-_30%_ASIR_2.nii.gz")
+    report_lines.append("│   └── voxels/")
+    report_lines.append("│       ├── 1.25_mm_4/")
+    report_lines.append("│       │   ├── aorta.nii.gz")
+    report_lines.append("│       │   └── inferior_vena_cava.nii.gz")
+    report_lines.append("│       └── 2.5_mm_STD_-_30%_ASIR_2/")
+    report_lines.append("│           ├── aorta.nii.gz")
+    report_lines.append("│           └── inferior_vena_cava.nii.gz")
+    report_lines.append("└── PA00000003/")
+    report_lines.append("    (same structure...)")
+    report_lines.append("")
+    report_lines.append("OLD STRUCTURE (still supported):")
+    report_lines.append("output/")
+    report_lines.append("├── nifti/PA00000002/")
+    report_lines.append("└── segments/PA00000002/")
     
     report_lines.append("\n" + "=" * 80)
     report_lines.append("✅ Analysis Complete")
@@ -381,17 +431,34 @@ def main():
         print("   3. SSL certificates are properly configured")
         sys.exit(1)
     
-    # Get nifti folder contents to find patients
+    # Get output folder contents to find patients (new structure)
     if not args.quiet:
         print("\n🔍 Scanning for patients...")
     
-    nifti_contents = get_folder_contents(image_server_url, "nifti", args.verify_ssl)
-    if not nifti_contents:
-        print("❌ Could not access nifti folder")
-        sys.exit(1)
+    # First try the new structure (output/ folder with patient directories)
+    output_contents = get_folder_contents(image_server_url, "", args.verify_ssl)
+    patient_folders = []
     
-    # Filter for patient folders
-    patient_folders = [item for item in nifti_contents if item['is_directory'] and is_patient_folder(item['name'])]
+    if output_contents:
+        # Filter for patient folders in the new structure
+        patient_folders = [item for item in output_contents if item['is_directory'] and is_patient_folder(item['name'])]
+    
+    # If no patients found in new structure, fall back to old structure
+    if not patient_folders:
+        if not args.quiet:
+            print("  No patients found in new structure, checking old structure...")
+        
+        nifti_contents = get_folder_contents(image_server_url, "nifti", args.verify_ssl)
+        if nifti_contents:
+            patient_folders = [item for item in nifti_contents if item['is_directory'] and is_patient_folder(item['name'])]
+            # Mark these as old structure for later processing
+            for folder in patient_folders:
+                folder['old_structure'] = True
+    
+    if not patient_folders:
+        print("❌ No patient folders found (expected format: PA00000002)")
+        print("   Checked both new structure (output/{patient}/) and old structure (output/nifti/{patient}/)")
+        sys.exit(1)
     
     if not patient_folders:
         print("❌ No patient folders found (expected format: PA00000002)")
@@ -406,7 +473,9 @@ def main():
         if not args.quiet:
             print(f"\n📊 Processing patient {i}/{len(patient_folders)}: {patient_folder['name']}")
         
-        patient_data = analyze_patient_data(image_server_url, patient_folder['name'], args.verify_ssl)
+        # Check if this patient uses old structure
+        use_old_structure = patient_folder.get('old_structure', False)
+        patient_data = analyze_patient_data(image_server_url, patient_folder['name'], args.verify_ssl, use_old_structure)
         analysis_data.append(patient_data)
     
     # Generate and display report
