@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).parent / 'utils'))
 from assets.navigation import render_navigation
 from assets.nvidia_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
-from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
+#from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
 
 def check_image_server_status():
     """Check if the image server is available."""
@@ -133,7 +133,7 @@ if current_page == 'home':
     # Render HPE AI badge in sidebar
     _render_hpe_badge()
     # Render NiiVue badge in sidebar
-    _render_niivue_badge()
+    #_render_niivue_badge()
     st.title("Vessel Segmentation Viewer")
     st.markdown("Welcome to the NIfTI Vessel Segmentation and Viewer application.")
     st.markdown("Use the sidebar to navigate to different tools and features.")

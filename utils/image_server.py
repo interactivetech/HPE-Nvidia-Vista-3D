@@ -237,7 +237,7 @@ async def get_filtered_voxels(
         label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
         
         # Construct path to voxels file (strict - no fallback)
-        voxels_dir = project_root / "output" / "segments" / patient_id / "voxels"
+        voxels_dir = project_root / "output" / patient_id / "voxels"
         voxels_path = voxels_dir / filename
         if not voxels_path.exists():
             # Attempt to find a voxels file with matching stem or any .nii/.nii.gz in the voxels dir
@@ -302,7 +302,7 @@ async def get_available_voxel_labels(
 ):
     """Return available non-zero label IDs (and names) present in the voxels NIfTI for this patient/file."""
     try:
-        voxels_dir = project_root / "output" / "segments" / patient_id / "voxels"
+        voxels_dir = project_root / "output" / patient_id / "voxels"
         voxels_path = voxels_dir / filename
         if not voxels_path.exists():
             # Attempt to find a voxels file with matching stem or any .nii/.nii.gz

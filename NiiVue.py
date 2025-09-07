@@ -91,15 +91,14 @@ def fetch_available_voxel_labels(patient_id: str, filename: str) -> Tuple[Set[in
 # --- Sidebar UI ---
 with st.sidebar:
     
-    selected_source = 'nifti'
-
-    patient_folders = get_server_data(selected_source, 'folders', ('',))
+    # Patient folders are now directly in the output directory
+    patient_folders = get_server_data('', 'folders', ('',))
     selected_patient = st.selectbox("Select Patient", patient_folders)
 
     selected_file = None
     if selected_patient:
         file_ext = ('.nii', '.nii.gz', '.dcm')
-        filenames = get_server_data(f"{selected_source}/{selected_patient}", 'files', file_ext)
+        filenames = get_server_data(f"{selected_patient}/nifti", 'files', file_ext)
         
         # Create display names without .nii.gz extensions
         if filenames:
@@ -341,13 +340,12 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Error loading segment colors: {e}")
 
-    # --- Partner Badges ---
-    # Badges removed from sidebar
+
 
 # --- Main Viewer Area ---
 if selected_file:
     # --- Prepare URLs and Settings for Viewer ---
-    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
+    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
     segment_url = ''
     selected_label_ids = []
     
@@ -369,7 +367,7 @@ if selected_file:
             individual_label_overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
+                'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}"
             }]
             
         elif voxel_mode == "label_sets":
@@ -408,7 +406,7 @@ if selected_file:
                 individual_label_overlays = [{
                     'label_id': 'all',
                     'label_name': 'All Segmentation',
-                    'url': f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
+                    'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}"
                 }]
                 
         elif voxel_mode == "individual_voxels":
@@ -442,7 +440,7 @@ if selected_file:
                 individual_label_overlays = [{
                     'label_id': 'all',
                     'label_name': 'All Segmentation',
-                    'url': f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
+                    'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}"
                 }]
     else:
         # Show Voxels is disabled, no overlays
@@ -481,6 +479,7 @@ if selected_file:
     # Debug information
     if st.checkbox("Show Debug Info", value=False):
         st.write("**Debug Information:**")
+        st.write(f"Base File URL: {base_file_url}")
         st.write(f"Volume List JS: {volume_list_js}")
         st.write(f"Individual Label Overlays: {individual_label_overlays}")
         st.write(f"Show Overlay: {show_overlay}")
