@@ -12,11 +12,16 @@ from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat
 import datetime
 import os.path as osp
 
-from fastapi import FastAPI, HTTPException, status, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, status, Request, Query
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware # Added
 import uvicorn
+import nibabel as nib
+import numpy as np
+import json
+import tempfile
+import io
 
 from dotenv import load_dotenv
 
@@ -166,6 +171,186 @@ app = FastAPI(title="Medical Imaging Server", description="HTTP server for medic
 
 # Mount the assets directory to serve static files like niivue.umd.js
 app.mount("/assets", StaticFiles(directory=project_root / "assets"), name="assets")
+
+@app.get("/filtered-segments/{patient_id}/{filename}")
+async def get_filtered_segments(
+    patient_id: str, 
+    filename: str, 
+    label_ids: str = Query(..., description="Comma-separated list of label IDs to include")
+):
+    """Filter segmentation file to only include specified label IDs"""
+    try:
+        # Parse label IDs from query parameter
+        label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
+        
+        # Construct path to original segmentation file
+        segment_path = project_root / "output" / "segments" / patient_id / filename
+        
+        if not segment_path.exists():
+            raise HTTPException(status_code=404, detail=f"Segmentation file not found: {filename}")
+        
+        # Load the NIfTI file
+        nifti_img = nib.load(str(segment_path))
+        data = nifti_img.get_fdata()
+        
+        # Create filtered data - only keep voxels with selected label IDs
+        filtered_data = np.zeros_like(data)
+        for label_id in label_id_list:
+            filtered_data[data == label_id] = label_id
+        
+        # Create new NIfTI image with filtered data
+        filtered_img = nib.Nifti1Image(filtered_data, nifti_img.affine, nifti_img.header)
+        
+        # Save to temporary file
+        with tempfile.NamedTemporaryFile(suffix='.nii.gz', delete=False) as tmp_file:
+            nib.save(filtered_img, tmp_file.name)
+            
+            # Read the temporary file and return as streaming response
+            def iter_file():
+                with open(tmp_file.name, 'rb') as f:
+                    while chunk := f.read(8192):
+                        yield chunk
+                # Clean up temporary file
+                os.unlink(tmp_file.name)
+            
+            return StreamingResponse(
+                iter_file(),
+                media_type="application/octet-stream",
+                headers={
+                    "Content-Disposition": f"attachment; filename=filtered_{filename}",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error filtering segmentation: {str(e)}")
+
+@app.get("/filtered-segments/{patient_id}/voxels/{filename}")
+async def get_filtered_voxels(
+    patient_id: str, 
+    filename: str, 
+    label_ids: str = Query(..., description="Comma-separated list of label IDs to include")
+):
+    """Filter voxels file to only include specified label IDs"""
+    try:
+        # Parse label IDs from query parameter
+        label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
+        
+        # Construct path to voxels file (strict - no fallback)
+        voxels_dir = project_root / "output" / "segments" / patient_id / "voxels"
+        voxels_path = voxels_dir / filename
+        if not voxels_path.exists():
+            # Attempt to find a voxels file with matching stem or any .nii/.nii.gz in the voxels dir
+            target_stem = Path(filename).stem
+            candidates = []
+            if voxels_dir.exists():
+                for p in voxels_dir.iterdir():
+                    if p.is_file() and p.suffix in (".nii", ".gz"):
+                        candidates.append(p)
+            # Prefer same stem
+            chosen = None
+            for p in candidates:
+                if p.stem == target_stem:
+                    chosen = p
+                    break
+            if chosen is None and candidates:
+                chosen = candidates[0]
+            if chosen is None:
+                raise HTTPException(status_code=404, detail=f"Voxels file not found: {filename}")
+            voxels_path = chosen
+        
+        # Load the NIfTI file
+        nifti_img = nib.load(str(voxels_path))
+        data = nifti_img.get_fdata()
+        
+        # Create filtered data - only keep voxels with selected label IDs
+        filtered_data = np.zeros_like(data)
+        for label_id in label_id_list:
+            filtered_data[data == label_id] = label_id
+        
+        # Create new NIfTI image with filtered data
+        filtered_img = nib.Nifti1Image(filtered_data, nifti_img.affine, nifti_img.header)
+        
+        # Save to temporary file
+        with tempfile.NamedTemporaryFile(suffix='.nii.gz', delete=False) as tmp_file:
+            nib.save(filtered_img, tmp_file.name)
+            
+            # Read the temporary file and return as streaming response
+            def iter_file():
+                with open(tmp_file.name, 'rb') as f:
+                    while chunk := f.read(8192):
+                        yield chunk
+                # Clean up temporary file
+                os.unlink(tmp_file.name)
+            
+            return StreamingResponse(
+                iter_file(),
+                media_type="application/octet-stream",
+                headers={
+                    "Content-Disposition": f"attachment; filename=filtered_voxels_{filename}",
+                    "Access-Control-Allow-Origin": "*"
+                }
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error filtering voxels: {str(e)}")
+
+@app.get("/segments/{patient_id}/voxels/{filename}/labels")
+async def get_available_voxel_labels(
+    patient_id: str,
+    filename: str,
+):
+    """Return available non-zero label IDs (and names) present in the voxels NIfTI for this patient/file."""
+    try:
+        voxels_dir = project_root / "output" / "segments" / patient_id / "voxels"
+        voxels_path = voxels_dir / filename
+        if not voxels_path.exists():
+            # Attempt to find a voxels file with matching stem or any .nii/.nii.gz
+            target_stem = Path(filename).stem
+            candidates = []
+            if voxels_dir.exists():
+                for p in voxels_dir.iterdir():
+                    if p.is_file() and p.suffix in (".nii", ".gz"):
+                        candidates.append(p)
+            chosen = None
+            for p in candidates:
+                if p.stem == target_stem:
+                    chosen = p
+                    break
+            if chosen is None and candidates:
+                chosen = candidates[0]
+            if chosen is None:
+                raise HTTPException(status_code=404, detail=f"Voxels file not found: {filename}")
+            voxels_path = chosen
+
+        # Load NIfTI and find unique labels (excluding 0)
+        nifti_img = nib.load(str(voxels_path))
+        data = nifti_img.get_fdata()
+        unique_vals = np.unique(data.astype(np.int32))
+        label_ids = [int(v) for v in unique_vals if int(v) != 0]
+
+        # Map IDs to names using conf/vista3d_label_colors.json if available
+        id_to_name = {}
+        try:
+            colors_path = project_root / "conf" / "vista3d_label_colors.json"
+            if colors_path.exists():
+                with open(colors_path, 'r') as f:
+                    items = json.load(f)
+                for item in items:
+                    iid = int(item.get('id', -1))
+                    name = item.get('name', '')
+                    if iid >= 0:
+                        id_to_name[iid] = name
+        except Exception:
+            # Non-fatal; names may be missing
+            pass
+
+        labels = [{"id": lid, "name": id_to_name.get(lid, str(lid))} for lid in label_ids]
+        return {"labels": labels, "voxel_filename": voxels_path.name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading voxel labels: {str(e)}")
 
 @app.get("/{full_path:path}")
 @app.head("/{full_path:path}")

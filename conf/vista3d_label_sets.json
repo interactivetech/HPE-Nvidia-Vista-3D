@@ -1,0 +1,298 @@
+{
+    "cardiovascular_system": {
+        "description": "Heart and major blood vessels",
+        "labels": [
+            "heart",
+            "aorta",
+            "inferior vena cava",
+            "superior vena cava",
+            "left iliac artery",
+            "right iliac artery",
+            "left iliac vena",
+            "right iliac vena",
+            "left brachiocephalic vein",
+            "right brachiocephalic vein",
+            "left common carotid artery",
+            "right common carotid artery",
+            "brachiocephalic trunk",
+            "left subclavian artery",
+            "right subclavian artery",
+            "pulmonary vein",
+            "left atrial appendage",
+            "portal vein and splenic vein",
+            "hepatic vessel"
+        ]
+    },
+    "respiratory_system": {
+        "description": "Lungs, airways, and respiratory structures",
+        "labels": [
+            "left lung upper lobe",
+            "left lung lower lobe",
+            "right lung upper lobe",
+            "right lung middle lobe",
+            "right lung lower lobe",
+            "trachea",
+            "airway"
+        ]
+    },
+    "gastrointestinal_system": {
+        "description": "Digestive organs and structures",
+        "labels": [
+            "liver",
+            "gallbladder",
+            "pancreas",
+            "esophagus",
+            "stomach",
+            "duodenum",
+            "small bowel",
+            "colon"
+        ]
+    },
+    "genitourinary_system": {
+        "description": "Kidneys, bladder, and reproductive organs",
+        "labels": [
+            "right kidney",
+            "left kidney",
+            "right kidney cyst",
+            "left kidney cyst",
+            "bladder",
+            "prostate"
+        ]
+    },
+    "endocrine_system": {
+        "description": "Hormone-producing glands",
+        "labels": [
+            "right adrenal gland",
+            "left adrenal gland",
+            "thyroid gland"
+        ]
+    },
+    "central_nervous_system": {
+        "description": "Brain and spinal cord",
+        "labels": [
+            "brain",
+            "spinal cord",
+            "skull"
+        ]
+    },
+    "skeletal_system": {
+        "description": "Bones and skeletal structures",
+        "labels": [
+            "left humerus",
+            "right humerus",
+            "left scapula",
+            "right scapula",
+            "left clavicula",
+            "right clavicula",
+            "left femur",
+            "right femur",
+            "left hip",
+            "right hip",
+            "sacrum",
+            "sternum",
+            "costal cartilages",
+            "bone lesion"
+        ]
+    },
+    "rib_cage_set": {
+        "description": "All rib cage components",
+        "labels": [
+            "left rib 1",
+            "left rib 2",
+            "left rib 3",
+            "left rib 4",
+            "left rib 5",
+            "left rib 6",
+            "left rib 7",
+            "left rib 8",
+            "left rib 9",
+            "left rib 10",
+            "left rib 11",
+            "left rib 12",
+            "right rib 1",
+            "right rib 2",
+            "right rib 3",
+            "right rib 4",
+            "right rib 5",
+            "right rib 6",
+            "right rib 7",
+            "right rib 8",
+            "right rib 9",
+            "right rib 10",
+            "right rib 11",
+            "right rib 12",
+            "sternum",
+            "costal cartilages"
+        ]
+    },
+    "vertebral_column": {
+        "description": "All vertebrae and spinal structures",
+        "labels": [
+            "vertebrae C1",
+            "vertebrae C2",
+            "vertebrae C3",
+            "vertebrae C4",
+            "vertebrae C5",
+            "vertebrae C6",
+            "vertebrae C7",
+            "vertebrae T1",
+            "vertebrae T2",
+            "vertebrae T3",
+            "vertebrae T4",
+            "vertebrae T5",
+            "vertebrae T6",
+            "vertebrae T7",
+            "vertebrae T8",
+            "vertebrae T9",
+            "vertebrae T10",
+            "vertebrae T11",
+            "vertebrae T12",
+            "vertebrae L1",
+            "vertebrae L2",
+            "vertebrae L3",
+            "vertebrae L4",
+            "vertebrae L5",
+            "vertebrae S1",
+            "spinal cord"
+        ]
+    },
+    "muscular_system": {
+        "description": "Muscles and soft tissues",
+        "labels": [
+            "left gluteus maximus",
+            "right gluteus maximus",
+            "left gluteus medius",
+            "right gluteus medius",
+            "left gluteus minimus",
+            "right gluteus minimus",
+            "left autochthon",
+            "right autochthon",
+            "left iliopsoas",
+            "right iliopsoas"
+        ]
+    },
+    "tumor_set": {
+        "description": "All tumor and cancer-related structures",
+        "labels": [
+            "lung tumor",
+            "pancreatic tumor",
+            "hepatic tumor",
+            "colon cancer primaries",
+            "bone lesion"
+        ]
+    },
+    "thoracic_organs": {
+        "description": "Organs within the thoracic cavity",
+        "labels": [
+            "heart",
+            "left lung upper lobe",
+            "left lung lower lobe",
+            "right lung upper lobe",
+            "right lung middle lobe",
+            "right lung lower lobe",
+            "trachea",
+            "esophagus",
+            "aorta",
+            "superior vena cava",
+            "inferior vena cava",
+            "pulmonary vein",
+            "left atrial appendage",
+            "brachiocephalic trunk",
+            "left brachiocephalic vein",
+            "right brachiocephalic vein",
+            "left common carotid artery",
+            "right common carotid artery",
+            "left subclavian artery",
+            "right subclavian artery",
+            "thyroid gland"
+        ]
+    },
+    "abdominal_organs": {
+        "description": "Organs within the abdominal cavity",
+        "labels": [
+            "liver",
+            "spleen",
+            "pancreas",
+            "right kidney",
+            "left kidney",
+            "right kidney cyst",
+            "left kidney cyst",
+            "right adrenal gland",
+            "left adrenal gland",
+            "gallbladder",
+            "stomach",
+            "duodenum",
+            "small bowel",
+            "colon",
+            "aorta",
+            "inferior vena cava",
+            "portal vein and splenic vein",
+            "hepatic vessel"
+        ]
+    },
+    "pelvic_organs": {
+        "description": "Organs within the pelvic cavity",
+        "labels": [
+            "bladder",
+            "prostate",
+            "left iliac artery",
+            "right iliac artery",
+            "left iliac vena",
+            "right iliac vena",
+            "sacrum",
+            "left hip",
+            "right hip"
+        ]
+    },
+    "upper_limb": {
+        "description": "Upper extremity structures",
+        "labels": [
+            "left humerus",
+            "right humerus",
+            "left scapula",
+            "right scapula",
+            "left clavicula",
+            "right clavicula"
+        ]
+    },
+    "lower_limb": {
+        "description": "Lower extremity structures",
+        "labels": [
+            "left femur",
+            "right femur",
+            "left hip",
+            "right hip",
+            "left gluteus maximus",
+            "right gluteus maximus",
+            "left gluteus medius",
+            "right gluteus medius",
+            "left gluteus minimus",
+            "right gluteus minimus",
+            "left autochthon",
+            "right autochthon",
+            "left iliopsoas",
+            "right iliopsoas"
+        ]
+    },
+    "head_and_neck": {
+        "description": "Cranial and cervical structures",
+        "labels": [
+            "brain",
+            "skull",
+            "thyroid gland",
+            "trachea",
+            "esophagus",
+            "left common carotid artery",
+            "right common carotid artery",
+            "left subclavian artery",
+            "right subclavian artery",
+            "vertebrae C1",
+            "vertebrae C2",
+            "vertebrae C3",
+            "vertebrae C4",
+            "vertebrae C5",
+            "vertebrae C6",
+            "vertebrae C7"
+        ]
+    }
+}

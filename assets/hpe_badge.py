@@ -6,8 +6,6 @@ import streamlit as st
 
 def render_hpe_badge() -> None:
     """Render an HPE AI badge linking to HPE AI site."""
-    st.sidebar.markdown("---")
-
     hpe_url = "https://hpe.com/ai"
 
     # Prepare inline images as base64 so the card renders reliably inside HTML
@@ -38,6 +36,7 @@ def render_hpe_badge() -> None:
         display: block;
         border-radius: 14px;
         overflow: hidden;
+        margin-top: 6px;
         border: 1px solid rgba(0,179,136,0.35);
         background: radial-gradient(120% 120% at 0% 0%, #0f1311 0%, #0a0f0d 45%, #131614 100%);
         box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,179,136,0.08);

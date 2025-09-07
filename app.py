@@ -15,6 +15,7 @@ sys.path.append(str(Path(__file__).parent / 'utils'))
 from navigation import render_navigation
 from assets.nvidia_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
+from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
 
 def check_image_server_status():
     """Check if the image server is available."""
@@ -106,7 +107,6 @@ def render_nvidia_vista_card():
 
 def render_server_status_sidebar():
     """Render server status message in sidebar."""
-    st.sidebar.markdown("---")
     
     if check_image_server_status():
         image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
@@ -128,20 +128,24 @@ nav = render_navigation()
 current_page = nav.get_current_page()
 
 if current_page == 'home':
-    # Render server status in sidebar (only on home page)
-    render_server_status_sidebar()
-    
     # Render Nvidia Vista 3D card in sidebar
     render_nvidia_vista_card()
     # Render HPE AI badge in sidebar
     _render_hpe_badge()
+    # Render NiiVue badge in sidebar
+    _render_niivue_badge()
     st.title("Vessel Segmentation Viewer")
     st.markdown("Welcome to the NIfTI Vessel Segmentation and Viewer application.")
     st.markdown("Use the sidebar to navigate to different tools and features.")
     
     # Image Data Analysis Section on main page
+    if check_image_server_status():
+        image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
+        st.info(f"🖥️ Image Server — Online • {image_server_url}")
+    else:
+        st.error("🖥️ Image Server — Offline. Start with: `python utils/image_server.py`")
     st.markdown("---")
-    st.header("🧬 Image Data")
+    st.header("🩻 Image Data")
     
     if check_image_server_status():
         with st.spinner("Analyzing server data..."):
@@ -204,8 +208,5 @@ elif current_page == 'niivue':
     # Import and run NiiVue content
     sys.path.append(str(Path(__file__).parent))
     exec(open('NiiVue.py').read())
-elif current_page == 'cache':
-    # Import and run cache content
-    sys.path.append(str(Path(__file__).parent))
-    exec(open('cache.py').read())
+    
 

@@ -6,8 +6,6 @@ import streamlit as st
 
 def render_nvidia_vista_card() -> None:
     """Render a modern NVIDIA VISTA-3D badge that links to NVIDIA Build."""
-    st.sidebar.markdown("---")
-
     vista_url = "https://build.nvidia.com/nvidia/vista-3d"
 
     # Prepare inline images as base64 so the card renders reliably inside HTML
@@ -36,6 +34,7 @@ def render_nvidia_vista_card() -> None:
         display: block;
         border-radius: 14px;
         overflow: hidden;
+        margin-bottom: 10px;
         border: 1px solid rgba(118,185,0,0.35);
         background: radial-gradient(120% 120% at 0% 0%, #0f130f 0%, #0b0d0a 45%, #131613 100%);
         box-shadow: 0 6px 18px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(118,185,0,0.08);
