@@ -305,13 +305,8 @@ with st.sidebar:
                     help="Select specific anatomical structures to display as overlays"
                 )
                 
-                # Display selected voxels
+                # Display selected voxels count only
                 if selected_voxels:
-                    st.markdown("**Selected Individual Voxels:**")
-                    for voxel_name in selected_voxels:
-                        voxel_id = label_dict[voxel_name]
-                        st.markdown(f"• **{voxel_name}** (ID: {voxel_id})")
-                    
                     st.info(f"Will display {len(selected_voxels)} individual voxels from the voxels directory.")
                 else:
                     st.info("No individual voxels selected. Select specific structures to display.")
