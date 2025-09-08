@@ -44,6 +44,8 @@ Version: 1.0.0
 
 import streamlit as st
 from typing import Dict, List, Optional
+import base64
+from pathlib import Path
 
 
 class NavigationItem:
@@ -158,6 +160,23 @@ class Navigation:
         # Initialize session state for navigation if not exists
         if 'current_page' not in st.session_state:
             st.session_state.current_page = 'home'
+
+    def get_logo_base64(self) -> str:
+        """
+        Get the HPE-NVIDIA logo as a base64 encoded string for HTML embedding.
+
+        Returns:
+            str: Base64 encoded logo image data
+        """
+        try:
+            logo_path = Path(__file__).parent.parent / "assets" / "HPE-NVIDIA.png"
+            if logo_path.exists():
+                with open(logo_path, "rb") as f:
+                    return base64.b64encode(f.read()).decode()
+            else:
+                return ""
+        except Exception:
+            return ""
     
     def navigate_to(self, page: str) -> None:
         """
@@ -193,9 +212,20 @@ class Navigation:
             >>> nav.render_sidebar()  # Renders all navigation buttons
         """
         with st.sidebar:
-            # Add HPE-NVIDIA logo at the top - full width
-            st.image("assets/Logo-HPE-NVIDIA.png", use_container_width=True)
-            
+            # Add HPE-NVIDIA logo at the top - full sidebar width
+            logo_b64 = self.get_logo_base64()
+            if logo_b64:
+                st.markdown(f"""
+                    <div style="width: 100%; margin: 0; padding: 0; overflow: hidden;">
+                        <img src="data:image/png;base64,{logo_b64}" style="width: 100%; height: auto; display: block;">
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Fallback to regular st.image if base64 fails
+                st.image("assets/HPE-NVIDIA.png", use_container_width=True)
+            # Add spacing to prevent styling conflicts with other sidebar elements
+            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+
             for item in self.items:
                 if item.is_image and item.icon:
                     # For image icons, create a container with image and button
