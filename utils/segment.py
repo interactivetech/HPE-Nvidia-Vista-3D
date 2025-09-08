@@ -187,7 +187,7 @@ def main():
                 docker_accessible_url = IMAGE_SERVER_URL.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal')
                 
                 vista3d_input_url = f"{docker_accessible_url.rstrip('/')}/{relative_path_to_nifti}"
-                payload = {"image": vista3d_input_url, "prompts": {"classes": target_vessels}}
+                payload = {"image": vista3d_input_url, "prompts": {"labels": target_vessels}}
                 headers = {"Content-Type": "application/json"}
 
                 print(f"\n  Processing: {nifti_file_path.name}")

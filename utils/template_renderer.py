@@ -29,10 +29,16 @@ class TemplateRenderer:
         Render the NiiVue viewer template with provided data.
         """
         try:
+            # Load the Niivue JavaScript library content
+            niivue_lib_path = Path(__file__).parent.parent / 'assets' / 'niivue.umd.js'
+            with open(niivue_lib_path, 'r') as f:
+                niivue_lib_content = f.read()
+
             template = self.env.get_template('niivue_viewer.html')
 
             # Prepare template variables
             template_vars = {
+                'niivue_lib_content': niivue_lib_content,
                 'volume_list_js': volume_list_js,
                 'overlay_colors_js': overlay_colors_js,
                 'custom_colormap_js': custom_colormap_js,
