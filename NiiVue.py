@@ -210,7 +210,7 @@ with st.sidebar:
         # Voxel selection mode
         voxel_mode = st.radio(
             "Choose voxel selection mode:",
-            ["All", "Label Sets", "Individual Voxels"],
+            ["All", "Individual Voxels"],
             index=0,
             help="Select how you want to choose which voxels to display"
         )
@@ -222,7 +222,7 @@ with st.sidebar:
         # If none available, surface a clear notice with the voxels directory URL
         ct_scan_folder_name = current_filename.replace('.nii.gz', '').replace('.nii', '') if current_filename else ''
         voxels_directory_url = f"{IMAGE_SERVER_URL.rstrip('/')}/output/{current_patient}/voxels/{ct_scan_folder_name}/"
-        if voxel_mode in ["Label Sets", "Individual Voxels"] and current_patient and current_filename and not available_label_ids:
+        if voxel_mode == "Individual Voxels" and current_patient and current_filename and not available_label_ids:
             st.warning("No voxels available for this patient/file.")
             st.caption(f"Voxels directory: {voxels_directory_url}")
             st.caption("Individual voxel files should be located in this directory.")
@@ -230,67 +230,8 @@ with st.sidebar:
         if voxel_mode == "All":
             st.info("Will display the complete base segmentation file.")
             st.session_state.voxel_mode = "all"
-            st.session_state.selected_label_sets = []
             st.session_state.selected_individual_voxels = []
             
-        elif voxel_mode == "Label Sets":
-            try:
-                with open('conf/vista3d_label_sets.json', 'r') as f:
-                    label_sets = json.load(f)
-                
-                # Create a multiselect for label sets
-                available_sets = list(label_sets.keys())
-                selected_sets = st.multiselect(
-                    "Choose anatomical sets to overlay:",
-                    available_sets,
-                    default=[],
-                    help="Select one or more anatomical sets to display as overlays"
-                )
-                
-                # Display selected sets with descriptions
-                if selected_sets:
-                    st.markdown("**Selected Sets:**")
-                    total_labels = 0
-                    for set_name in selected_sets:
-                        set_info = label_sets[set_name]
-                        # Filter set labels by availability
-                        set_label_names = set_info['labels']
-                        # Map names -> ids using conf/vista3d_label_dict.json
-                        with open('conf/vista3d_label_dict.json', 'r') as f2:
-                            name_to_id_dict = json.load(f2)
-                        available_names = []
-                        for ln in set_label_names:
-                            lid = name_to_id_dict.get(ln)
-                            if isinstance(lid, int) and lid in available_label_ids:
-                                available_names.append(ln)
-                        label_count = len(available_names)
-                        total_labels += label_count
-                        st.markdown(f"• **{set_name.replace('_', ' ').title()}**: {set_info['description']}")
-                        st.markdown(f"  *{label_count} available labels*")
-                        
-                        # Show which specific labels are available for this set
-                        if available_names:
-                            st.markdown(f"  Available: {', '.join(available_names[:5])}")
-                            if len(available_names) > 5:
-                                st.markdown(f"  *... and {len(available_names) - 5} more*")
-                        else:
-                            st.markdown(f"  *No labels available for this set*")
-                    
-                    st.markdown(f"**Total available labels: {total_labels}**")
-                    st.info("Each selected anatomical structure will be displayed as a separate overlay from the voxels directory.")
-                else:
-                    st.info("No label sets selected. Select sets to display individual voxels.")
-                
-                st.session_state.voxel_mode = "label_sets"
-                st.session_state.selected_label_sets = selected_sets
-                st.session_state.selected_individual_voxels = []
-                
-            except Exception as e:
-                st.error(f"Error loading label sets: {e}")
-                st.session_state.voxel_mode = "all"
-                st.session_state.selected_label_sets = []
-                st.session_state.selected_individual_voxels = []
-                
         elif voxel_mode == "Individual Voxels":
             try:
                 with open('conf/vista3d_label_dict.json', 'r') as f:
@@ -312,13 +253,11 @@ with st.sidebar:
                     st.info("No individual voxels selected. Select specific structures to display.")
                 
                 st.session_state.voxel_mode = "individual_voxels"
-                st.session_state.selected_label_sets = []
                 st.session_state.selected_individual_voxels = selected_voxels
                 
             except Exception as e:
                 st.error(f"Error loading individual voxels: {e}")
                 st.session_state.voxel_mode = "all"
-                st.session_state.selected_label_sets = []
                 st.session_state.selected_individual_voxels = []
     
     with st.expander("Voxel Image Settings", expanded=False):
@@ -378,60 +317,6 @@ if selected_file:
                 'is_all_segmentation': True  # Flag to indicate this needs special handling
             }]
             
-        elif voxel_mode == "label_sets":
-            # Show individual voxels from selected label sets
-            if hasattr(st.session_state, 'selected_label_sets') and st.session_state.selected_label_sets:
-                try:
-                    with open('conf/vista3d_label_sets.json', 'r') as f:
-                        label_sets = json.load(f)
-                    with open('conf/vista3d_label_dict.json', 'r') as f:
-                        label_dict = json.load(f)
-                    with open('conf/vista3d_label_colors.json', 'r') as f:
-                        label_colors_list = json.load(f)
-                    
-                    # Collect individual labels from selected sets
-                    # Convert CT scan name to folder name (remove .nii.gz extension)
-                    ct_scan_folder_name = segment_filename.replace('.nii.gz', '').replace('.nii', '')
-                    
-                    for set_name in st.session_state.selected_label_sets:
-                        if set_name in label_sets:
-                            for label_name in label_sets[set_name]['labels']:
-                                if label_name in label_dict:
-                                    label_id = label_dict[label_name]
-                                    # Only include overlays for labels that exist in voxels file
-                                    if label_id in available_label_ids_for_file:
-                                        selected_label_ids.append(label_id)
-                                        # Convert label name to filename format
-                                        voxel_filename = label_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
-                                        # Get color for this label
-                                        label_color = None
-                                        for item in label_colors_list:
-                                            if item['id'] == label_id:
-                                                label_color = item['color']
-                                                break
-                                        
-                                        individual_label_overlays.append({
-                                            'label_id': label_id,
-                                            'label_name': label_name,
-                                            'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/voxels/{ct_scan_folder_name}/{voxel_filename}",
-                                            'color': label_color
-                                        })
-                    
-                    # Remove duplicates and sort
-                    selected_label_ids = sorted(list(set(selected_label_ids)))
-                    
-                except Exception as e:
-                    st.error(f"Error processing selected label sets: {e}")
-                    selected_label_ids = []
-                    individual_label_overlays = []
-            else:
-                # No label sets selected, show base segmentation
-                individual_label_overlays = [{
-                    'label_id': 'all',
-                    'label_name': 'All Segmentation',
-                    'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}"
-                }]
-                
         elif voxel_mode == "individual_voxels":
             # Show individual voxels from selected individual voxels
             if hasattr(st.session_state, 'selected_individual_voxels') and st.session_state.selected_individual_voxels:
@@ -479,7 +364,8 @@ if selected_file:
                 individual_label_overlays = [{
                     'label_id': 'all',
                     'label_name': 'All Segmentation',
-                    'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}"
+                    'url': f"{IMAGE_SERVER_URL}/output/{selected_patient}/segments/{segment_filename}",
+                    'is_all_segmentation': True
                 }]
     else:
         # Show Voxels is disabled, no overlays
