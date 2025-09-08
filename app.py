@@ -9,6 +9,9 @@ import json
 import base64
 import mimetypes
 from typing import List, Dict, Optional
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Add utils to path for imports
 sys.path.append(str(Path(__file__).parent / 'utils'))
@@ -140,6 +143,249 @@ def render_nvidia_vista_card():
     """Delegate rendering to assets.nvidia_badge module."""
     _render_nvidia_vista_card()
 
+def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:
+    """Prepare patient data for the stacked bar chart."""
+    chart_data = []
+    
+    for patient in patients_data:
+        patient_id = patient.get('id', 'Unknown')
+        ct_scans = patient.get('ct_scans', 0)
+        voxel_files = patient.get('voxel_files', 0)
+        
+        # Calculate segments - this is the number of individual voxel files per patient
+        # In the current data structure, segments are represented by voxel files
+        segments = voxel_files
+        
+        # Extract size information from data_size string (e.g., "123.4 MB")
+        data_size_str = patient.get('data_size', 'Unknown')
+        size_mb = 0
+        if data_size_str != 'Unknown' and 'MB' in data_size_str:
+            try:
+                size_mb = float(data_size_str.replace('MB', '').strip())
+            except:
+                size_mb = 0
+        elif data_size_str != 'Unknown' and 'GB' in data_size_str:
+            try:
+                size_gb = float(data_size_str.replace('GB', '').strip())
+                size_mb = size_gb * 1024  # Convert GB to MB
+            except:
+                size_mb = 0
+        
+        # Prepare scan names for hover tooltip
+        scan_names = []
+        if patient.get('scans'):
+            scan_names = [scan.get('name', 'Unknown') for scan in patient['scans']]
+        
+        chart_data.append({
+            'Patient': patient_id,
+            'CT Scans': ct_scans,
+            'Segments': segments,
+            'Voxels': voxel_files,  # Using voxel_files as the voxel count
+            'Size (MB)': size_mb,
+            'Scan Names': scan_names
+        })
+    
+    return pd.DataFrame(chart_data)
+
+def render_patient_data_chart(patients_data: List[Dict]):
+    """Render a comprehensive chart showing patient data with file counts and folder sizes."""
+    if not patients_data:
+        st.warning("No patient data available for chart")
+        return
+    
+    # Prepare data for the chart
+    df = prepare_chart_data(patients_data)
+    
+    # Create tabs for different chart views
+    tab1, tab2, tab3 = st.tabs(["📊 File Counts", "💾 Folder Sizes", "📈 Combined View"])
+    
+    with tab1:
+        # File counts stacked bar chart
+        chart_df = pd.melt(
+            df, 
+            id_vars=['Patient'], 
+            value_vars=['CT Scans', 'Segments', 'Voxels'],
+            var_name='Data Type', 
+            value_name='Count'
+        )
+        
+        # Add scan names to the chart data for hover tooltips
+        chart_df_with_scans = chart_df.merge(df[['Patient', 'Scan Names']], on='Patient', how='left')
+        chart_df_with_scans['Scan Names Text'] = chart_df_with_scans['Scan Names'].apply(
+            lambda x: '<br>'.join(x) if x else 'No scan data'
+        )
+        
+        fig = px.bar(
+            chart_df_with_scans, 
+            x='Patient', 
+            y='Count', 
+            color='Data Type',
+            title='Patient File Counts - CT Scans, Segments, and Voxels',
+            labels={'Count': 'Number of Files', 'Patient': 'Patient ID'},
+            color_discrete_map={
+                'CT Scans': '#1f77b4',
+                'Segments': '#ff7f0e', 
+                'Voxels': '#2ca02c'
+            },
+            hover_data={'Scan Names Text': True}
+        )
+        
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            height=500,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        # Folder sizes bar chart
+        fig = px.bar(
+            df, 
+            x='Patient', 
+            y='Size (MB)',
+            title='Patient Folder Sizes',
+            labels={'Size (MB)': 'Folder Size (MB)', 'Patient': 'Patient ID'},
+            color='Size (MB)',
+            color_continuous_scale='Viridis'
+        )
+        
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            height=500,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with tab3:
+        # Combined view with dual y-axis
+        from plotly.subplots import make_subplots
+        
+        # Create subplot with secondary y-axis
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        
+        # Add file counts as stacked bars
+        chart_df = pd.melt(
+            df, 
+            id_vars=['Patient'], 
+            value_vars=['CT Scans', 'Segments', 'Voxels'],
+            var_name='Data Type', 
+            value_name='Count'
+        )
+        
+        # Add scan names for hover tooltips
+        chart_df_with_scans = chart_df.merge(df[['Patient', 'Scan Names']], on='Patient', how='left')
+        chart_df_with_scans['Scan Names Text'] = chart_df_with_scans['Scan Names'].apply(
+            lambda x: '<br>'.join(x) if x else 'No scan data'
+        )
+        
+        for data_type in ['CT Scans', 'Segments', 'Voxels']:
+            data_subset = chart_df_with_scans[chart_df_with_scans['Data Type'] == data_type]
+            fig.add_trace(
+                go.Bar(
+                    x=data_subset['Patient'], 
+                    y=data_subset['Count'],
+                    name=data_type,
+                    marker_color={
+                        'CT Scans': '#1f77b4',
+                        'Segments': '#ff7f0e', 
+                        'Voxels': '#2ca02c'
+                    }[data_type],
+                    customdata=data_subset['Scan Names Text'],
+                    hovertemplate=f'<b>{data_type}</b><br>' +
+                                 'Patient: %{x}<br>' +
+                                 'Count: %{y}<br>' +
+                                 'Scan Names:<br>%{customdata}<br>' +
+                                 '<extra></extra>'
+                ),
+                secondary_y=False
+            )
+        
+        # Add folder sizes as line chart
+        df['Scan Names Text'] = df['Scan Names'].apply(
+            lambda x: '<br>'.join(x) if x else 'No scan data'
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df['Patient'], 
+                y=df['Size (MB)'],
+                name='Folder Size (MB)',
+                mode='lines+markers',
+                line=dict(color='red', width=3),
+                marker=dict(size=8),
+                customdata=df['Scan Names Text'],
+                hovertemplate='<b>Folder Size</b><br>' +
+                             'Patient: %{x}<br>' +
+                             'Size: %{y} MB<br>' +
+                             'Scan Names:<br>%{customdata}<br>' +
+                             '<extra></extra>'
+            ),
+            secondary_y=True
+        )
+        
+        # Update layout
+        fig.update_layout(
+            title_text="Patient Data Overview - File Counts & Folder Sizes",
+            xaxis_tickangle=-45,
+            height=600,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        # Set y-axes titles
+        fig.update_yaxes(title_text="Number of Files", secondary_y=False)
+        fig.update_yaxes(title_text="Folder Size (MB)", secondary_y=True)
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+def render_patient_details_visualization(patients_data: List[Dict]):
+    """Render comprehensive patient details visualization."""
+    if not patients_data:
+        st.warning("No patient data available")
+        return
+    
+    # Prepare data for visualization
+    df = prepare_chart_data(patients_data)
+    
+    # Interactive Data Table
+    
+    # Prepare table data
+    table_data = []
+    for patient in patients_data:
+        # Get scan names for this patient
+        scan_names = []
+        if patient.get('scans'):
+            scan_names = [scan.get('name', 'Unknown') for scan in patient['scans']]
+        
+        # Format scan names for display
+        if scan_names:
+            scan_names_text = ', '.join(scan_names)
+        else:
+            scan_names_text = f"{patient['ct_scans']} scans"
+        
+        table_data.append({
+            'Patient ID': patient['id'],
+            'CT Scans': scan_names_text,
+            'Voxel Files': patient['voxel_files'],
+            'Data Size': patient.get('data_size', 'Unknown')
+        })
+    
+    table_df = pd.DataFrame(table_data)
+    st.dataframe(
+        table_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Patient ID": st.column_config.TextColumn("Patient ID", width="medium"),
+            "CT Scans": st.column_config.TextColumn("CT Scans", width="large"),
+            "Voxel Files": st.column_config.NumberColumn("Voxel Files", width="small"),
+            "Data Size": st.column_config.TextColumn("Data Size", width="medium")
+        }
+    )
+    
+
 def render_server_status_sidebar():
     """Render server status message in sidebar."""
     
@@ -221,21 +467,8 @@ if current_page == 'home':
                     help="Total size of all patient data"
                 )
             
-            # Patient Details
-            st.subheader("👥 Patient Details")
-            
-            for patient in patients:
-                with st.expander(f"{patient['id']} - {patient['ct_scans']} CT Scans - {patient.get('data_size', 'Unknown size')}"):
-                    st.write(f"**CT Scans:** {patient['ct_scans']}")
-                    st.write(f"**Voxel Files:** {patient['voxel_files']}")
-                    st.write(f"**Total Data Size:** {patient.get('data_size', 'Unknown')}")
-                    
-                    if patient['scans']:
-                        st.write("**Scan Details:**")
-                        for scan in patient['scans']:
-                            st.write(f"• {scan['name']}: {scan['voxel_count']} voxels")
-                    else:
-                        st.write("No scan details available")
+            # Patient Details Visualization
+            render_patient_details_visualization(patients)
             
         
         elif error:

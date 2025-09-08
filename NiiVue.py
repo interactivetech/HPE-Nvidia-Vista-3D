@@ -168,6 +168,9 @@ def render_viewer(selected_patient: str, selected_file: str):
     window_center, window_width = viewer_config.get_window_settings()
     actual_slice_type = viewer_config.get_slice_type_index()
 
+    # Debug info checkbox (if it exists) - this line can be removed if no debug checkbox is present
+    # st.checkbox("Show Debug Info", value=False, key="debug_info")
+
     # Render the viewer using our template
     html_content = template_renderer.render_viewer(
         volume_list_js=volume_list_js,
