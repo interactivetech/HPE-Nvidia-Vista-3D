@@ -19,7 +19,7 @@ DEFAULT_VIEWER_SETTINGS = {
     'slice_type': 'Multiplanar',
     'orientation': 'Axial',
     'color_map': 'gray',
-    'nifti_opacity': 1.0,
+    'nifti_opacity': 0.5,
     'nifti_gamma': 1.0,
     'show_nifti': True,
     'show_overlay': False,

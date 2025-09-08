@@ -121,24 +121,26 @@
                 nv.opts.multiplanarShowRender = true;
                 nv.opts.multiplanarForceRender = true;
                 nv.opts.showCrosshairs = true;
+                nv.opts.show3Dcrosshair = true;
+                // Enable 3D rendering for the bottom-right panel
+                nv.opts.isOrientCube = false;
+                nv.opts.isRuler = false;
                 setTimeout(() => {
-                    nv.opts.show3Dcrosshair = true;
                     nv.drawScene();
                 }, 500);
                 {% elif actual_slice_type == 4 %}
-                // 3D Render mode - disable any container/boundary settings
+                // 3D Render mode - full 3D view
                 nv.opts.multiplanarShowRender = false;
                 nv.opts.multiplanarForceRender = false;
                 nv.opts.showCrosshairs = false;
-                nv.opts.show3Dcrosshair = false;
+                nv.opts.show3Dcrosshair = true;
                 nv.opts.isOrientCube = false;
                 nv.opts.isRuler = false;
                 nv.opts.isRadiologicalConvention = false;
-                nv.opts.isOrientCube = false;
-                nv.opts.isRuler = false;
-                // Disable any 3D container or boundary rendering
-                nv.opts.isOrientCube = false;
-                nv.opts.isRuler = false;
+                // Enable 3D rendering
+                setTimeout(() => {
+                    nv.drawScene();
+                }, 500);
                 {% else %}
                 // Ensure multiplanar flags are disabled when not in multiplanar mode
                 nv.opts.multiplanarShowRender = false;

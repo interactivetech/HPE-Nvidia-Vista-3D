@@ -183,6 +183,8 @@ class ViewerConfig:
         # Voxel display settings
         self._settings['show_overlay'] = st.checkbox("Show Voxels", value=self._settings['show_overlay'])
 
+    def render_voxel_image_settings(self):
+        """Render the voxel image settings in an expander."""
         if self._settings['show_overlay']:
             with st.expander("Voxel Image Settings", expanded=False):
                 self._settings['segment_opacity'] = st.slider(

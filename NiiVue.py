@@ -48,7 +48,7 @@ def render_sidebar():
                     filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
                     for filename in filenames
                 ]
-                selected_display_name = st.selectbox("Select File", display_names)
+                selected_display_name = st.selectbox("Select Scan", display_names)
                 # Map back to the actual filename
                 if selected_display_name:
                     selected_index = display_names.index(selected_display_name)
@@ -61,9 +61,11 @@ def render_sidebar():
         # Render viewer settings
         viewer_config.render_sidebar_settings()
 
-        # Voxel selection
+        # Voxel selection (after show_overlay is set)
         if viewer_config.settings.get('show_overlay', False):
             render_voxel_selection(selected_patient, selected_file)
+            # Voxel image settings (after voxel selection)
+            viewer_config.render_voxel_image_settings()
 
         # Voxel legend
         viewer_config.render_voxel_legend()
