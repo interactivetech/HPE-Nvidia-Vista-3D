@@ -295,7 +295,7 @@ async def get_filtered_voxels(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error filtering voxels: {str(e)}")
 
-@app.get("/segments/{patient_id}/voxels/{filename}/labels")
+@app.get("/output/{patient_id}/voxels/{filename}/labels")
 async def get_available_voxel_labels(
     patient_id: str,
     filename: str,
