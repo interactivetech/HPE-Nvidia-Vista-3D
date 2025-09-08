@@ -3,18 +3,18 @@
         "id": 1,
         "name": "liver",
         "color": [
-            34,
-            139,
-            34
+            0,
+            128,
+            0
         ]
     },
     {
         "id": 3,
         "name": "spleen",
         "color": [
-            255,
-            140,
-            0
+            128,
+            0,
+            128
         ]
     },
     {
@@ -22,7 +22,7 @@
         "name": "pancreas",
         "color": [
             255,
-            215,
+            255,
             0
         ]
     },
@@ -30,26 +30,26 @@
         "id": 5,
         "name": "right kidney",
         "color": [
-            0,
-            191,
-            255
+            255,
+            165,
+            0
         ]
     },
     {
         "id": 6,
         "name": "aorta",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 7,
         "name": "inferior vena cava",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -58,8 +58,8 @@
         "name": "right adrenal gland",
         "color": [
             255,
-            20,
-            147
+            165,
+            0
         ]
     },
     {
@@ -67,16 +67,16 @@
         "name": "left adrenal gland",
         "color": [
             255,
-            20,
-            147
+            165,
+            0
         ]
     },
     {
         "id": 10,
         "name": "gallbladder",
         "color": [
-            255,
-            255,
+            0,
+            128,
             0
         ]
     },
@@ -85,7 +85,7 @@
         "name": "esophagus",
         "color": [
             255,
-            165,
+            255,
             0
         ]
     },
@@ -94,7 +94,7 @@
         "name": "stomach",
         "color": [
             255,
-            215,
+            255,
             0
         ]
     },
@@ -103,7 +103,7 @@
         "name": "duodenum",
         "color": [
             255,
-            140,
+            255,
             0
         ]
     },
@@ -111,9 +111,9 @@
         "id": 14,
         "name": "left kidney",
         "color": [
-            0,
-            191,
-            255
+            255,
+            165,
+            0
         ]
     },
     {
@@ -121,7 +121,7 @@
         "name": "bladder",
         "color": [
             255,
-            69,
+            255,
             0
         ]
     },
@@ -130,8 +130,8 @@
         "name": "portal vein and splenic vein",
         "color": [
             0,
-            100,
-            200
+            0,
+            255
         ]
     },
     {
@@ -139,7 +139,7 @@
         "name": "small bowel",
         "color": [
             255,
-            140,
+            255,
             0
         ]
     },
@@ -147,9 +147,9 @@
         "id": 22,
         "name": "brain",
         "color": [
-            0,
-            191,
-            255
+            173,
+            216,
+            230
         ]
     },
     {
@@ -158,7 +158,7 @@
         "color": [
             255,
             0,
-            128
+            255
         ]
     },
     {
@@ -167,16 +167,16 @@
         "color": [
             255,
             0,
-            128
+            255
         ]
     },
     {
         "id": 25,
         "name": "hepatic vessel",
         "color": [
-            0,
-            100,
-            200
+            128,
+            128,
+            128
         ]
     },
     {
@@ -185,7 +185,7 @@
         "color": [
             255,
             0,
-            128
+            255
         ]
     },
     {
@@ -194,7 +194,7 @@
         "color": [
             255,
             0,
-            128
+            255
         ]
     },
     {
@@ -202,7 +202,7 @@
         "name": "left lung upper lobe",
         "color": [
             0,
-            200,
+            255,
             0
         ]
     },
@@ -211,7 +211,7 @@
         "name": "left lung lower lobe",
         "color": [
             0,
-            200,
+            255,
             0
         ]
     },
@@ -220,7 +220,7 @@
         "name": "right lung upper lobe",
         "color": [
             0,
-            200,
+            255,
             0
         ]
     },
@@ -229,7 +229,7 @@
         "name": "right lung middle lobe",
         "color": [
             0,
-            200,
+            255,
             0
         ]
     },
@@ -238,7 +238,7 @@
         "name": "right lung lower lobe",
         "color": [
             0,
-            200,
+            255,
             0
         ]
     },
@@ -246,251 +246,251 @@
         "id": 33,
         "name": "vertebrae L5",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 34,
         "name": "vertebrae L4",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 35,
         "name": "vertebrae L3",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 36,
         "name": "vertebrae L2",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 37,
         "name": "vertebrae L1",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 38,
         "name": "vertebrae T12",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 39,
         "name": "vertebrae T11",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 40,
         "name": "vertebrae T10",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 41,
         "name": "vertebrae T9",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 42,
         "name": "vertebrae T8",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 43,
         "name": "vertebrae T7",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 44,
         "name": "vertebrae T6",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 45,
         "name": "vertebrae T5",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 46,
         "name": "vertebrae T4",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 47,
         "name": "vertebrae T3",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 48,
         "name": "vertebrae T2",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 49,
         "name": "vertebrae T1",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 50,
         "name": "vertebrae C7",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 51,
         "name": "vertebrae C6",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 52,
         "name": "vertebrae C5",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 53,
         "name": "vertebrae C4",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 54,
         "name": "vertebrae C3",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 55,
         "name": "vertebrae C2",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 56,
         "name": "vertebrae C1",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 57,
         "name": "trachea",
         "color": [
-            0,
-            191,
-            255
+            135,
+            206,
+            235
         ]
     },
     {
         "id": 58,
         "name": "left iliac artery",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 59,
         "name": "right iliac artery",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 60,
         "name": "left iliac vena",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -498,8 +498,8 @@
         "id": 61,
         "name": "right iliac vena",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -508,7 +508,7 @@
         "name": "colon",
         "color": [
             255,
-            140,
+            255,
             0
         ]
     },
@@ -516,315 +516,315 @@
         "id": 63,
         "name": "left rib 1",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 64,
         "name": "left rib 2",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 65,
         "name": "left rib 3",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 66,
         "name": "left rib 4",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 67,
         "name": "left rib 5",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 68,
         "name": "left rib 6",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 69,
         "name": "left rib 7",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 70,
         "name": "left rib 8",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 71,
         "name": "left rib 9",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 72,
         "name": "left rib 10",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 73,
         "name": "left rib 11",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 74,
         "name": "left rib 12",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 75,
         "name": "right rib 1",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 76,
         "name": "right rib 2",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 77,
         "name": "right rib 3",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 78,
         "name": "right rib 4",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 79,
         "name": "right rib 5",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 80,
         "name": "right rib 6",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 81,
         "name": "right rib 7",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 82,
         "name": "right rib 8",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 83,
         "name": "right rib 9",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 84,
         "name": "right rib 10",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 85,
         "name": "right rib 11",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 86,
         "name": "right rib 12",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 87,
         "name": "left humerus",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 88,
         "name": "right humerus",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 89,
         "name": "left scapula",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 90,
         "name": "right scapula",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 91,
         "name": "left clavicula",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 92,
         "name": "right clavicula",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 93,
         "name": "left femur",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 94,
         "name": "right femur",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 95,
         "name": "left hip",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 96,
         "name": "right hip",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 97,
         "name": "sacrum",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
@@ -832,8 +832,8 @@
         "name": "left gluteus maximus",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -841,8 +841,8 @@
         "name": "right gluteus maximus",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -850,8 +850,8 @@
         "name": "left gluteus medius",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -859,8 +859,8 @@
         "name": "right gluteus medius",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -868,8 +868,8 @@
         "name": "left gluteus minimus",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -877,8 +877,8 @@
         "name": "right gluteus minimus",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -886,8 +886,8 @@
         "name": "left autochthon",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -895,8 +895,8 @@
         "name": "right autochthon",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -904,8 +904,8 @@
         "name": "left iliopsoas",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
@@ -913,34 +913,34 @@
         "name": "right iliopsoas",
         "color": [
             255,
-            192,
-            203
+            182,
+            193
         ]
     },
     {
         "id": 108,
         "name": "left atrial appendage",
         "color": [
-            220,
-            20,
-            60
+            128,
+            128,
+            128
         ]
     },
     {
         "id": 109,
         "name": "brachiocephalic trunk",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 110,
         "name": "left brachiocephalic vein",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -948,8 +948,8 @@
         "id": 111,
         "name": "right brachiocephalic vein",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -957,36 +957,36 @@
         "id": 112,
         "name": "left common carotid artery",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 113,
         "name": "right common carotid artery",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 114,
         "name": "costal cartilages",
         "color": [
-            220,
-            220,
-            220
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 115,
         "name": "heart",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
@@ -1012,7 +1012,7 @@
         "name": "prostate",
         "color": [
             255,
-            69,
+            140,
             0
         ]
     },
@@ -1020,8 +1020,8 @@
         "id": 119,
         "name": "pulmonary vein",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -1029,9 +1029,9 @@
         "id": 120,
         "name": "skull",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
@@ -1047,35 +1047,35 @@
         "id": 122,
         "name": "sternum",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
         "id": 123,
         "name": "left subclavian artery",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 124,
         "name": "right subclavian artery",
         "color": [
-            220,
-            20,
-            60
+            255,
+            0,
+            0
         ]
     },
     {
         "id": 125,
         "name": "superior vena cava",
         "color": [
-            30,
-            144,
+            0,
+            0,
             255
         ]
     },
@@ -1084,17 +1084,17 @@
         "name": "thyroid gland",
         "color": [
             255,
-            20,
-            147
+            0,
+            255
         ]
     },
     {
         "id": 127,
         "name": "vertebrae S1",
         "color": [
-            240,
-            240,
-            240
+            255,
+            255,
+            255
         ]
     },
     {
@@ -1103,88 +1103,16 @@
         "color": [
             255,
             0,
-            128
-        ]
-    },
-    {
-        "id": 2,
-        "name": "kidney",
-        "color": [
-            0,
-            191,
             255
-        ]
-    },
-    {
-        "id": 16,
-        "name": "prostate or uterus",
-        "color": [
-            255,
-            69,
-            0
-        ]
-    },
-    {
-        "id": 18,
-        "name": "rectum",
-        "color": [
-            255,
-            140,
-            0
-        ]
-    },
-    {
-        "id": 20,
-        "name": "lung",
-        "color": [
-            0,
-            200,
-            0
-        ]
-    },
-    {
-        "id": 21,
-        "name": "bone",
-        "color": [
-            240,
-            240,
-            240
-        ]
-    },
-    {
-        "id": 129,
-        "name": "kidney mass",
-        "color": [
-            255,
-            255,
-            0
-        ]
-    },
-    {
-        "id": 130,
-        "name": "liver tumor",
-        "color": [
-            255,
-            0,
-            128
-        ]
-    },
-    {
-        "id": 131,
-        "name": "vertebrae L6",
-        "color": [
-            240,
-            240,
-            240
         ]
     },
     {
         "id": 132,
         "name": "airway",
         "color": [
-            0,
-            191,
-            255
+            135,
+            206,
+            235
         ]
     }
 ]

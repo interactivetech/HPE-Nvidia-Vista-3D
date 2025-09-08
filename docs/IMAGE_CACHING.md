@@ -65,7 +65,7 @@ The cache system uses environment variables for configuration:
 ```bash
 # .env file
 IMAGE_SERVER=https://localhost:8888
-CACHE_DIR=~/.cache/vista3d
+CACHE_DIR=output/cache
 CACHE_MAX_SIZE_MB=1024
 CACHE_DEFAULT_TTL_HOURS=24
 ```
@@ -211,7 +211,7 @@ python test_cache.py
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `IMAGE_SERVER` | `https://localhost:8888` | Base URL of image server |
-| `CACHE_DIR` | `~/.cache/vista3d` | Cache directory |
+| `CACHE_DIR` | `output/cache` | Cache directory |
 | `CACHE_MAX_SIZE_MB` | `1024` | Maximum cache size in MB |
 | `CACHE_DEFAULT_TTL_HOURS` | `24` | Default TTL in hours |
 
@@ -233,7 +233,7 @@ cache = ImageCacheManager(
 #### **Cache Not Working**
 ```bash
 # Check if cache directory exists and is writable
-ls -la ~/.cache/vista3d/
+ls -la output/cache/
 
 # Check cache statistics
 python -c "from utils.image_cache import get_cache_stats; print(get_cache_stats())"

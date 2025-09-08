@@ -1,389 +1,209 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import os
-import re
-import requests
-from typing import List, Dict, Optional
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 import json
-from pathlib import Path
+from typing import List, Dict, Optional
+from dotenv import load_dotenv
+
+# Import our new modules
+from utils.config_manager import ConfigManager
+from utils.data_manager import DataManager
+from utils.voxel_manager import VoxelManager
+from utils.viewer_config import ViewerConfig
+from utils.template_renderer import TemplateRenderer
+from utils.constants import (
+    NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
+    VOXEL_MODES, MESSAGES, VIEWER_HEIGHT
+)
+ 
+ 
 
 # --- Initial Setup ---
 load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 
-# --- Helper Functions ---
-def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
-    """Parses the HTML from the image server to get a list of files and folders."""
-    items = []
-    try:
-        soup = BeautifulSoup(html_content, 'html.parser')
-        for item in soup.find_all('li'):
-            link = item.find('a')
-            if link and link.get('href'):
-                text = link.get_text().strip()
-                if text == "📁 ../" or text.endswith('../'):
-                    continue
-                is_directory = text.startswith('📁') or text.endswith('/')
-                name = re.sub(r'^📁\s*|📄\s*', '', text).strip('/')
-                items.append({'name': name, 'is_directory': is_directory})
-    except Exception as e:
-        st.error(f"Error parsing directory listing: {e}")
-    return items
+# Initialize our managers
+config_manager = ConfigManager()
+data_manager = DataManager(IMAGE_SERVER_URL)
+voxel_manager = VoxelManager(config_manager, data_manager)
+viewer_config = ViewerConfig()
+template_renderer = TemplateRenderer()
 
-def get_folder_contents(folder_path: str) -> Optional[List[Dict[str, str]]]:
-    """Fetches and parses the contents of a specific folder from the image server."""
-    url = f"{IMAGE_SERVER_URL.rstrip('/')}/output/{folder_path.strip('/')}/"
-    try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            return parse_directory_listing(response.text)
-        elif response.status_code != 404:
-            st.error(f"Image server returned HTTP {response.status_code}")
-    except requests.exceptions.RequestException as e:
-        st.error(f"Could not connect to image server: {e}")
-    return None
-
-def get_server_data(path: str, type: str, file_extensions: tuple):
-    """Gets folders or files from the server based on the path and type."""
-    items = get_folder_contents(path)
-    if items is None:
-        return []
-    if type == 'folders':
-        return sorted([item['name'] for item in items if item['is_directory']])
-    elif type == 'files':
-        return sorted([item['name'] for item in items if not item['is_directory'] and item['name'].lower().endswith(file_extensions)])
-    return []
 
 # --- Sidebar UI ---
-with st.sidebar:
-    
-    data_sources = ['nifti', 'segments']
-    data_source_display = {'nifti': 'NIfTI', 'segments': 'Segments'}
-    display_options = [data_source_display[source] for source in data_sources]
-    selected_display = st.selectbox("Select Data Source", display_options)
-    # Map back to the actual source name
-    selected_source = data_sources[display_options.index(selected_display)]
+def render_sidebar():
+    """Render the sidebar with patient/file selection and viewer settings."""
+    with st.sidebar:
+        # Patient folders are now directly in the output directory
+        patient_folders = data_manager.get_server_data('', 'folders', ('',))
+        selected_patient = st.selectbox("Select Patient", patient_folders)
 
-    patient_folders = get_server_data(selected_source, 'folders', ('',))
-    selected_patient = st.selectbox("Select Patient", patient_folders)
+        selected_file = None
+        if selected_patient:
+            filenames = data_manager.get_server_data(f"{selected_patient}/nifti", 'files', IMAGE_EXTENSIONS)
 
-    selected_file = None
-    if selected_patient:
-        file_ext = ('.nii', '.nii.gz', '.dcm')
-        filenames = get_server_data(f"{selected_source}/{selected_patient}", 'files', file_ext)
-        
-        # Create display names without .nii.gz extensions
-        if filenames:
-            display_names = [filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '') for filename in filenames]
-            selected_display_name = st.selectbox("Select File", display_names)
-            # Map back to the actual filename
-            if selected_display_name:
-                selected_index = display_names.index(selected_display_name)
-                selected_file = filenames[selected_index]
-        
-        # Show voxels popdown for segments data source
-        if selected_source == 'segments' and selected_file:
-            voxels_folders = get_server_data(f"{selected_source}/{selected_patient}", 'folders', ('',))
-            if 'voxels' in voxels_folders:
-                voxels_files = get_server_data(f"{selected_source}/{selected_patient}/voxels", 'files', file_ext)
-                if voxels_files:
-                    # Filter voxels that are associated with the selected file
-                    # Assuming voxels are named similarly or contain the base name of the selected file
-                    selected_file_base = selected_file.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                    associated_voxels = [vf for vf in voxels_files if selected_file_base in vf]
-                    
-                    if associated_voxels:
-                        with st.expander("Voxels", expanded=False):
-                            # Add Clear All button
-                            if st.button("Clear All", key="clear_all_voxels"):
-                                # Clear all voxel checkboxes by resetting their session state
-                                for voxel_file in associated_voxels:
-                                    clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                                    if f"voxel_{clean_name}" in st.session_state:
-                                        st.session_state[f"voxel_{clean_name}"] = False
-                            
-                            for voxel_file in associated_voxels:
-                                # Extract the clean voxel name by removing specific prefix and extensions
-                                clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                                st.checkbox(clean_name, value=False, key=f"voxel_{clean_name}")
+            # Create display names without .nii.gz extensions
+            if filenames:
+                display_names = [
+                    filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+                    for filename in filenames
+                ]
+                selected_display_name = st.selectbox("Select Scan", display_names)
+                # Map back to the actual filename
+                if selected_display_name:
+                    selected_index = display_names.index(selected_display_name)
+                    selected_file = filenames[selected_index]
 
-    # --- Viewer Settings ---
-    # Initialize all viewer settings with sensible defaults
-    slice_type = "Multiplanar"
-    orientation = "Axial"
-    color_map = "gray"
-    nifti_opacity = 1.0
-    nifti_gamma = 1.0
-    show_overlay = False
-    segment_opacity = 0.5
-    segment_gamma = 1.0
+        # Update viewer config with selections
+        viewer_config.selected_patient = selected_patient
+        viewer_config.selected_file = selected_file
 
-    if selected_source != 'segments':
-        st.subheader("Slice Type")
-        slice_type = st.selectbox("Slice Type", ["3D Render", "Multiplanar", "Single View"], index=1)
-        orientation = "Axial"
-        if slice_type == "Single View":
-            orientation = st.selectbox("Orientation", ["Axial", "Coronal", "Sagittal"], index=0)
+        # Render viewer settings
+        viewer_config.render_sidebar_settings()
 
-        st.subheader("NIfTI Color Map")
-        color_map = st.selectbox("Color Map", ['gray', 'viridis', 'plasma', 'inferno', 'magma'], index=0)
+        # Voxel selection (after show_overlay is set)
+        if viewer_config.settings.get('show_overlay', False):
+            render_voxel_selection(selected_patient, selected_file)
+            # Voxel image settings (after voxel selection)
+            viewer_config.render_voxel_image_settings()
 
-        with st.expander("NIfTI Image Settings", expanded=False):
-            nifti_opacity = st.slider("NIfTI Opacity", 0.0, 1.0, 1.0, key="nifti_opacity")
-            nifti_gamma = st.slider("NIfTI Gamma", 0.1, 3.0, 1.0, step=0.1, key="nifti_gamma")
-        
-        show_overlay = st.checkbox("Show Segmentation Overlay", value=False)
-        if show_overlay:
-            with st.expander("Overlay Settings", expanded=False):
-                segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 0.5, key="segment_opacity")
-                segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
-    else:
-        # For segments data source, ALWAYS use 3D Render only - no other view options
-        slice_type = "3D Render"
-        orientation = "Axial"
-        nifti_opacity = 1.0
-        nifti_gamma = 1.0
-        show_overlay = False
-        
-        # Display info that only 3D render is available for segments
-        
-        with st.expander("Image Settings", expanded=False):
-            segment_opacity = st.slider("Segment Opacity", 0.0, 1.0, 1.0, key="segment_opacity")
-            segment_gamma = st.slider("Segment Gamma", 0.1, 3.0, 1.0, step=0.1, key="segment_gamma")
+        # Voxel legend
+        viewer_config.render_voxel_legend()
 
-    with st.expander("Segment Colors", expanded=False):
-        try:
-            with open('conf/vista3d_label_colors.json', 'r') as f:
-                label_dict = json.load(f)
-            
-            for label_info in label_dict:
-                label_name = label_info["name"]
-                label_id = label_info["id"]
-                color_rgb = label_info["color"]
-                color_hex = f"#{color_rgb[0]:02x}{color_rgb[1]:02x}{color_rgb[2]:02x}"
-                st.markdown(f'''<div style="display: flex; align-items: center; margin-bottom: 5px;">
-                            <div style="width: 20px; height: 20px; background-color: {color_hex}; border: 1px solid #ccc; margin-right: 10px;"></div>
-                            <span>{label_name} (ID: {label_id})</span>
-                            </div>''', unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Error loading segment colors: {e}")
+    return selected_patient, selected_file
 
-# --- Main Viewer Area ---
-if selected_file:
-    # Check if any voxels are selected when in segments mode
-    selected_voxel_files = []
-    if selected_source == 'segments':
-        # Collect all selected voxels
-        for voxel_file in get_server_data(f"{selected_source}/{selected_patient}/voxels", 'files', ('.nii', '.nii.gz', '.dcm')):
-            clean_name = voxel_file.replace('2.5MM_ARTERIAL_3_', '').replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-            if f"voxel_{clean_name}" in st.session_state and st.session_state[f"voxel_{clean_name}"]:
-                selected_voxel_files.append(voxel_file)
-    
-    # --- Prepare URLs and Settings for Viewer ---
-    if selected_voxel_files:
-        # Display the first selected voxel as the main volume
-        base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/voxels/{selected_voxel_files[0]}"
-    else:
-        base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/{selected_file}"
-    segment_url = ''
-    if show_overlay:
-        segment_filename = selected_file
-        segment_url = f"{IMAGE_SERVER_URL}/output/segments/{selected_patient}/{segment_filename}"
-    
-    slice_type_map = {"Axial": 0, "Coronal": 1, "Sagittal": 2, "Multiplanar": 3, "3D Render": 4}
-    # For segments, always use pure 3D render (4), not multiplanar (3)
-    if selected_source == 'segments':
-        actual_slice_type = 4  # Pure 3D render
-    else:
-        actual_slice_type = slice_type_map.get(slice_type if slice_type != "Single View" else orientation, 3)
 
-    # --- HTML and Javascript for NiiVue ---
-    if selected_source != 'segments':
-        main_volume_entry = f"{{ url: \"{base_file_url}\", opacity: {nifti_opacity} }}"
-    else:
-        main_volume_entry = f"{{ url: \"{base_file_url}\", colormap: \"custom_segmentation\" }}"
-    
-    volume_list_entries = [main_volume_entry]
-    
-    # Add additional selected voxels as overlays (if more than one is selected)
-    if selected_voxel_files and len(selected_voxel_files) > 1:
-        for additional_voxel in selected_voxel_files[1:]:  # Skip the first one as it's already the main volume
-            additional_voxel_url = f"{IMAGE_SERVER_URL}/output/{selected_source}/{selected_patient}/voxels/{additional_voxel}"
-            additional_entry = f"{{ url: \"{additional_voxel_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
-            volume_list_entries.append(additional_entry)
-    
-    if show_overlay and segment_url and not selected_voxel_files:  # Only show overlay if no voxels are selected
-        overlay_entry = f"{{ url: \"{segment_url}\", opacity: {segment_opacity}, colormap: \"custom_segmentation\" }}"
-        volume_list_entries.append(overlay_entry)
-    
-    volume_list_js = "[" + ", ".join(volume_list_entries) + "]"
+def render_voxel_selection(selected_patient: str, selected_file: str):
+    """Render the voxel selection interface."""
+    with st.expander("Select Voxels", expanded=False):
+        # Voxel selection mode
+        voxel_mode = st.radio(
+            "Choose voxel selection mode:",
+            VOXEL_MODES,
+            index=0,
+            help="Select how you want to choose which voxels to display"
+        )
 
-    custom_colormap_js = ""
-    try:
-        with open('conf/vista3d_label_colors.json', 'r') as f:
-            label_colors_list = json.load(f)
-            r_values, g_values, b_values, a_values, labels = [0]*256, [0]*256, [0]*256, [0]*256, [""]*256
-            r_values[0], g_values[0], b_values[0], a_values[0], labels[0] = 0,0,0,0, "Background"
-            max_id = 0
-            for item in label_colors_list:
-                idx, label_name, color = item['id'], item['name'], item['color']
-                if 0 <= idx < 256:
-                    r_values[idx], g_values[idx], b_values[idx], a_values[idx], labels[idx] = color[0], color[1], color[2], 255, label_name
-                if idx > max_id:
-                    max_id = idx
-            r_values, g_values, b_values, a_values, labels = r_values[:max_id+1], g_values[:max_id+1], b_values[:max_id+1], a_values[:max_id+1], labels[:max_id+1]
+        # Get available voxel information
+        available_ids, id_to_name_map, available_voxel_names = voxel_manager.get_available_voxels(
+            selected_patient, selected_file, voxel_mode
+        )
 
-            # Correctly format the labels for the JavaScript array
-            js_labels = []
-            for l in labels:
-                escaped_l = l.replace('"', '\"')
-                js_labels.append(f'"{escaped_l}"')
-            labels_string = ",".join(js_labels)
+        # Handle voxel mode selection
+        if voxel_mode == "All":
+            st.info("Will display the complete base segmentation file.")
+            viewer_config.voxel_mode = "all"
+            viewer_config.selected_individual_voxels = []
 
-        custom_colormap_js = f"""
-            const customSegmentationColormap = {{
-                R: [{ ",".join(map(str, r_values)) }],
-                G: [{ ",".join(map(str, g_values)) }],
-                B: [{ ",".join(map(str, b_values)) }],
-                A: [{ ",".join(map(str, a_values)) }],
-                labels: [{labels_string}]
-            }}; 
-            console.log('Vista3D colormap loaded from vista3d_label_colors.json:', customSegmentationColormap);
-            """
-    except Exception as e:
-        st.error(f"Error loading vista3d_label_colors.json: {e}")
+        elif voxel_mode == "Individual Voxels":
+            if not available_ids:
+                # Show warning if no voxels available
+                voxels_url = data_manager.get_voxel_directory_url(selected_patient, selected_file)
+                st.warning("No voxels available for this patient/file.")
+                st.caption(f"Voxels directory: {voxels_url}")
+                st.caption("Individual voxel files should be located in this directory.")
+            else:
+                # Show voxel selection interface
+                selected_voxels = st.multiselect(
+                    "Choose individual voxels to overlay:",
+                    available_voxel_names,
+                    default=[],
+                    help="Select specific anatomical structures to display"
+                )
 
-    html_string = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body, html {{ margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }}
-        #niivue-canvas {{ width: 100%; height: 100%; display: block; pointer-events: auto; }}
-    </style>
-</head>
-<body>
-    <canvas id=\"niivue-canvas\"></canvas>
-    <script src=\"{IMAGE_SERVER_URL}/assets/niivue.umd.js\"></script>
-    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js\"></script>
-    <script>
-        if (typeof niivue === 'undefined') {{
-            console.error('Niivue library not loaded!');
-        }} else {{
-            console.log('NiiVue library loaded successfully');
-            
-            const nv = new niivue.Niivue ({{
-                isColorbar: false,
-                loadingText: 'loading ...',
-                dragAndDropEnabled: false,
-                isResizeCanvas: true,
-                crosshairWidth: 1,
-                crosshairColor: [1, 0, 0, 1]
-            }});
-            nv.attachTo('niivue-canvas');
+                # Display selection status
+                if selected_voxels:
+                    st.info(f"Will display {len(selected_voxels)} individual voxels from the voxels directory.")
+                else:
+                    st.info("No individual voxels selected. Select specific structures to display.")
 
-            const volumeList = {volume_list_js};
-            
-            {custom_colormap_js}
-            if (typeof customSegmentationColormap !== 'undefined') {{
-                nv.addColormap('custom_segmentation', customSegmentationColormap);
-                console.log('Custom segmentation colormap added');
-            }}
-            
-            nv.loadVolumes(volumeList).then(() => {{
-                console.log('Volumes loaded');
-                const mainVol = nv.volumes[0];
-                
-                if ('{selected_source}' === 'segments') {{
-                    // Force pure 3D render immediately and exit handler early
-                    nv.opts.multiplanarShowRender = false;
-                    nv.opts.multiplanarForceRender = false;
-                    nv.opts.showCrosshairs = false;
-                    nv.opts.show3Dcrosshair = false;
-                    nv.setSliceType(4);
-                    nv.drawScene();
-                    console.log('Segments: enforced pure 3D render with early return');
-                    return;
-                }}
+                viewer_config.voxel_mode = "individual_voxels"
+                viewer_config.selected_individual_voxels = selected_voxels
 
-                if ('{selected_source}' !== 'segments') {{
-                    nv.setColormap(mainVol.id, '{color_map}');
-                    nv.setGamma({nifti_gamma});
-                    mainVol.opacity = {nifti_opacity};
-                }} else {{
-                    if (typeof customSegmentationColormap !== 'undefined') {{
-                        nv.setColormap(mainVol.id, 'custom_segmentation');
-                        console.log('Applied custom_segmentation colormap to main volume:', mainVol.id);
-                        console.log('Main volume min/max values:', mainVol.cal_min, mainVol.cal_max);
-                        console.log('Main volume data range:', Math.min(...mainVol.img), 'to', Math.max(...mainVol.img));
-                    }}
-                    nv.setGamma({segment_gamma});
-                    mainVol.opacity = {segment_opacity};
-                }}
-                // Apply colormap to all additional volumes (overlays)
-                if (nv.volumes.length > 1) {{
-                    for (let i = 1; i < nv.volumes.length; i++) {{
-                        const overlayVol = nv.volumes[i];
-                        overlayVol.opacity = {segment_opacity};
-                        if (typeof customSegmentationColormap !== 'undefined') {{
-                            nv.setColormap(overlayVol.id, 'custom_segmentation');
-                            console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id);
-                            console.log('Overlay volume', i, 'min/max values:', overlayVol.cal_min, overlayVol.cal_max);
-                            console.log('Overlay volume data range:', Math.min(...overlayVol.img), 'to', Math.max(...overlayVol.img));
-                        }}
-                    }}
-                }}
-                
-                if ('{selected_source}' === 'segments') {{
-                    // Force pure 3D render for segments
-                    nv.opts.multiplanarShowRender = false;
-                    nv.opts.multiplanarForceRender = false;
-                    nv.opts.showCrosshairs = false;
-                    nv.opts.show3Dcrosshair = false;
-                    nv.setSliceType(4);
-                    nv.drawScene();
-                }} else {{
-                    // Non-segments: honor requested slice type
-                    nv.setSliceType({actual_slice_type});
-                    if ({actual_slice_type} === 3) {{
-                        // Multiplanar view with 4 panes
-                        nv.opts.multiplanarShowRender = true;
-                        nv.opts.multiplanarForceRender = true;
-                        nv.opts.showCrosshairs = true;
-                        setTimeout(() => {{
-                            nv.opts.show3Dcrosshair = true;
-                            nv.drawScene();
-                        }}, 500);
-                    }} else {{
-                        nv.opts.showCrosshairs = false;
-                    }}
-                    nv.drawScene();
-                }}
-                
-                // Force a final redraw to ensure colormap is applied
-                setTimeout(() => {{
-                    nv.drawScene();
-                    console.log('Final scene redraw completed');
-                    
-                    // Double-check for segments: ensure pure 3D render
-                    if ('{selected_source}' === 'segments') {{
-                        nv.opts.multiplanarShowRender = false;
-                        nv.opts.multiplanarForceRender = false;
-                        nv.setSliceType(4);
-                        nv.drawScene();
-                        console.log('Enforced pure 3D render for segments');
-                    }}
-                }}, 100);
-                
-                nv.drawScene();
-            }}).catch(console.error);
-        }}
-    </script>
-</body>
-</html>"""
+        # Update session state
+        viewer_config.to_session_state()
 
-    components.html(html_string, height=1000, scrolling=False)
-else:
-    st.info("Select a data source, patient, and file to begin.")
+    # Display current voxel selection status
+    status_message = viewer_config.get_status_message()
+    if status_message:
+        st.info(status_message)
+# --- Main Application ---
+def render_viewer(selected_patient: str, selected_file: str):
+    """Render the main NiiVue viewer."""
+    if not selected_file:
+        st.info(MESSAGES['select_patient_file'])
+        return
+
+    # Prepare volume URLs and overlays
+    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
+
+    # Create overlays based on voxel mode
+    overlays = voxel_manager.create_overlays(
+        selected_patient,
+        selected_file,
+        viewer_config.voxel_mode,
+        viewer_config.selected_individual_voxels
+    )
+
+    # Build volume list for NiiVue
+    volume_list_entries = []
+    if viewer_config.settings.get('show_nifti', True):
+        volume_list_entries.append({"url": base_file_url})
+
+    # Add overlay volumes
+    if viewer_config.settings.get('show_overlay', False) and overlays:
+        for overlay in overlays:
+            if overlay.get('url'):
+                volume_list_entries.append({"url": overlay['url']})
+
+    if not volume_list_entries:
+        st.info(MESSAGES['no_nifti_or_voxels'])
+        return
+
+    # Prepare JavaScript data
+    volume_list_js = json.dumps(volume_list_entries)
+    overlay_colors_js = json.dumps(overlays)
+    custom_colormap_js = voxel_manager.create_custom_colormap_js()
+
+    # Get viewer settings
+    settings = viewer_config.settings
+    window_center, window_width = viewer_config.get_window_settings()
+    actual_slice_type = viewer_config.get_slice_type_index()
+
+    # Debug info checkbox (if it exists) - this line can be removed if no debug checkbox is present
+    # st.checkbox("Show Debug Info", value=False, key="debug_info")
+
+    # Render the viewer using our template
+    html_content = template_renderer.render_viewer(
+        volume_list_js=volume_list_js,
+        overlay_colors_js=overlay_colors_js,
+        custom_colormap_js=custom_colormap_js,
+        image_server_url=IMAGE_SERVER_URL,
+        main_is_nifti=settings.get('show_nifti', True),
+        main_vol=settings.get('show_nifti', True),
+        color_map_js=json.dumps(settings.get('color_map', 'gray')),
+        nifti_gamma=settings.get('nifti_gamma', 1.0),
+        nifti_opacity=settings.get('nifti_opacity', 1.0),
+        window_center=window_center,
+        window_width=window_width,
+        overlay_start_index=1 if settings.get('show_nifti', True) else 0,
+        actual_slice_type=actual_slice_type,
+        segment_opacity=settings.get('segment_opacity', 0.5)
+    )
+
+    # Display the viewer
+    components.html(html_content, height=VIEWER_HEIGHT, scrolling=False)
+
+
+# --- Main Application Flow ---
+def main():
+    """Main application entry point."""
+    # Render sidebar and get selections
+    selected_patient, selected_file = render_sidebar()
+
+    # Render main viewer
+    render_viewer(selected_patient, selected_file)
+
+
+if __name__ == "__main__":
+    main()
