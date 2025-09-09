@@ -9,7 +9,7 @@
 </head>
 <body>
     <canvas id="niivue-canvas"></canvas>
-    <script src="{{ image_server_url }}/assets/niivue.umd.js"></script>
+    <script>{{ niivue_lib_content|safe }}</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script>
         if (typeof niivue === 'undefined') {
