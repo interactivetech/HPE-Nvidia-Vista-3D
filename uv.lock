@@ -930,6 +930,7 @@ dependencies = [
     { name = "plotly" },
     { name = "pymeshfix" },
     { name = "requests" },
+    { name = "stl" },
     { name = "streamlit" },
     { name = "streamlit-mermaid" },
     { name = "tqdm" },
@@ -952,6 +953,7 @@ requires-dist = [
     { name = "plotly", specifier = ">=5.0.0" },
     { name = "pymeshfix", specifier = ">=0.17.1" },
     { name = "requests", specifier = ">=2.31.0" },
+    { name = "stl", specifier = ">=0.0.3" },
     { name = "streamlit", specifier = ">=1.32.0" },
     { name = "streamlit-mermaid", specifier = ">=0.3.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
@@ -1765,6 +1767,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/15/b9/cc3017f9a9c9b6e27
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/fd/901cfa59aaa5b30a99e16876f11abe38b59a1a2c51ffb3d7142bb6089069/starlette-0.47.3-py3-none-any.whl", hash = "sha256:89c0778ca62a76b826101e7c709e70680a1699ca7da6b44d38eb0a7e61fe4b51", size = 72991, upload-time = "2025-08-24T13:36:40.887Z" },
 ]
+
+[[package]]
+name = "stl"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/91/4bdb12160348109179158d34e6eda6279166302ec0224d6edc8324f344df/stl-0.0.3.tar.gz", hash = "sha256:03a6b58ad52ecf16823b1cf1acf6ef382aa5c0fc1152379f464e284a4f81304b", size = 4230, upload-time = "2015-07-13T17:31:23.736Z" }
 
 [[package]]
 name = "streamlit"
