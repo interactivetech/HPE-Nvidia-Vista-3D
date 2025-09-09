@@ -383,9 +383,9 @@ def render_sidebar():
             st.warning("No mesh files available for this CT scan.")
             selected_meshes = []
         else:
-            # Create display names for multiselect
+            # Create display names for multiselect (just the name without extension)
             mesh_display_names = [
-                f"{mf['name']} ({format_file_size(mf['size_bytes'])})" 
+                mf['name'].replace('.stl', '') 
                 for mf in scan_mesh_files
             ]
             

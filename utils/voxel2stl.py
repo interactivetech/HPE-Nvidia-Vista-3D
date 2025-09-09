@@ -147,7 +147,7 @@ def smooth_mesh(vertices, faces, iterations=3, lambda_factor=0.5):
     
     return smoothed_vertices
 
-def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smooth_factor=0.5, use_affine=False):
+def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smooth_factor=0.5, use_affine=True):
     """
     Converts a .nii.gz file to a .stl file, preserving voxel spacing and optionally affine transformation.
     
@@ -261,7 +261,7 @@ def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smo
     except Exception as e:
         print(f"Could not convert {nii_path}. Error: {e}")
 
-def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth_factor=0.5, use_affine=False):
+def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth_factor=0.5, use_affine=True):
     """
     Processes a patient's folder to convert all .nii.gz files to .stl files.
     
@@ -310,7 +310,8 @@ if __name__ == '__main__':
     parser.add_argument('--smooth_iterations', type=int, default=3, help='Number of Laplacian smoothing iterations (default: 3)')
     parser.add_argument('--smooth_factor', type=float, default=0.5, help='Smoothing factor 0.0-1.0 (default: 0.5)')
     parser.add_argument('--no_smooth', action='store_true', help='Disable mesh smoothing (keep original blocky appearance)')
-    parser.add_argument('--use_affine', action='store_true', help='Apply affine transformation (default: use voxel spacing only)')
+    parser.add_argument('--use_affine', action='store_true', default=True, help='Apply affine transformation (default: True)')
+    parser.add_argument('--no_affine', action='store_true', help='Disable affine transformation (use voxel spacing only)')
     args = parser.parse_args()
 
     if not os.path.isdir(args.output_dir):
@@ -320,7 +321,7 @@ if __name__ == '__main__':
     # Set smoothing parameters
     smooth_iterations = 0 if args.no_smooth else args.smooth_iterations
     smooth_factor = 0.0 if args.no_smooth else args.smooth_factor
-    use_affine = args.use_affine
+    use_affine = not args.no_affine  # Use affine by default, disable only if --no_affine is specified
     
     # Determine which patients to process
     if args.patient:
