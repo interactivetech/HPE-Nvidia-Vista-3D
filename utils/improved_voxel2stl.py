@@ -252,10 +252,16 @@ def convert_nii_to_stl_improved(nii_path: str, stl_path: str,
     success = False
     
     if method == "vtk" or method == "auto":
-        success = convert_nii_to_stl_vtk(nii_path, stl_path, **kwargs)
+        # Filter kwargs to only include VTK-specific parameters
+        vtk_kwargs = {k: v for k, v in kwargs.items() 
+                     if k in ['threshold', 'smoothing_iterations', 'smoothing_factor']}
+        success = convert_nii_to_stl_vtk(nii_path, stl_path, **vtk_kwargs)
     
     if not success and (method == "open3d" or method == "auto"):
-        success = convert_nii_to_stl_open3d(nii_path, stl_path, **kwargs)
+        # Filter kwargs to only include Open3D-specific parameters
+        open3d_kwargs = {k: v for k, v in kwargs.items() 
+                        if k in ['poisson_depth']}
+        success = convert_nii_to_stl_open3d(nii_path, stl_path, **open3d_kwargs)
     
     if success and clean_mesh:
         print("  Cleaning mesh with PyMeshFix...")
