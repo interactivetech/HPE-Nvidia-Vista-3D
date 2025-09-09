@@ -192,6 +192,7 @@ def render_threejs_viewer(mesh_files: List[Dict[str, str]], show_wireframe: bool
                 const colors = [0x00ff00, 0xff0000, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffa500, 0x800080];
                 let loadedCount = 0;
                 const totalFiles = meshFiles.length;
+                const loadedMeshes = []; // Store loaded meshes for global centering
                 
                 meshFiles.forEach((meshFile, index) => {{
                     loader.load(
@@ -210,18 +211,11 @@ def render_threejs_viewer(mesh_files: List[Dict[str, str]], show_wireframe: bool
                             currentMesh.receiveShadow = true;
                             currentMesh.userData = {{ name: meshFile.name }};
                             
-                            // Center the mesh
-                            geometry.computeBoundingBox();
-                            const center = geometry.boundingBox.getCenter(new THREE.Vector3());
-                            currentMesh.position.sub(center);
-                            
-                            // Scale to reasonable size
-                            const size = geometry.boundingBox.getSize(new THREE.Vector3());
-                            const maxDim = Math.max(size.x, size.y, size.z);
-                            const scale = 20 / maxDim;
-                            currentMesh.scale.setScalar(scale);
+                            // DON'T center individual meshes - preserve their spatial relationships
+                            // The STL files now contain real-world coordinates in mm with correct positioning
                             
                             scene.add(currentMesh);
+                            loadedMeshes.push(currentMesh);
                             
                             // Add wireframe if requested
                             if ({str(show_wireframe).lower()}) {{
@@ -238,29 +232,48 @@ def render_threejs_viewer(mesh_files: List[Dict[str, str]], show_wireframe: bool
                             
                             loadedCount++;
                             
-                            // When all meshes are loaded, update camera position
+                            // When all meshes are loaded, center them globally and update camera
                             if (loadedCount === totalFiles) {{
-                                // Update camera position to fit all meshes
-                                const box = new THREE.Box3();
+                                // Calculate bounding box of all meshes together
+                                const globalBox = new THREE.Box3();
+                                loadedMeshes.forEach(mesh => {{
+                                    globalBox.expandByObject(mesh);
+                                }});
+                                
+                                // Get the center of all meshes combined
+                                const globalCenter = globalBox.getCenter(new THREE.Vector3());
+                                
+                                // Center all meshes around the origin while preserving their relative positions
+                                loadedMeshes.forEach(mesh => {{
+                                    mesh.position.sub(globalCenter);
+                                }});
+                                
+                                // Also center wireframes if they exist
                                 scene.children.forEach(child => {{
-                                    if (child.isMesh && child.userData.name) {{
-                                        box.expandByObject(child);
+                                    if (child.isMesh && child.material.wireframe) {{
+                                        child.position.sub(globalCenter);
                                     }}
                                 }});
                                 
-                                const center2 = box.getCenter(new THREE.Vector3());
-                                const size2 = box.getSize(new THREE.Vector3());
-                                const maxDim2 = Math.max(size2.x, size2.y, size2.z);
+                                // Update the global box after centering
+                                const centeredBox = new THREE.Box3();
+                                loadedMeshes.forEach(mesh => {{
+                                    centeredBox.expandByObject(mesh);
+                                }});
                                 
-                                camera.position.set(
-                                    center2.x + maxDim2,
-                                    center2.y + maxDim2,
-                                    center2.z + maxDim2
-                                );
-                                controls.target.copy(center2);
+                                const size = centeredBox.getSize(new THREE.Vector3());
+                                const maxDim = Math.max(size.x, size.y, size.z);
+                                
+                                // Position camera at appropriate distance based on combined mesh size
+                                const distance = maxDim * 1.5;
+                                camera.position.set(distance, distance, distance);
+                                controls.target.set(0, 0, 0); // Target the origin where all meshes are now centered
                                 controls.update();
                                 
                                 console.log(`All ${{totalFiles}} STL files loaded successfully`);
+                                console.log(`Combined mesh dimensions: ${{size.x.toFixed(1)}} x ${{size.y.toFixed(1)}} x ${{size.z.toFixed(1)}} mm`);
+                                console.log(`Camera distance: ${{distance.toFixed(1)}} mm`);
+                                console.log(`Meshes centered at origin while preserving spatial relationships`);
                             }}
                         }},
                         function (progress) {{
@@ -287,10 +300,24 @@ def render_threejs_viewer(mesh_files: List[Dict[str, str]], show_wireframe: bool
             
             function onKeyDown(event) {{
                 if (event.key === 'r' || event.key === 'R') {{
-                    // Reset view
-                    camera.position.set(50, 50, 50);
-                    controls.target.set(0, 0, 0);
-                    controls.update();
+                    // Reset view to fit all meshes (they should already be centered at origin)
+                    const box = new THREE.Box3();
+                    scene.children.forEach(child => {{
+                        if (child.isMesh && child.userData.name) {{
+                            box.expandByObject(child);
+                        }}
+                    }});
+                    
+                    if (!box.isEmpty()) {{
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        const distance = maxDim * 1.5;
+                        
+                        // All meshes should be centered at origin, so camera targets (0,0,0)
+                        camera.position.set(distance, distance, distance);
+                        controls.target.set(0, 0, 0);
+                        controls.update();
+                    }}
                 }}
             }}
             
