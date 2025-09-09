@@ -171,7 +171,7 @@ def convert_nii_to_stl_open3d(nii_path: str, stl_path: str,
         pcd.estimate_normals()
         
         # Create mesh using Poisson reconstruction
-        mesh, _ = pcd.create_mesh_poisson(depth=poisson_depth)
+        mesh, _ = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(pcd, depth=poisson_depth)
         
         # Clean mesh
         mesh.remove_degenerate_triangles()
@@ -210,10 +210,13 @@ def clean_mesh_with_pymeshfix(stl_path: str, output_path: Optional[str] = None) 
         mesh = trimesh.load(stl_path)
         
         # Fix mesh using pymeshfix
-        fixed_mesh = pymeshfix.clean_from_arrays(
+        fixed_vertices, fixed_faces = pymeshfix.clean_from_arrays(
             mesh.vertices, 
             mesh.faces
         )
+        
+        # Create new mesh from fixed data
+        fixed_mesh = trimesh.Trimesh(vertices=fixed_vertices, faces=fixed_faces)
         
         # Save cleaned mesh
         output_file = output_path or stl_path
