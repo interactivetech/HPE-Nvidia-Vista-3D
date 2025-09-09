@@ -147,9 +147,9 @@ def smooth_mesh(vertices, faces, iterations=3, lambda_factor=0.5):
     
     return smoothed_vertices
 
-def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smooth_factor=0.5):
+def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smooth_factor=0.5, use_affine=False):
     """
-    Converts a .nii.gz file to a .stl file, preserving voxel spacing and affine transformation.
+    Converts a .nii.gz file to a .stl file, preserving voxel spacing and optionally affine transformation.
     
     Args:
         nii_path: Path to input NIfTI file
@@ -157,6 +157,7 @@ def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smo
         force: If True, overwrite existing STL files
         smooth_iterations: Number of smoothing iterations (default: 3)
         smooth_factor: Smoothing factor 0.0-1.0 (default: 0.5)
+        use_affine: If True, apply affine transformation (default: False)
     """
     try:
         # Check if STL file already exists
@@ -212,15 +213,17 @@ def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smo
             return
         
         # Apply voxel spacing to convert from voxel coordinates to mm
-        # This preserves the actual anatomical dimensions
-        verts_scaled = verts.copy()
+        verts_world = verts.copy()
         for i in range(3):
-            verts_scaled[:, i] *= voxel_spacing[i]
+            verts_world[:, i] *= voxel_spacing[i]
         
-        # Apply affine transformation to get real-world coordinates
-        # Add homogeneous coordinate (1) to each vertex
-        verts_homogeneous = np.column_stack([verts_scaled, np.ones(verts_scaled.shape[0])])
-        verts_world = (affine @ verts_homogeneous.T).T[:, :3]
+        # Optionally apply affine transformation
+        if use_affine:
+            print(f"  Applying affine transformation")
+            verts_homogeneous = np.column_stack([verts_world, np.ones(verts_world.shape[0])])
+            verts_world = (affine @ verts_homogeneous.T).T[:, :3]
+        else:
+            print(f"  Using voxel spacing only (no affine transformation)")
         
         print(f"  Mesh vertices: {len(verts_world)}")
         print(f"  Bounding box: {verts_world.min(axis=0)} to {verts_world.max(axis=0)}")
@@ -258,7 +261,7 @@ def convert_nii_to_stl(nii_path, stl_path, force=False, smooth_iterations=3, smo
     except Exception as e:
         print(f"Could not convert {nii_path}. Error: {e}")
 
-def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth_factor=0.5):
+def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth_factor=0.5, use_affine=False):
     """
     Processes a patient's folder to convert all .nii.gz files to .stl files.
     
@@ -267,6 +270,7 @@ def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth
         force: If True, overwrite existing STL files
         smooth_iterations: Number of smoothing iterations
         smooth_factor: Smoothing factor 0.0-1.0
+        use_affine: If True, apply affine transformation
     """
     voxels_dir = os.path.join(patient_dir, 'voxels')
     mesh_dir = os.path.join(patient_dir, 'mesh')
@@ -296,7 +300,7 @@ def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth
                 stl_file_path = os.path.join(stl_file_dir, stl_file_name)
                 
                 # Convert the file
-                convert_nii_to_stl(nii_file_path, stl_file_path, force, smooth_iterations, smooth_factor)
+                convert_nii_to_stl(nii_file_path, stl_file_path, force, smooth_iterations, smooth_factor, use_affine)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert .nii.gz voxel files to .stl mesh files for patients in the output directory.')
@@ -306,6 +310,7 @@ if __name__ == '__main__':
     parser.add_argument('--smooth_iterations', type=int, default=3, help='Number of Laplacian smoothing iterations (default: 3)')
     parser.add_argument('--smooth_factor', type=float, default=0.5, help='Smoothing factor 0.0-1.0 (default: 0.5)')
     parser.add_argument('--no_smooth', action='store_true', help='Disable mesh smoothing (keep original blocky appearance)')
+    parser.add_argument('--use_affine', action='store_true', help='Apply affine transformation (default: use voxel spacing only)')
     args = parser.parse_args()
 
     if not os.path.isdir(args.output_dir):
@@ -315,6 +320,7 @@ if __name__ == '__main__':
     # Set smoothing parameters
     smooth_iterations = 0 if args.no_smooth else args.smooth_iterations
     smooth_factor = 0.0 if args.no_smooth else args.smooth_factor
+    use_affine = args.use_affine
     
     # Determine which patients to process
     if args.patient:
@@ -341,8 +347,13 @@ if __name__ == '__main__':
     else:
         print("Smoothing disabled - keeping original blocky appearance")
     
+    if use_affine:
+        print("Using affine transformation")
+    else:
+        print("Using voxel spacing only (no affine transformation)")
+    
     # Process the selected patients
     for patient_folder in patients_to_process:
         patient_dir = os.path.join(args.output_dir, patient_folder)
         print(f"Processing patient folder: {patient_dir}")
-        process_patient_folder(patient_dir, args.force, smooth_iterations, smooth_factor)
+        process_patient_folder(patient_dir, args.force, smooth_iterations, smooth_factor, use_affine)
