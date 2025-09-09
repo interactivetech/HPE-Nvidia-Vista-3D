@@ -2,6 +2,7 @@
 output
 dicom
 .DS_Store
+vu.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
