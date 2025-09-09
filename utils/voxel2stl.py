@@ -6,11 +6,21 @@ import numpy as np
 from stl import mesh
 from skimage.measure import marching_cubes
 
-def convert_nii_to_stl(nii_path, stl_path):
+def convert_nii_to_stl(nii_path, stl_path, force=False):
     """
     Converts a .nii.gz file to a .stl file, preserving voxel spacing and affine transformation.
+    
+    Args:
+        nii_path: Path to input NIfTI file
+        stl_path: Path to output STL file
+        force: If True, overwrite existing STL files
     """
     try:
+        # Check if STL file already exists
+        if os.path.exists(stl_path) and not force:
+            print(f"  Skipping {stl_path} (already exists, use --force to overwrite)")
+            return
+        
         # Load the NIfTI file
         nii_img = nib.load(nii_path)
         nii_data = nii_img.get_fdata()
@@ -21,9 +31,33 @@ def convert_nii_to_stl(nii_path, stl_path):
         
         print(f"  Voxel spacing: {voxel_spacing} mm")
         print(f"  Data shape: {nii_data.shape}")
+        print(f"  Data type: {nii_data.dtype}")
+        print(f"  Data range: {nii_data.min()} to {nii_data.max()}")
+        print(f"  Unique values: {np.unique(nii_data)}")
+
+        # Convert label data to binary for marching cubes
+        # The voxel files contain label IDs, but marching cubes needs binary data
+        binary_data = (nii_data > 0).astype(np.float32)
+        print(f"  Binary data - non-zero voxels: {np.sum(binary_data)}")
 
         # Generate the mesh using marching cubes
-        verts, faces, _, _ = marching_cubes(nii_data, level=0)
+        try:
+            verts, faces, _, _ = marching_cubes(binary_data, level=0.5)
+            print(f"  Marching cubes successful: {len(verts)} vertices, {len(faces)} faces")
+        except Exception as mc_error:
+            print(f"  Marching cubes failed: {mc_error}")
+            print(f"  Trying with different parameters...")
+            # Try with different level values
+            try:
+                verts, faces, _, _ = marching_cubes(binary_data, level=0.0)
+                print(f"  Marching cubes (level=0.0) successful: {len(verts)} vertices, {len(faces)} faces")
+            except Exception as mc_error2:
+                print(f"  Marching cubes (level=0.0) also failed: {mc_error2}")
+                raise mc_error2
+        
+        if len(verts) == 0:
+            print(f"  Warning: No mesh generated - check if voxel data contains valid structures")
+            return
         
         # Apply voxel spacing to convert from voxel coordinates to mm
         # This preserves the actual anatomical dimensions
@@ -52,9 +86,13 @@ def convert_nii_to_stl(nii_path, stl_path):
     except Exception as e:
         print(f"Could not convert {nii_path}. Error: {e}")
 
-def process_patient_folder(patient_dir):
+def process_patient_folder(patient_dir, force=False):
     """
     Processes a patient's folder to convert all .nii.gz files to .stl files.
+    
+    Args:
+        patient_dir: Path to patient directory
+        force: If True, overwrite existing STL files
     """
     voxels_dir = os.path.join(patient_dir, 'voxels')
     mesh_dir = os.path.join(patient_dir, 'mesh')
@@ -84,11 +122,12 @@ def process_patient_folder(patient_dir):
                 stl_file_path = os.path.join(stl_file_dir, stl_file_name)
                 
                 # Convert the file
-                convert_nii_to_stl(nii_file_path, stl_file_path)
+                convert_nii_to_stl(nii_file_path, stl_file_path, force)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert .nii.gz voxel files to .stl mesh files for all patients in the output directory.')
     parser.add_argument('--output_dir', type=str, default='output', help='Path to the output directory containing patient folders (default: output)')
+    parser.add_argument('--force', action='store_true', help='Overwrite existing STL files (default: skip existing files)')
     args = parser.parse_args()
 
     if not os.path.isdir(args.output_dir):
@@ -96,8 +135,13 @@ if __name__ == '__main__':
         exit()
 
     print(f"Processing patients in {args.output_dir}...")
+    if args.force:
+        print("Force mode enabled - will overwrite existing STL files")
+    else:
+        print("Skip mode enabled - will skip existing STL files (use --force to overwrite)")
+    
     for patient_folder in os.listdir(args.output_dir):
         patient_dir = os.path.join(args.output_dir, patient_folder)
         if os.path.isdir(patient_dir):
             print(f"Processing patient folder: {patient_dir}")
-            process_patient_folder(patient_dir)
+            process_patient_folder(patient_dir, args.force)
