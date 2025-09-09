@@ -1,0 +1,38 @@
+graph TD
+    A["📁 DICOM Images"] --> B["🔄 DICOM to NIfTI<br/>Conversion"]
+    B --> C["🩻 NIfTI Files"]
+    C --> D["🧠 Segment"]
+    D -->|"📤 NIfTI Images"| E["⚡ Nvidia Vista-3D"]
+    E -->|"📥 Processed Data"| D
+    D --> F["🎯 All Voxel Data"]
+    D --> G["🔍 Individual Voxel Data"]
+    F --> H["👁️ NiiVue 3D<br/>Visualization"]
+    G --> H["👁️ NiiVue 3D<br/>Visualization"]
+    
+    %% Input/Data nodes - Medical blue theme
+    style A fill:transparent,stroke:#1976d2,stroke-width:3px,color:#fff,font-weight:bold
+    style B fill:transparent,stroke:#388e3c,stroke-width:3px,color:#fff,font-weight:bold
+    style C fill:transparent,stroke:#f57c00,stroke-width:3px,color:#fff,font-weight:bold
+    
+    %% Processing nodes - Tech purple theme
+    style D fill:transparent,stroke:#7b1fa2,stroke-width:4px,color:#fff,font-weight:bold
+    style E fill:transparent,stroke:#0277bd,stroke-width:4px,color:#fff,font-weight:bold
+    
+    %% Output nodes - Success green theme
+    style F fill:transparent,stroke:#2e7d32,stroke-width:3px,color:#fff,font-weight:bold
+    style G fill:transparent,stroke:#2e7d32,stroke-width:3px,color:#fff,font-weight:bold
+    
+    %% Final visualization - Premium gold theme
+    style H fill:transparent,stroke:#f9a825,stroke-width:4px,color:#fff,font-weight:bold
+    
+    %% Connection styling
+    linkStyle 0 stroke:#1976d2,stroke-width:2px
+    linkStyle 1 stroke:#388e3c,stroke-width:2px
+    linkStyle 2 stroke:#f57c00,stroke-width:2px
+    linkStyle 3 stroke:#7b1fa2,stroke-width:3px,color:#000,fill:#000
+    linkStyle 4 stroke:#0277bd,stroke-width:3px,color:#000,fill:#000
+    linkStyle 5 stroke:#2e7d32,stroke-width:2px
+    linkStyle 6 stroke:#2e7d32,stroke-width:2px
+    linkStyle 7 stroke:#f9a825,stroke-width:3px
+    linkStyle 8 stroke:#f9a825,stroke-width:3px
+

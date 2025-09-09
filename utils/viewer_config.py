@@ -114,7 +114,7 @@ class ViewerConfig:
         st.markdown("Select Slice")
         slice_options = ["3D Render", "Multiplanar", "Single View"]
         current_slice = st.selectbox(
-            "",
+            "Slice Type",
             slice_options,
             index=slice_options.index(self._settings['slice_type']) if self._settings['slice_type'] in slice_options else 0,
             label_visibility="collapsed"

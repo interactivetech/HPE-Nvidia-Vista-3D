@@ -12,10 +12,12 @@ from typing import List, Dict, Optional
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import extra_streamlit_components as stx
 
 # Add utils to path for imports
 sys.path.append(str(Path(__file__).parent / 'utils'))
 from utils.navigation import render_navigation
+from utils.mermaid import render_workflow_section
 from assets.nvidia_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
 #from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
@@ -479,7 +481,11 @@ if current_page == 'home':
     else:
         st.warning("⚠️ Image server is offline. Start the server to view data analysis.")
         st.code("python utils/image_server.py", language="bash")
-        
+    
+    # Add workflow diagram after Image Data section
+    st.markdown("---")
+    render_workflow_section()
+    
 
 elif current_page == 'niivue':
     # Import and run NiiVue content

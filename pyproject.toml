@@ -24,4 +24,5 @@ dependencies = [
     "dcm2niix>=1.0.20250506",
     "pandas>=2.0.0",
     "plotly>=5.0.0",
+    "streamlit-mermaid>=0.3.0",
 ]
