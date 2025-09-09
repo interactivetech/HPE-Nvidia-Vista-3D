@@ -63,8 +63,110 @@ def check_uv_installed() -> bool:
     success, _ = run_command(["uv", "--version"], check=False, capture_output=True)
     return success
 
+def install_uv() -> bool:
+    """Install uv package manager following README_setup.md approach."""
+    print_status("Installing uv package manager...", "package")
+    
+    # Use shell=True for the pipe command
+    success, _ = run_command([
+        "bash", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    ], check=False)
+    
+    if not success:
+        print_status("Failed to install uv", "error")
+        return False
+    
+    # Add uv to PATH for current session
+    home_dir = os.path.expanduser("~")
+    uv_path = f"{home_dir}/.cargo/bin"
+    os.environ["PATH"] = f"{uv_path}:{os.environ.get('PATH', '')}"
+    
+    print_status("✅ uv installed successfully", "success")
+    return True
+
+def check_github_cli_installed() -> bool:
+    """Check if GitHub CLI is installed."""
+    success, _ = run_command(["gh", "--version"], check=False, capture_output=True)
+    return success
+
+def install_github_cli() -> bool:
+    """Install GitHub CLI following README_setup.md approach."""
+    print_status("Installing GitHub CLI...", "package")
+    
+    # Update package index
+    success, _ = run_command(["sudo", "apt", "update"], check=False)
+    if not success:
+        print_status("Failed to update package index", "error")
+        return False
+    
+    # Install git if not present
+    success, _ = run_command(["sudo", "apt", "install", "-y", "git"], check=False)
+    if not success:
+        print_status("Failed to install git", "error")
+        return False
+    
+    # Add GitHub CLI GPG key
+    success, output = run_command([
+        "curl", "-fsSL", "https://cli.github.com/packages/githubcli-archive-keyring.gpg"
+    ], check=False, capture_output=True)
+    
+    if success:
+        proc = subprocess.Popen(["sudo", "dd", "of=/usr/share/keyrings/githubcli-archive-keyring.gpg"], 
+                              stdin=subprocess.PIPE, text=True)
+        proc.communicate(input=output)
+        if proc.returncode != 0:
+            print_status("Failed to add GitHub CLI GPG key", "error")
+            return False
+    else:
+        print_status("Failed to download GitHub CLI GPG key", "error")
+        return False
+    
+    # Add GitHub CLI repository
+    arch_cmd = ["dpkg", "--print-architecture"]
+    success, arch = run_command(arch_cmd, check=False, capture_output=True)
+    if not success:
+        arch = "amd64"  # fallback
+    
+    repo_cmd = f'echo "deb [arch={arch.strip()} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"'
+    success, _ = run_command([f'sudo bash -c \'{repo_cmd} > /etc/apt/sources.list.d/github-cli.list\''], check=False)
+    if not success:
+        print_status("Failed to add GitHub CLI repository", "error")
+        return False
+    
+    # Update and install GitHub CLI
+    success, _ = run_command(["sudo", "apt", "update"], check=False)
+    if not success:
+        print_status("Failed to update package index", "error")
+        return False
+    
+    success, _ = run_command(["sudo", "apt", "install", "-y", "gh"], check=False)
+    if not success:
+        print_status("Failed to install GitHub CLI", "error")
+        return False
+    
+    print_status("✅ GitHub CLI installed successfully", "success")
+    return True
+
+def setup_github_auth() -> bool:
+    """Set up GitHub authentication."""
+    print_status("Setting up GitHub authentication...", "info")
+    print("Please follow the authentication prompts:")
+    print("1. Choose 'HTTPS' as your preferred protocol")
+    print("2. Choose 'Yes' to authenticate Git with your GitHub credentials")
+    print("3. Choose your preferred authentication method")
+    print()
+    
+    success, _ = run_command(["gh", "auth", "login"], check=False)
+    if not success:
+        print_status("Failed to authenticate with GitHub", "error")
+        print_status("You can run 'gh auth login' manually later", "warning")
+        return False
+    
+    print_status("✅ GitHub authentication successful", "success")
+    return True
+
 def check_system_requirements() -> bool:
-    """Check if the system meets Vista3D requirements."""
+    """Check if the system meets Vista3D requirements following README_setup.md approach."""
     print_status("Checking system requirements...", "info")
     
     # Check if running on Linux
@@ -98,6 +200,54 @@ def check_system_requirements() -> bool:
             print_status("Please run with sudo or ensure your user is in the sudo group", "error")
             return False
     
+    # Check for required system packages
+    required_packages = ["wget", "unzip", "curl", "git"]
+    missing_packages = []
+    
+    for package in required_packages:
+        success, _ = run_command(["which", package], check=False, capture_output=True)
+        if not success:
+            missing_packages.append(package)
+    
+    if missing_packages:
+        print_status(f"Installing missing system packages: {', '.join(missing_packages)}", "info")
+        success, _ = run_command(["sudo", "apt", "update"], check=False)
+        if success:
+            success, _ = run_command(["sudo", "apt", "install", "-y"] + missing_packages, check=False)
+            if not success:
+                print_status(f"Failed to install required packages: {', '.join(missing_packages)}", "error")
+                return False
+        else:
+            print_status("Failed to update package index", "error")
+            return False
+    
+    # Check available disk space (at least 10GB)
+    try:
+        statvfs = os.statvfs('.')
+        free_space_gb = (statvfs.f_frsize * statvfs.f_bavail) / (1024**3)
+        if free_space_gb < 10:
+            print_status(f"⚠️  Low disk space: {free_space_gb:.1f}GB available (recommend 10GB+)", "warning")
+        else:
+            print_status(f"✅ Sufficient disk space: {free_space_gb:.1f}GB available", "success")
+    except Exception:
+        print_status("⚠️  Could not check disk space", "warning")
+    
+    # Check available memory (at least 8GB)
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            meminfo = f.read()
+            for line in meminfo.split('\n'):
+                if 'MemTotal' in line:
+                    mem_kb = int(line.split()[1])
+                    mem_gb = mem_kb / (1024**2)
+                    if mem_gb < 8:
+                        print_status(f"⚠️  Low memory: {mem_gb:.1f}GB available (recommend 8GB+)", "warning")
+                    else:
+                        print_status(f"✅ Sufficient memory: {mem_gb:.1f}GB available", "success")
+                    break
+    except Exception:
+        print_status("⚠️  Could not check memory", "warning")
+    
     return True
 
 def check_nvidia_gpu() -> bool:
@@ -120,78 +270,112 @@ def check_nvidia_gpu() -> bool:
         return False
 
 def check_docker_installed() -> bool:
-    """Check if Docker is installed."""
+    """Check if Docker is installed and user is in docker group."""
     print_status("Checking Docker installation...", "info")
     
     success, _ = run_command(["docker", "--version"], check=False, capture_output=True)
     if success:
         print_status("✅ Docker is installed", "success")
+        
+        # Check if user is in docker group
+        current_user = os.getenv('USER', 'ubuntu')
+        success, output = run_command(["groups", current_user], check=False, capture_output=True)
+        if success and 'docker' in output:
+            print_status("✅ User is in docker group", "success")
+        else:
+            print_status("⚠️  User is not in docker group - you may need to log out and back in", "warning")
+            print_status("   Or run: newgrp docker", "info")
+        
         return True
     else:
         print_status("❌ Docker is not installed", "error")
         return False
 
 def install_docker() -> bool:
-    """Install Docker on Ubuntu."""
+    """Install Docker on Ubuntu following best practices from README_setup.md."""
     print_status("Installing Docker...", "package")
     
-    commands = [
-        ["sudo", "apt", "update"],
-        ["sudo", "apt", "install", "-y", "apt-transport-https", "ca-certificates", "curl", "gnupg", "lsb-release"],
-        ["curl", "-fsSL", "https://download.docker.com/linux/ubuntu/gpg"],
-        ["sudo", "gpg", "--dearmor", "-o", "/usr/share/keyrings/docker-archive-keyring.gpg"],
-        ["sudo", "apt", "update"],
-        ["sudo", "apt", "install", "-y", "docker-ce", "docker-ce-cli", "containerd.io"]
+    # Update package index
+    success, _ = run_command(["sudo", "apt", "update"], check=False)
+    if not success:
+        print_status("Failed to update package index", "error")
+        return False
+    
+    # Install prerequisites
+    prereq_packages = [
+        "apt-transport-https", "ca-certificates", "curl", 
+        "software-properties-common", "gnupg", "lsb-release"
     ]
+    success, _ = run_command(["sudo", "apt", "install", "-y"] + prereq_packages, check=False)
+    if not success:
+        print_status("Failed to install prerequisites", "error")
+        return False
     
-    for i, cmd in enumerate(commands):
-        if i == 2:  # Special handling for GPG key
-            success, output = run_command(cmd, check=False, capture_output=True)
-            if success:
-                # Pipe the output to gpg
-                proc = subprocess.Popen(["sudo", "gpg", "--dearmor", "-o", "/usr/share/keyrings/docker-archive-keyring.gpg"], 
-                                      stdin=subprocess.PIPE, text=True)
-                proc.communicate(input=output)
-                if proc.returncode != 0:
-                    print_status("Failed to add Docker GPG key", "error")
-                    return False
-            else:
-                print_status("Failed to download Docker GPG key", "error")
-                return False
-        elif i == 3:  # Skip this step as it's handled above
-            continue
-        else:
-            success, _ = run_command(cmd, check=False)
-            if not success:
-                print_status(f"Failed to execute: {' '.join(cmd)}", "error")
-                return False
+    # Add Docker GPG key
+    success, output = run_command(["curl", "-fsSL", "https://download.docker.com/linux/ubuntu/gpg"], 
+                                 check=False, capture_output=True)
+    if success:
+        proc = subprocess.Popen(["sudo", "gpg", "--dearmor", "-o", "/usr/share/keyrings/docker-archive-keyring.gpg"], 
+                              stdin=subprocess.PIPE, text=True)
+        proc.communicate(input=output)
+        if proc.returncode != 0:
+            print_status("Failed to add Docker GPG key", "error")
+            return False
+    else:
+        print_status("Failed to download Docker GPG key", "error")
+        return False
     
-    # Add Docker APT repository
-    repo_cmd = 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"'
+    # Add Docker repository using architecture detection
+    arch_cmd = ["dpkg", "--print-architecture"]
+    success, arch = run_command(arch_cmd, check=False, capture_output=True)
+    if not success:
+        arch = "amd64"  # fallback
+    
+    repo_cmd = f'echo "deb [arch={arch.strip()} signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"'
     success, _ = run_command([f'sudo bash -c \'{repo_cmd} > /etc/apt/sources.list.d/docker.list\''], check=False)
     if not success:
         print_status("Failed to add Docker repository", "error")
         return False
     
+    # Update package index again
+    success, _ = run_command(["sudo", "apt", "update"], check=False)
+    if not success:
+        print_status("Failed to update package index after adding Docker repo", "error")
+        return False
+    
+    # Install Docker packages
+    docker_packages = [
+        "docker-ce", "docker-ce-cli", "containerd.io", 
+        "docker-buildx-plugin", "docker-compose-plugin"
+    ]
+    success, _ = run_command(["sudo", "apt", "install", "-y"] + docker_packages, check=False)
+    if not success:
+        print_status("Failed to install Docker packages", "error")
+        return False
+    
+    # Add current user to docker group
+    current_user = os.getenv('USER', 'ubuntu')
+    success, _ = run_command(["sudo", "usermod", "-aG", "docker", current_user], check=False)
+    if not success:
+        print_status("Failed to add user to docker group", "error")
+        return False
+    
     print_status("✅ Docker installed successfully", "success")
+    print_status(f"   User {current_user} added to docker group", "info")
+    print_status("   Note: You may need to log out and back in for group changes to take effect", "warning")
+    
     return True
 
 def install_nvidia_container_toolkit() -> bool:
-    """Install NVIDIA Container Toolkit."""
+    """Install NVIDIA Container Toolkit following best practices from README_setup.md."""
     print_status("Installing NVIDIA Container Toolkit...", "package")
     
-    commands = [
-        ["curl", "-fsSL", "https://nvidia.github.io/libnvidia-container/gpgkey"],
-        ["curl", "-s", "-L", "https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list"],
-        ["sudo", "apt", "update"],
-        ["sudo", "apt", "install", "-y", "nvidia-container-toolkit"],
-        ["sudo", "systemctl", "restart", "docker"]
-    ]
-    
     # Add NVIDIA GPG key
-    success, output = run_command(commands[0], check=False, capture_output=True)
+    success, output = run_command(["curl", "-fsSL", "https://nvidia.github.io/libnvidia-container/gpgkey"], 
+                                 check=False, capture_output=True)
     if success:
-        proc = subprocess.Popen(["sudo", "apt-key", "add", "-"], stdin=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(["sudo", "gpg", "--dearmor", "-o", "/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"], 
+                              stdin=subprocess.PIPE, text=True)
         proc.communicate(input=output)
         if proc.returncode != 0:
             print_status("Failed to add NVIDIA Container Toolkit GPG key", "error")
@@ -200,11 +384,19 @@ def install_nvidia_container_toolkit() -> bool:
         print_status("Failed to download NVIDIA Container Toolkit GPG key", "error")
         return False
     
-    # Add repository
-    success, output = run_command(commands[1], check=False, capture_output=True)
+    # Add repository with proper signing
+    success, output = run_command(["curl", "-s", "-L", "https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list"], 
+                                 check=False, capture_output=True)
     if success:
+        # Process the repository list to add signing key
+        processed_repo = output.replace(
+            "deb https://", 
+            "deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://"
+        )
+        
         with open("/tmp/nvidia-container-toolkit.list", "w") as f:
-            f.write(output)
+            f.write(processed_repo)
+        
         success, _ = run_command(["sudo", "cp", "/tmp/nvidia-container-toolkit.list", "/etc/apt/sources.list.d/"], check=False)
         if not success:
             print_status("Failed to add NVIDIA Container Toolkit repository", "error")
@@ -213,14 +405,123 @@ def install_nvidia_container_toolkit() -> bool:
         print_status("Failed to get NVIDIA Container Toolkit repository", "error")
         return False
     
-    # Update and install
-    for cmd in commands[2:]:
-        success, _ = run_command(cmd, check=False)
-        if not success:
-            print_status(f"Failed to execute: {' '.join(cmd)}", "error")
-            return False
+    # Update package index
+    success, _ = run_command(["sudo", "apt", "update"], check=False)
+    if not success:
+        print_status("Failed to update package index", "error")
+        return False
+    
+    # Install NVIDIA Container Toolkit
+    success, _ = run_command(["sudo", "apt-get", "install", "-y", "nvidia-container-toolkit"], check=False)
+    if not success:
+        print_status("Failed to install NVIDIA Container Toolkit", "error")
+        return False
+    
+    # Configure Docker runtime
+    success, _ = run_command(["sudo", "nvidia-ctk", "runtime", "configure", "--runtime=docker"], check=False)
+    if not success:
+        print_status("Failed to configure Docker runtime for NVIDIA", "error")
+        return False
+    
+    # Restart Docker service
+    success, _ = run_command(["sudo", "systemctl", "restart", "docker"], check=False)
+    if not success:
+        print_status("Failed to restart Docker service", "error")
+        return False
     
     print_status("✅ NVIDIA Container Toolkit installed successfully", "success")
+    return True
+
+def check_ngc_cli_installed() -> bool:
+    """Check if NGC CLI is installed."""
+    success, _ = run_command(["ngc", "--version"], check=False, capture_output=True)
+    return success
+
+def install_ngc_cli() -> bool:
+    """Install NVIDIA NGC CLI following README_setup.md approach."""
+    print_status("Installing NGC CLI...", "package")
+    
+    # Download NGC CLI
+    success, _ = run_command([
+        "wget", "--content-disposition", 
+        "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.44.0/files/ngccli_linux.zip",
+        "-O", "ngccli_linux.zip"
+    ], check=False)
+    
+    if not success:
+        print_status("Failed to download NGC CLI", "error")
+        return False
+    
+    # Extract the archive
+    success, _ = run_command(["unzip", "ngccli_linux.zip"], check=False)
+    if not success:
+        print_status("Failed to extract NGC CLI", "error")
+        return False
+    
+    # Install NGC CLI
+    success, _ = run_command(["./ngc-cli/install"], check=False)
+    if not success:
+        print_status("Failed to install NGC CLI", "error")
+        return False
+    
+    # Add NGC CLI to PATH
+    home_dir = os.path.expanduser("~")
+    ngc_path = f"{home_dir}/ngc-cli"
+    
+    # Add to current session PATH
+    os.environ["PATH"] = f"{ngc_path}:{os.environ.get('PATH', '')}"
+    
+    # Add to bashrc for persistence
+    bashrc_path = os.path.expanduser("~/.bashrc")
+    path_export = f'export PATH="$PATH:{ngc_path}"'
+    
+    try:
+        with open(bashrc_path, "a") as f:
+            f.write(f"\n# NGC CLI PATH\n{path_export}\n")
+    except Exception as e:
+        print_status(f"Warning: Could not add NGC CLI to .bashrc: {e}", "warning")
+    
+    # Clean up
+    try:
+        os.remove("ngccli_linux.zip")
+        shutil.rmtree("ngc-cli", ignore_errors=True)
+    except Exception:
+        pass  # Cleanup is not critical
+    
+    print_status("✅ NGC CLI installed successfully", "success")
+    print_status(f"   NGC CLI added to PATH: {ngc_path}", "info")
+    return True
+
+def configure_ngc_cli(api_key: str, org_id: str) -> bool:
+    """Configure NGC CLI with credentials."""
+    print_status("Configuring NGC CLI...", "info")
+    
+    # Set API key using subprocess with input
+    try:
+        proc = subprocess.Popen(
+            ["ngc", "config", "set"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        stdout, stderr = proc.communicate(input=f"{api_key}\n{org_id}\n")
+        
+        if proc.returncode != 0:
+            print_status("Failed to configure NGC CLI", "error")
+            print_status(f"Error: {stderr}", "error")
+            return False
+    except Exception as e:
+        print_status(f"Failed to configure NGC CLI: {e}", "error")
+        return False
+    
+    # Test configuration
+    success, _ = run_command(["ngc", "registry", "info"], check=False)
+    if not success:
+        print_status("Failed to verify NGC CLI configuration", "error")
+        return False
+    
+    print_status("✅ NGC CLI configured successfully", "success")
     return True
 
 def test_nvidia_docker() -> bool:
@@ -229,7 +530,7 @@ def test_nvidia_docker() -> bool:
     
     success, _ = run_command([
         "sudo", "docker", "run", "--rm", "--gpus", "all", 
-        "nvidia/cuda:11.0-base-ubuntu20.04", "nvidia-smi"
+        "nvidia/cuda:11.0.3-base-ubuntu20.04", "nvidia-smi"
     ], check=False)
     
     if success:
@@ -397,7 +698,7 @@ def check_vista3d_health() -> bool:
     return False
 
 def setup_vista3d_complete() -> bool:
-    """Complete Vista3D setup process."""
+    """Complete Vista3D setup process following README_setup.md approach."""
     print_status("=== NVIDIA Vista3D NIM Setup ===", "info")
     print()
     
@@ -408,6 +709,19 @@ def setup_vista3d_complete() -> bool:
     # Check NVIDIA GPU
     if not check_nvidia_gpu():
         return False
+    
+    # Check/Install uv
+    if not check_uv_installed():
+        if not install_uv():
+            return False
+    
+    # Check/Install GitHub CLI
+    if not check_github_cli_installed():
+        if not install_github_cli():
+            return False
+    
+    # Set up GitHub authentication
+    setup_github_auth()  # Non-critical, so don't fail if it doesn't work
     
     # Check/Install Docker
     if not check_docker_installed():
@@ -422,8 +736,16 @@ def setup_vista3d_complete() -> bool:
     if not test_nvidia_docker():
         return False
     
+    # Check/Install NGC CLI
+    if not check_ngc_cli_installed():
+        if not install_ngc_cli():
+            return False
+    
     # Get NVIDIA credentials
     api_key, org_id = prompt_nvidia_credentials()
+    
+    # Configure NGC CLI
+    configure_ngc_cli(api_key, org_id)
     
     # Create .env file
     create_env_file(api_key, org_id)
@@ -458,6 +780,8 @@ def setup_vista3d_complete() -> bool:
     print("  • Check container logs: sudo docker logs vista3d")
     print("  • Stop Vista3D: sudo docker stop vista3d")
     print("  • Restart Vista3D: sudo docker restart vista3d")
+    print("  • NGC CLI: ngc registry info")
+    print("  • GitHub CLI: gh repo list")
     
     return True
 
@@ -692,6 +1016,51 @@ def print_final_status():
     print_status("To run DICOM conversion manually:", "info")
     print("   python setup.py --convert-dicom")
 
+def install_system_dependencies() -> bool:
+    """Install all system dependencies following README_setup.md approach."""
+    print_status("Installing system dependencies...", "info")
+    
+    # Check system requirements first
+    if not check_system_requirements():
+        return False
+    
+    # Install uv if not present
+    if not check_uv_installed():
+        if not install_uv():
+            return False
+    
+    # Install GitHub CLI if not present
+    if not check_github_cli_installed():
+        if not install_github_cli():
+            return False
+    
+    # Install Docker if not present
+    if not check_docker_installed():
+        if not install_docker():
+            return False
+    
+    # Install NVIDIA Container Toolkit
+    if not install_nvidia_container_toolkit():
+        return False
+    
+    # Test NVIDIA Docker
+    if not test_nvidia_docker():
+        return False
+    
+    # Install NGC CLI if not present
+    if not check_ngc_cli_installed():
+        if not install_ngc_cli():
+            return False
+    
+    print_status("🎉 All system dependencies installed successfully!", "success")
+    print()
+    print_status("Next steps:", "info")
+    print("  1. Run: python setup.py --setup-vista3d  (for Vista3D setup)")
+    print("  2. Run: python setup.py  (for full project setup)")
+    print("  3. Set up GitHub authentication: gh auth login")
+    
+    return True
+
 def main():
     """Main setup function."""
     
@@ -700,6 +1069,10 @@ def main():
         if sys.argv[1] == "--setup-vista3d":
             print_status("Starting NVIDIA Vista3D NIM setup...", "info")
             success = setup_vista3d_complete()
+            sys.exit(0 if success else 1)
+        elif sys.argv[1] == "--install-deps":
+            print_status("Installing system dependencies...", "info")
+            success = install_system_dependencies()
             sys.exit(0 if success else 1)
         elif sys.argv[1] == "--start-server":
             pid = start_http_server()
@@ -713,6 +1086,7 @@ def main():
             print("Usage: python setup.py [OPTION]")
             print("Options:")
             print("  --setup-vista3d   Complete Vista3D NIM setup on Ubuntu")
+            print("  --install-deps    Install all system dependencies")
             print("  --start-server    Start HTTPS image server only")
             print("  --convert-dicom   Run DICOM conversion only")
             print("  --help           Show this help message")
@@ -721,13 +1095,15 @@ def main():
     
     print_status("Setting up NV project environment...", "info")
     
-    # Check if uv is installed
+    # Check if uv is installed, install if not
     if not check_uv_installed():
-        print_status("Error: uv is not installed. Please install uv first:", "error")
-        print("   curl -LsSf https://astral.sh/uv/install.sh | sh")
-        sys.exit(1)
-    
-    print_status("uv is installed", "success")
+        print_status("uv is not installed, installing now...", "info")
+        if not install_uv():
+            print_status("Error: Failed to install uv. Please install manually:", "error")
+            print("   curl -LsSf https://astral.sh/uv/install.sh | sh")
+            sys.exit(1)
+    else:
+        print_status("uv is already installed", "success")
     
     # Create output directories
     create_output_directories()
