@@ -299,7 +299,8 @@ def process_patient_folder(patient_dir, force=False, smooth_iterations=3, smooth
                 convert_nii_to_stl(nii_file_path, stl_file_path, force, smooth_iterations, smooth_factor)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Convert .nii.gz voxel files to .stl mesh files for all patients in the output directory.')
+    parser = argparse.ArgumentParser(description='Convert .nii.gz voxel files to .stl mesh files for patients in the output directory.')
+    parser.add_argument('patient', nargs='?', help='Patient name to process (e.g., PA00000002). If not provided, processes all patients.')
     parser.add_argument('--output_dir', type=str, default='output', help='Path to the output directory containing patient folders (default: output)')
     parser.add_argument('--force', action='store_true', help='Overwrite existing STL files (default: skip existing files)')
     parser.add_argument('--smooth_iterations', type=int, default=3, help='Number of Laplacian smoothing iterations (default: 3)')
@@ -315,7 +316,21 @@ if __name__ == '__main__':
     smooth_iterations = 0 if args.no_smooth else args.smooth_iterations
     smooth_factor = 0.0 if args.no_smooth else args.smooth_factor
     
-    print(f"Processing patients in {args.output_dir}...")
+    # Determine which patients to process
+    if args.patient:
+        # Process only the specified patient
+        patient_dir = os.path.join(args.output_dir, args.patient)
+        if not os.path.isdir(patient_dir):
+            print(f"Error: Patient directory not found: {patient_dir}")
+            exit()
+        patients_to_process = [args.patient]
+        print(f"Processing single patient: {args.patient}")
+    else:
+        # Process all patients
+        patients_to_process = [f for f in os.listdir(args.output_dir) 
+                             if os.path.isdir(os.path.join(args.output_dir, f))]
+        print(f"Processing all patients in {args.output_dir}...")
+    
     if args.force:
         print("Force mode enabled - will overwrite existing STL files")
     else:
@@ -326,8 +341,8 @@ if __name__ == '__main__':
     else:
         print("Smoothing disabled - keeping original blocky appearance")
     
-    for patient_folder in os.listdir(args.output_dir):
+    # Process the selected patients
+    for patient_folder in patients_to_process:
         patient_dir = os.path.join(args.output_dir, patient_folder)
-        if os.path.isdir(patient_dir):
-            print(f"Processing patient folder: {patient_dir}")
-            process_patient_folder(patient_dir, args.force, smooth_iterations, smooth_factor)
+        print(f"Processing patient folder: {patient_dir}")
+        process_patient_folder(patient_dir, args.force, smooth_iterations, smooth_factor)
