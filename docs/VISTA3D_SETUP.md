@@ -92,6 +92,18 @@ python3 setup.py --convert-dicom
 python3 setup.py --help
 ```
 
+### Manual Vista3D Management
+```bash
+# Start Vista3D manually (if already set up)
+python3 utils/start_vista3d.py
+
+# Query Vista3D API for supported labels
+python3 utils/query_vista3d_api.py
+
+# Run segmentation analysis
+python3 utils/segment.py
+```
+
 ## Post-Setup Verification
 
 After successful setup, you should see:
@@ -114,6 +126,9 @@ sudo docker logs vista3d
 curl -X POST http://localhost:8000/v1/vista3d/inference \
   -H "Content-Type: application/json" \
   -d '{"image": "/workspace/output/nifti/test.nii.gz"}'
+
+# Query API for supported labels
+curl http://localhost:8000/v1/vista3d/info
 ```
 
 ## Container Management
@@ -185,6 +200,28 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
+#### 6. File Access Issues
+```bash
+# Check file permissions
+ls -la output/
+sudo chown -R $USER:$USER output/
+
+# Verify .env file exists and is readable
+cat .env
+```
+
+#### 7. Vista3D API Not Responding
+```bash
+# Check if container is running
+sudo docker ps | grep vista3d
+
+# Check container logs for errors
+sudo docker logs vista3d
+
+# Test API connectivity
+curl -v http://localhost:8000/v1/vista3d/info
+```
+
 ### Log Files
 - **Setup logs**: Output displayed in terminal
 - **Docker logs**: `sudo docker logs vista3d`
@@ -219,6 +256,34 @@ NVIDIA_DRIVER_CAPABILITIES=compute,utility
 EXTERNAL_IMAGE_SERVER=https://host.docker.internal:8888
 EXTERNAL_IMAGE_SERVER_HOST=host.docker.internal
 EXTERNAL_IMAGE_SERVER_PORT=8888
+EXTERNAL_IMAGE_SERVER_PROTOCOL=https
+
+# Project Configuration
+PROJECT_ROOT=/path/to/your/project
+DICOM_FOLDER=dicom
+IMAGE_SERVER=http://localhost:8888
+VESSELS_OF_INTEREST=all
+
+# File Access Configuration
+ALLOW_LOCAL_FILES=True
+ENABLE_FILE_ACCESS=True
+ALLOW_FILE_PROTOCOL=True
+WORKSPACE_IMAGES_PATH=/workspace/output/nifti
+WORKSPACE_OUTPUTS_PATH=/workspace/output
+IGNORE_SSL_ERRORS=True
+
+# Additional Vista3D Environment Variables (optional)
+ENABLE_CONTAINER_PATHS=True
+ALLOW_ABSOLUTE_PATHS=True
+ALLOW_RELATIVE_PATHS=True
+ALLOW_LOCAL_PATHS=True
+DISABLE_URL_VALIDATION=False
+ALLOW_ABSOLUTE_FILE_PATHS=True
+ALLOW_RELATIVE_FILE_PATHS=True
+FILE_ACCESS_MODE=local
+LOCAL_FILE_ACCESS=True
+IMAGE_URI_ALLOW_REDIRECTS=True
+IMAGE_URI_HTTPS_ONLY=False
 ```
 
 ### Container Configuration
@@ -227,6 +292,8 @@ EXTERNAL_IMAGE_SERVER_PORT=8888
 - **GPU**: All available GPUs
 - **Memory**: 8GB shared memory
 - **Volumes**: Project output directory mounted at `/workspace/output`
+- **Runtime**: NVIDIA Container Runtime
+- **Environment Variables**: NGC credentials and file access settings
 
 ## Next Steps
 
@@ -237,21 +304,33 @@ After Vista3D is running:
    python3 setup.py
    ```
 
-2. **Add NIFTI files**:
+2. **Configure your environment**:
+   ```bash
+   # Copy and edit the environment template
+   cp dot_env_template .env
+   # Edit .env to set your PROJECT_ROOT and other settings
+   ```
+
+3. **Add NIFTI files**:
    ```bash
    # Place your .nii.gz files here
    mkdir -p output/nifti
    cp your_scan.nii.gz output/nifti/
    ```
 
-3. **Start the web viewer**:
+4. **Start the web viewer**:
    ```bash
    streamlit run app.py
    ```
 
-4. **Run segmentation**:
+5. **Run segmentation**:
    ```bash
    python3 utils/segment.py
+   ```
+
+6. **Convert DICOM files** (if needed):
+   ```bash
+   python3 setup.py --convert-dicom
    ```
 
 ## Security Considerations
@@ -267,6 +346,8 @@ After Vista3D is running:
 - **System Memory**: 16GB+ RAM recommended for large medical images
 - **Storage**: SSD storage recommended for faster image processing
 - **Network**: Stable internet connection required for initial download
+- **File Access**: Ensure proper file permissions for the output directory
+- **Container Resources**: Monitor container resource usage with `sudo docker stats vista3d`
 
 ---
 

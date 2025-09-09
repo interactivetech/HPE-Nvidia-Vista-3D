@@ -524,13 +524,13 @@ def is_server_running() -> bool:
             continue
     return False
 
-def start_https_server() -> Optional[int]:
-    """Start HTTPS image server in background."""
-    print_status("Starting HTTPS image server in background...", "server")
+def start_http_server() -> Optional[int]:
+    """Start HTTP image server in background."""
+    print_status("Starting HTTP image server in background...", "server")
     
     # Check if server is already running
     if is_server_running():
-        print_status("   HTTPS image server is already running", "info")
+        print_status("   HTTP image server is already running", "info")
         return None
     
     # Check if the server script exists
@@ -559,12 +559,12 @@ def start_https_server() -> Optional[int]:
         
         # Check if server started successfully
         if process.poll() is None:  # Process is still running
-            print_status(f"   HTTPS image server started successfully (PID: {process.pid})", "success")
+            print_status(f"   HTTP image server started successfully (PID: {process.pid})", "success")
             print_status("   Server logs: output/server.log", "info")
             print_status(f"   To stop server: kill {process.pid}", "info")
             return process.pid
         else:
-            print_status("   Failed to start HTTPS image server", "error")
+            print_status("   Failed to start HTTP image server", "error")
             return None
             
     except Exception as e:
@@ -702,7 +702,7 @@ def main():
             success = setup_vista3d_complete()
             sys.exit(0 if success else 1)
         elif sys.argv[1] == "--start-server":
-            pid = start_https_server()
+            pid = start_http_server()
             if pid:
                 print(f"Server started with PID: {pid}")
             return
@@ -741,7 +741,7 @@ def main():
         sys.exit(1)
     
     # Start HTTPS image server
-    start_https_server()
+    start_http_server()
     
     # Run DICOM to NIFTI conversion
     run_dicom_conversion()

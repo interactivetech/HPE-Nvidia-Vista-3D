@@ -1,3 +1,8 @@
+
+# use ssh to portforward 8888 to localhost:8888
+ssh -L 8888:localhost:8888 <your_ssh_username>@<your_ssh_host>
+
+
 # install docker
 sudo apt update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
@@ -83,5 +88,3 @@ python utils/segment.py
 
 # start gui
 streamlit run app.py
-
-

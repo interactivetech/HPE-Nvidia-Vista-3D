@@ -128,7 +128,7 @@ def load_environment_config():
         print("⚠️  No .env file found, using defaults")
     
     # Get IMAGE_SERVER URL with default
-    image_server_url = os.getenv("IMAGE_SERVER", "https://localhost:8888")
+    image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
     return image_server_url
 
 def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
@@ -181,7 +181,7 @@ def parse_directory_listing(html_content: str) -> List[Dict[str, str]]:
     
     return items
 
-def get_folder_contents(base_url: str, folder_path: str, verify_ssl: bool = False) -> Optional[List[Dict[str, str]]]:
+def get_folder_contents(base_url: str, folder_path: str) -> Optional[List[Dict[str, str]]]:
     """Get contents of a folder from the image server."""
     
     # Construct the full URL
@@ -190,8 +190,8 @@ def get_folder_contents(base_url: str, folder_path: str, verify_ssl: bool = Fals
     try:
         print(f"🔍 Fetching: {folder_url}")
         
-        # Make request with SSL verification disabled for self-signed certs
-        response = requests.get(folder_url, verify=verify_ssl, timeout=10)
+        # Make request
+        response = requests.get(folder_url, timeout=10)
         
         if response.status_code == 200:
             items = parse_directory_listing(response.text)
@@ -205,7 +205,6 @@ def get_folder_contents(base_url: str, folder_path: str, verify_ssl: bool = Fals
             
     except requests.exceptions.SSLError as e:
         print(f"❌ SSL Error: {e}")
-        print("💡 Try using --verify-ssl flag if you have proper certificates")
         return None
     except requests.exceptions.ConnectionError as e:
         print(f"❌ Connection Error: {e}")
@@ -248,7 +247,7 @@ def get_voxel_files(segments_folder_contents: List[Dict[str, str]]) -> List[Dict
 
 # Removed get_voxel_folder_contents - now handled directly in analyze_patient_data
 
-def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = False, use_old_structure: bool = False) -> Dict:
+def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool = False) -> Dict:
     """Analyze data for a single patient."""
     print(f"  📊 Analyzing patient: {patient_id}")
     
@@ -267,7 +266,7 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
     print(f"    Using {structure_type} folder structure")
     
     # Get nifti folder contents for this patient
-    nifti_contents = get_folder_contents(base_url, nifti_folder_path, verify_ssl)
+    nifti_contents = get_folder_contents(base_url, nifti_folder_path)
     
     if not nifti_contents:
         return {
@@ -290,7 +289,7 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
     total_ct_size_bytes = sum(scan.get('size_bytes', 0) for scan in ct_scans)
     
     # Get segments folder contents for this patient
-    segments_contents = get_folder_contents(base_url, segments_folder_path, verify_ssl)
+    segments_contents = get_folder_contents(base_url, segments_folder_path)
     
     voxel_data = {}
     total_voxel_files = 0
@@ -298,10 +297,10 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
     
     # Get voxel folder contents (different logic for new vs old structure)
     if use_old_structure:
-        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path, verify_ssl)
+        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
     else:
         # In current structure, voxels are organized by CT scan subfolders
-        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path, verify_ssl)
+        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
     
     if segments_contents:
         # For each CT scan, check for corresponding voxel data
@@ -351,7 +350,7 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
                     # If found, get contents of the CT scan voxel subfolder
                     if ct_scan_voxel_folder:
                         ct_scan_voxel_path = f"{voxel_folder_path}/{ct_scan_voxel_folder}"
-                        ct_scan_voxel_contents = get_folder_contents(base_url, ct_scan_voxel_path, verify_ssl)
+                        ct_scan_voxel_contents = get_folder_contents(base_url, ct_scan_voxel_path)
                         if ct_scan_voxel_contents:
                             for item in ct_scan_voxel_contents:
                                 if not item['is_directory'] and item['name'].endswith('.nii.gz'):
@@ -394,14 +393,14 @@ def analyze_patient_data(base_url: str, patient_id: str, verify_ssl: bool = Fals
         'error': None
     }
 
-def test_server_connection(base_url: str, verify_ssl: bool = False) -> bool:
+def test_server_connection(base_url: str) -> bool:
     """Test if the image server is accessible."""
     try:
         print(f"🔗 Testing connection to: {base_url}")
         
         # Test with a known file first (README.md)
         test_url = urljoin(base_url.rstrip('/') + '/', 'README.md')
-        response = requests.get(test_url, verify=verify_ssl, timeout=10)
+        response = requests.get(test_url, timeout=10)
         
         if response.status_code == 200:
             print(f"✅ Server is accessible (tested with README.md)")
@@ -410,7 +409,7 @@ def test_server_connection(base_url: str, verify_ssl: bool = False) -> bool:
             print(f"⚠️  Server responded with HTTP {response.status_code} for README.md")
             
             # Fallback: try root path
-            response = requests.get(base_url, verify=verify_ssl, timeout=10)
+            response = requests.get(base_url, timeout=10)
             if response.status_code in [200, 404]:  # 404 is OK for root if no index
                 print(f"✅ Server is running (HTTP {response.status_code} from root)")
                 return True
@@ -552,7 +551,6 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
 def main():
     """Main function to analyze server data and generate report."""
     parser = argparse.ArgumentParser(description="Analyze image server data and generate comprehensive report")
-    parser.add_argument("--verify-ssl", action="store_true", help="Verify SSL certificates (disable for self-signed certs)")
     parser.add_argument("--url", help="Override IMAGE_SERVER URL from environment")
     parser.add_argument("--output", "-o", help="Save report to file")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress progress output")
@@ -564,14 +562,12 @@ def main():
     
     if not args.quiet:
         print(f"🌐 Image Server URL: {image_server_url}")
-        print(f"🔒 SSL Verification: {'Enabled' if args.verify_ssl else 'Disabled (for self-signed certs)'}")
     
     # Test server connection
-    if not test_server_connection(image_server_url, args.verify_ssl):
+    if not test_server_connection(image_server_url):
         print("\n❌ Cannot connect to image server. Please ensure:")
         print("   1. The image server is running (python utils/image_server.py)")
         print("   2. The IMAGE_SERVER URL in .env is correct")
-        print("   3. SSL certificates are properly configured")
         sys.exit(1)
     
     # Get output folder contents to find patients (current structure)
@@ -579,7 +575,7 @@ def main():
         print("\n🔍 Scanning for patients...")
     
     # First try the current structure (output/ folder with patient directories)
-    output_contents = get_folder_contents(image_server_url, "", args.verify_ssl)
+    output_contents = get_folder_contents(image_server_url, "")
     patient_folders = []
     
     if output_contents:
@@ -591,7 +587,7 @@ def main():
         if not args.quiet:
             print("  No patients found in current structure, checking old structure...")
         
-        nifti_contents = get_folder_contents(image_server_url, "nifti", args.verify_ssl)
+        nifti_contents = get_folder_contents(image_server_url, "nifti")
         if nifti_contents:
             patient_folders = [item for item in nifti_contents if item['is_directory'] and is_patient_folder(item['name'])]
             # Mark these as old structure for later processing
@@ -619,7 +615,7 @@ def main():
         # Check if this patient uses old structure
         use_old_structure = patient_folder.get('old_structure', False)
         try:
-            patient_data = analyze_patient_data(image_server_url, patient_folder['name'], args.verify_ssl, use_old_structure)
+            patient_data = analyze_patient_data(image_server_url, patient_folder['name'], use_old_structure)
             analysis_data.append(patient_data)
         except Exception as e:
             print(f"❌ Error analyzing patient {patient_folder['name']}: {e}")

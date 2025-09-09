@@ -1,15 +1,7 @@
 import os
-import ssl
 import argparse
-import ipaddress
 from pathlib import Path
 from urllib.parse import urlparse
-from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, NoEncryption
-import datetime
 import os.path as osp
 
 from fastapi import FastAPI, HTTPException, status, Request, Query
@@ -31,63 +23,6 @@ project_root = Path(__file__).parent.parent
 # Load environment variables
 load_dotenv()
 
-# --- Certificate Generation Functions ---
-def generate_self_signed_cert(cert_dir: Path, cert_file: Path, key_file: Path, hostname: str = "localhost"):
-    """Generate a self-signed SSL certificate and private key."""
-    
-    cert_dir.mkdir(parents=True, exist_ok=True)
-
-    # Generate private key
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-    )
-    
-    # Create certificate
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
-        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, "San Jose"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Image Server"),
-        x509.NameAttribute(NameOID.COMMON_NAME, hostname),
-    ])
-    
-    cert = x509.CertificateBuilder().subject_name(
-        subject
-    ).issuer_name(
-        issuer
-    ).public_key(
-        private_key.public_key()
-    ).serial_number(
-        x509.random_serial_number()
-    ).not_valid_before(
-        datetime.datetime.utcnow()
-    ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=365)
-    ).add_extension(
-        x509.SubjectAlternativeName([
-            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
-            x509.DNSName(hostname),
-            x509.DNSName("127.0.0.1"),
-        ]),
-        critical=False,
-    ).sign(private_key, hashes.SHA256())
-    
-    # Write certificate to file
-    with open(cert_file, "wb") as f:
-        f.write(cert.public_bytes(Encoding.PEM))
-    
-    # Write private key to file
-    with open(key_file, "wb") as f:
-        f.write(private_key.private_bytes(
-            Encoding.PEM,
-            PrivateFormat.PKCS8,
-            NoEncryption()
-        ))
-    
-    print(f"Generated self-signed certificate:")
-    print(f"  Certificate: {cert_file}")
-    print(f"  Private Key: {key_file}")
 
 def get_server_config():
     """Get server configuration from environment variables."""
@@ -472,12 +407,10 @@ app.add_middleware(
 # --- Main execution block for Uvicorn ---
 if __name__ == "__main__":
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="HTTP/S Image Server")
+    parser = argparse.ArgumentParser(description="HTTP Image Server")
     parser.add_argument("--host", help="Host to bind to (default: from IMAGE_SERVER env var)")
     parser.add_argument("--port", type=int, help="Port to bind to (default: from IMAGE_SERVER env var)")
-    parser.add_argument("--cert-dir", help="Directory to store SSL certificate and key files", default=str(project_root / "output" / "certs"))
     parser.add_argument("--disable-dir-listing", action="store_true", help="Disable directory listing for enhanced security (files will still be served)")
-    parser.add_argument("--https", action="store_true", help="Run as an HTTPS server with a self-signed certificate")
     
     args = parser.parse_args()
     
@@ -489,46 +422,16 @@ if __name__ == "__main__":
     # Note: Files are served via the @app.get("/{full_path:path}") route above
     # This provides better control over directory listings and security
 
-    if args.https:
-        # Run Uvicorn with SSL
-        # Set up SSL certificate and key paths
-        cert_dir = Path(args.cert_dir)
-        cert_file = cert_dir / "server.crt"
-        key_file = cert_dir / "server.key"
-        
-        # Generate self-signed certificate if it doesn't exist
-        if not cert_file.exists() or not key_file.exists():
-            print("Self-signed certificate not found. Generating new one...")
-            generate_self_signed_cert(cert_dir, cert_file, key_file, host)
-
-        print(f"Starting HTTPS Image Server with FastAPI/Uvicorn...")
-        print(f"  URL: https://{host}:{port}")
-        print(f"  Serving from: {project_root.absolute()}")
-        print(f"  Certificate: {cert_file}")
-        print(f"  Private Key: {key_file}")
-        print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
-        print(f"  Press Ctrl+C to stop the server")
-        print("-" * 60)
-
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=port,
-            ssl_keyfile=str(key_file),
-            ssl_certfile=str(cert_file),
-            log_level="info"
-        )
-    else:
-        # Run Uvicorn without SSL (default)
-        print(f"Starting HTTP Image Server with FastAPI/Uvicorn...")
-        print(f"  URL: http://{host}:{port}")
-        print(f"  Serving from: {project_root.absolute()}")
-        print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
-        print(f"  Press Ctrl+C to stop the server")
-        print("-" * 60)
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=port,
-            log_level="info"
-        )
+    # Run Uvicorn without SSL
+    print(f"Starting HTTP Image Server with FastAPI/Uvicorn...")
+    print(f"  URL: http://{host}:{port}")
+    print(f"  Serving from: {project_root.absolute()}")
+    print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
+    print(f"  Press Ctrl+C to stop the server")
+    print("-" * 60)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        log_level="info"
+    )

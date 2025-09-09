@@ -14,7 +14,7 @@ class TemplateRenderer:
     Renders HTML templates with dynamic data using Jinja2.
     """
 
-    def __init__(self, template_dir: str = "templates"):
+    def __init__(self, template_dir: str = "assets"):
         self.template_dir = Path(template_dir)
         self.env = Environment(loader=FileSystemLoader(template_dir))
 

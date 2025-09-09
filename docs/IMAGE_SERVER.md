@@ -1,189 +1,249 @@
-# HTTPS Image Server
+# Medical Imaging Server
 
-A secure HTTPS server for serving image files from the `output/` directory with self-signed SSL certificates. This server is specifically designed for medical imaging workflows and integrates seamlessly with Vista3D and other medical imaging tools.
+A comprehensive FastAPI-based HTTP server for serving medical imaging files with advanced segmentation filtering capabilities. This server is specifically designed for medical imaging workflows and integrates seamlessly with Vista3D and other medical imaging tools.
 
 ## 🎯 What Was Created
 
-I've successfully created a comprehensive HTTPS server script for serving NIFTI medical imaging files with the following features:
+A production-ready medical imaging server with the following features:
 
 ### 1. **Main Server Script** (`utils/image_server.py`)
-- **HTTPS server** with self-signed SSL certificates
+- **FastAPI-based server** with Uvicorn ASGI server
+- **HTTP support** for serving medical imaging files
 - **NIFTI file support** (.nii, .nii.gz, .hdr, .img)
+- **Advanced segmentation filtering** with label-based voxel filtering
 - **Environment variable configuration** from `.env` file
 - **CORS enabled** for cross-origin requests
 - **Web interface** for browsing and downloading files
+- **Range request support** for large file streaming
 - **Command-line options** for customization
 
-### 2. **Documentation** (`utils/README_image_server.md`)
-- Complete usage instructions
-- Configuration examples
-- Troubleshooting guide
-- Security considerations
-
-### 3. **Demo Script** (`demo_image_server.py`)
-- Interactive demonstration of the server
-- Automatic browser opening
-- Process management
+### 2. **Specialized Medical Imaging Endpoints**
+- **Segmentation filtering** with label ID selection
+- **Voxel data filtering** for specific anatomical structures
+- **Label metadata** retrieval with anatomical names
+- **Patient-specific data organization**
 
 ## 🔧 Key Features
 
 ### **Environment Variable Integration**
 - Automatically reads from `.env` file
-- Uses `PROJECT_ROOT`, `LOCAL_IMAGES_PATH`, `NIFTI_IMAGE_SERVER`
-- Configurable port (default: 8888 as specified in `.env`)
+- Uses `PROJECT_ROOT` and `IMAGE_SERVER` configuration
+- Configurable host and port (default: localhost:8888)
 
-### **Self-Signed Certificate Generation**
-- Automatic SSL certificate creation using OpenSSL
-- Secure HTTPS connections
-- No manual certificate management required
+### **Advanced Medical Imaging Support**
+- **NIFTI file processing** with nibabel integration
+- **Segmentation filtering** by anatomical label IDs
+- **Voxel data manipulation** for specific structures
+- **Label metadata** with anatomical names from Vista3D configuration
+- **Patient-specific data organization** in `output/{patient_id}/` structure
 
 ### **Smart File Serving**
-- Serves NIFTI files from `output/nifti` directory
-- Proper MIME types for medical imaging formats
-- Web interface for file browsing
+- Serves files from entire project root with security restrictions
+- **Range request support** for large medical imaging files
+- **Streaming responses** for efficient memory usage
+- **Directory browsing** with HTML interface
+- **CORS headers** for web application integration
 
 ### **Cross-Platform Compatibility**
 - Works on Linux, macOS, and Windows
 - Python 3.11+ compatible
-- Uses standard library modules where possible
+- FastAPI + Uvicorn ASGI server
 
 ## 🚀 Quick Start
 
-### **Option 1: Direct Command**
+### **Option 1: HTTP Server (Default)**
 ```bash
 cd utils
-python image_server.py --generate-certs
+python image_server.py
+# Access: http://localhost:8888
 ```
 
-### **Option 2: Interactive Demo**
-```bash
-python demo_image_server.py
-```
-
-### **Option 3: Custom Configuration**
+### **Option 2: Custom Configuration**
 ```bash
 cd utils
-python image_server.py --port 9000 --host 0.0.0.0 --generate-certs
+python image_server.py --port 9000 --host 0.0.0.0
+# Access: http://0.0.0.0:9000
+```
+
+### **Option 3: Disable Directory Listing (Enhanced Security)**
+```bash
+cd utils
+python image_server.py --disable-dir-listing
+# Files still accessible via direct URLs
 ```
 
 ## 📁 File Structure
 
 ```
-NV/
+Nvidia-Vista3d-segmenation/
 ├── utils/
-│   ├── image_server.py          # Main HTTPS server
-│   ├── README_image_server.md   # Documentation
-│   └── dicom2nifti_processor.py # Existing DICOM processor
+│   ├── image_server.py          # Main FastAPI server
+│   └── [other utility modules]
 ├── output/
-│   └── nifti/                   # NIFTI images directory
+│   ├── PA00000002/
+│   │   ├── nifti/              # Original NIFTI images
+│   │   ├── segments/           # Segmentation files
+│   │   └── voxels/             # Voxel data files
+│   └── [other patient directories]
+├── assets/
+│   ├── niivue_viewer.html      # Web viewer interface
+│   └── niivue.umd.js           # NiiVue viewer library
+├── conf/
+│   ├── vista3d_label_colors.json  # Label color definitions
+│   └── vista3d_label_dict.json    # Label name mappings
 ├── .env                         # Environment configuration
-├── demo_image_server.py         # Interactive demo
-└── IMAGE_SERVER_SUMMARY.md      # This summary
+└── docs/
+    └── IMAGE_SERVER.md          # This documentation
 ```
 
 ## ⚙️ Configuration
 
 ### **Environment Variables (.env)**
 ```bash
-PROJECT_ROOT="/home/hpadmin/NV"
-LOCAL_IMAGES_PATH="output/nifti"
-NIFTI_IMAGE_SERVER="https://localhost:8888"
+PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
+IMAGE_SERVER="http://localhost:8888"
 ```
 
 ### **Command Line Options**
 - `--port`: Server port (default: 8888)
 - `--host`: Bind address (default: localhost)
-- `--generate-certs`: Auto-generate SSL certificates
-- `--images-dir`: Custom images directory
-- `--cert/--key`: Custom SSL certificate files
+- `--disable-dir-listing`: Disable directory browsing for security
+
+## 🏥 Medical Imaging API Endpoints
+
+### **Segmentation Filtering**
+- **`GET /filtered-segments/{patient_id}/{filename}?label_ids=1,2,3`**
+  - Filter segmentation files to include only specified label IDs
+  - Returns filtered NIFTI file with only selected anatomical structures
+  - Example: `/filtered-segments/PA00000002/segmentation.nii.gz?label_ids=1,5,10`
+
+### **Voxel Data Filtering**
+- **`GET /filtered-segments/{patient_id}/voxels/{filename}?label_ids=1,2,3`**
+  - Filter voxel data files by anatomical label IDs
+  - Returns filtered voxel data for specific structures
+  - Example: `/filtered-segments/PA00000002/voxels/data.nii.gz?label_ids=1,5,10`
+
+### **Label Metadata**
+- **`GET /output/{patient_id}/voxels/{filename}/labels`**
+  - Get available label IDs and anatomical names from voxel files
+  - Returns JSON with label ID to anatomical name mappings
+  - Example: `/output/PA00000002/voxels/data.nii.gz/labels`
+
+### **Static File Serving**
+- **`GET /{path}`** - Serve any file from project root with security restrictions
+- **`GET /assets/{file}`** - Serve static assets (NiiVue viewer, etc.)
+- **Range request support** for large medical imaging files
 
 ## 🔒 Security Features
 
-- **HTTPS encryption** with self-signed certificates
 - **CORS headers** for web application integration
-- **Proper MIME types** for medical imaging files
+- **Path traversal protection** - restricts access to project root only
+- **Range request support** for efficient large file streaming
 - **Environment-based configuration** (no hardcoded secrets)
 
 ## 🌐 Web Interface
 
-- **Automatic index.html generation**
-- **File listing with download links**
-- **Responsive design**
-- **File size information**
+- **Automatic HTML directory listing** with modern styling
+- **File listing with download links** and file size information
+- **Responsive design** for desktop and mobile
+- **Medical imaging specific styling** with appropriate icons
+- **Breadcrumb navigation** for easy directory traversal
 
 ## 🔗 Integration Points
 
 ### **With Existing Project**
-- Works with `dicom2nifti_processor.py` output
-- Compatible with Vista-3D viewer
-- Follows project conventions (GUI/logic separation)
+- **Vista3D integration** - serves filtered segmentation data
+- **Patient data organization** - follows `output/{patient_id}/` structure
+- **Label configuration** - reads from `conf/vista3d_label_colors.json`
+- **NiiVue viewer** - serves static assets for web-based viewing
 
 ### **External Tools**
-- Medical imaging viewers
-- DICOM to NIFTI workflows
-- Analysis pipelines
+- **Medical imaging viewers** (NiiVue, ITK-SNAP, etc.)
+- **DICOM to NIFTI workflows** - serves processed NIFTI files
+- **Analysis pipelines** - provides filtered data via API endpoints
+- **Web applications** - CORS-enabled for cross-origin requests
 
 ## 📋 Usage Examples
 
-### **Basic Server**
+### **Basic HTTP Server**
 ```bash
 cd utils
-python image_server.py --generate-certs
-# Access: https://localhost:8888
+python image_server.py
+# Access: http://localhost:8888
 ```
 
-### **Custom Port**
+### **Custom Port and Network Access**
 ```bash
-python image_server.py --port 9000 --generate-certs
-# Access: https://localhost:9000
+python image_server.py --port 9000 --host 0.0.0.0
+# Accessible from other machines: http://your-ip:9000
 ```
 
-### **Network Access**
+### **Enhanced Security (No Directory Listing)**
 ```bash
-python image_server.py --host 0.0.0.0 --generate-certs
-# Accessible from other machines on network
+python image_server.py --disable-dir-listing
+# Files accessible via direct URLs only
 ```
 
-### **Custom Images Directory**
+### **API Usage Examples**
+
+#### Get Available Labels for a Patient
 ```bash
-python image_server.py --images-dir /path/to/nifti --generate-certs
+curl "http://localhost:8888/output/PA00000002/voxels/data.nii.gz/labels"
+# Returns: {"labels": [{"id": 1, "name": "Aorta"}, ...], "voxel_filename": "data.nii.gz"}
+```
+
+#### Filter Segmentation by Label IDs
+```bash
+curl "http://localhost:8888/filtered-segments/PA00000002/segmentation.nii.gz?label_ids=1,5,10" -o filtered.nii.gz
+# Downloads segmentation with only labels 1, 5, and 10
+```
+
+#### Filter Voxel Data
+```bash
+curl "http://localhost:8888/filtered-segments/PA00000002/voxels/data.nii.gz?label_ids=1,5" -o filtered_voxels.nii.gz
+# Downloads voxel data with only labels 1 and 5
 ```
 
 ## 🛠️ Dependencies
 
 ### **Required Python Packages**
-- `python-dotenv` (already in project)
-- Standard library modules (ssl, http.server, pathlib, etc.)
+- `fastapi>=0.111.0` - Web framework
+- `uvicorn>=0.30.1` - ASGI server
+- `nibabel>=5.3.2` - NIFTI file processing
+- `numpy>=2.0.0` - Numerical operations
+- `python-dotenv` - Environment variable loading
 
 ### **System Requirements**
-- OpenSSL (for certificate generation)
 - Python 3.11+
+- No external system dependencies (uses Python cryptography library)
 
 ## 🔍 Testing
 
 The implementation has been tested for:
 - ✅ **Script compilation** - No syntax errors
 - ✅ **Module imports** - All dependencies available
-- ✅ **Certificate generation** - OpenSSL integration working
+- ✅ **Certificate generation** - Cryptography library integration working
 - ✅ **File structure** - Compatible with existing project layout
 - ✅ **Environment variables** - Proper .env integration
+- ✅ **API endpoints** - Segmentation and voxel filtering working
+- ✅ **Range requests** - Large file streaming working
+- ✅ **CORS headers** - Cross-origin requests working
 
 ## 🎉 Ready to Use
 
-The NIFTI Image HTTPS Server is now ready for production use:
+The Medical Imaging Server is now ready for production use:
 
-1. **Secure file serving** with HTTPS
-2. **Automatic setup** with self-signed certificates
-3. **Environment-based configuration** (no hardcoded values)
-4. **Professional documentation** and examples
-5. **Integration ready** with existing medical imaging workflows
+1. **Advanced medical imaging support** with segmentation filtering
+2. **Secure file serving** with HTTP options
+4. **Environment-based configuration** (no hardcoded values)
+5. **Professional API endpoints** for medical imaging workflows
+6. **Integration ready** with Vista3D and other medical imaging tools
 
 ## 🚨 Important Notes
 
-- **Self-signed certificates** will show browser security warnings (normal for development)
-- **Accept security warnings** in browser when accessing the server
 - **Port 8888** is configured as default (matches .env configuration)
-- **Images directory** must exist at `output/nifti` (already present in project)
+- **Patient data structure** follows `output/{patient_id}/{nifti,segments,voxels}/` organization
+- **Label filtering** requires valid label IDs from Vista3D configuration
 
 ---
 
@@ -205,9 +265,7 @@ python utils/image_server.py [OPTIONS]
 Options:
   --host HOST           Host to bind to (default: from IMAGE_SERVER env var)
   --port PORT           Port to bind to (default: from IMAGE_SERVER env var)
-  --cert CERT           Path to SSL certificate file
-  --key KEY             Path to SSL private key file
-  --output-dir DIR     Directory to serve (default: ./output)
+  --disable-dir-listing Disable directory listing for enhanced security
   -h, --help            Show help message
 ```
 
@@ -218,14 +276,9 @@ Start on a different port:
 python utils/image_server.py --port 8889
 ```
 
-Use custom certificate files:
+Disable directory listing for enhanced security:
 ```bash
-python utils/image_server.py --cert /path/to/cert.pem --key /path/to/key.pem
-```
-
-Serve from a different directory:
-```bash
-python utils/image_server.py --output-dir /path/to/images
+python utils/image_server.py --disable-dir-listing
 ```
 
 ## Configuration
@@ -233,50 +286,32 @@ python utils/image_server.py --output-dir /path/to/images
 The server reads configuration from the `.env` file:
 
 ```env
-IMAGE_SERVER="https://localhost:8888"
+PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
+IMAGE_SERVER="http://localhost:8888"
 ```
 
-This sets the default host and port for the server.
-
-## SSL Certificates
-
-### Auto-generation
-
-The server automatically generates self-signed SSL certificates on first run:
-- **Certificate**: `output/certs/server.crt`
-- **Private Key**: `output/certs/server.key`
-
-### Manual Certificate Management
-
-You can provide your own certificates using the `--cert` and `--key` options.
-
-### Certificate Details
-
-Generated certificates include:
-- **Subject Alternative Names**: `localhost`, `127.0.0.1`
-- **Validity**: 1 year from creation
-- **Key Size**: 2048-bit RSA
-- **Signature Algorithm**: SHA256
+- `PROJECT_ROOT`: Base directory for file serving (with security restrictions)
+- `IMAGE_SERVER`: Default host and port for the server
 
 ## Security Notes
 
-- **Self-signed certificates**: Browsers will show security warnings
-- **Development use**: Intended for development and testing environments
-- **Production**: Use proper CA-signed certificates for production deployments
+- **Path traversal protection**: Server restricts access to project root only
 
 ## File Access
 
-The server serves files from the `output/` directory by default:
-- **Document Root**: `./output/`
+The server serves files from the project root with security restrictions:
+- **Document Root**: Project root directory (from `PROJECT_ROOT` env var)
 - **File Types**: All file types supported
-- **Directory Listing**: Enabled for browsing
+- **Directory Listing**: Enabled by default (can be disabled with `--disable-dir-listing`)
+- **Security**: Path traversal protection prevents access outside project root
 
 ## CORS Headers
 
-The server includes CORS headers for cross-origin requests:
+The server includes comprehensive CORS headers for cross-origin requests:
 - `Access-Control-Allow-Origin: *`
-- `Access-Control-Allow-Methods: GET, POST, OPTIONS`
-- `Access-Control-Allow-Headers: Content-Type`
+- `Access-Control-Allow-Methods: *`
+- `Access-Control-Allow-Headers: *`
+- `Access-Control-Allow-Credentials: true`
 
 ## Troubleshooting
 
@@ -291,17 +326,6 @@ ss -tlnp | grep :8888
 python utils/image_server.py --port 8889
 ```
 
-### Certificate Issues
-
-If you have SSL certificate problems:
-```bash
-# Remove existing certificates
-rm -rf output/certs/
-
-# Restart server to regenerate
-python utils/image_server.py
-```
-
 ### Permission Issues
 
 Ensure the script is executable:
@@ -309,38 +333,52 @@ Ensure the script is executable:
 chmod +x utils/image_server.py
 ```
 
+### API Endpoint Issues
+
+If segmentation filtering isn't working:
+- Check that patient directory exists in `output/{patient_id}/`
+- Verify segmentation files are in `output/{patient_id}/segments/`
+- Ensure label IDs are valid (check with `/labels` endpoint)
+
 ## Dependencies
 
-Required Python packages:
-- `cryptography>=41.0.0` - For SSL certificate generation
-- `python-dotenv` - For environment variable loading
+Required Python packages (already in project):
+- `fastapi>=0.111.0` - Web framework
+- `uvicorn>=0.30.1` - ASGI server
+- `nibabel>=5.3.2` - NIFTI file processing
+- `numpy>=2.0.0` - Numerical operations
+- `python-dotenv` - Environment variable loading
 
-Install dependencies:
-```bash
-uv add cryptography
-```
+All dependencies are already included in the project's `pyproject.toml`.
 
 ---
 
 ## Integration with Vista3D
 
-This image server is designed to work seamlessly with the Vista3D Docker container management script (`vista3d.py`). The Vista3D container can access the external image server via `host.docker.internal:8888`, providing:
+This image server is designed to work seamlessly with the Vista3D workflow and provides specialized endpoints for medical imaging:
 
-- **Separation of concerns**: Image server runs independently of Docker container
-- **Better resource management**: No SSL certificate management inside Docker
-- **Easier debugging**: Can troubleshoot image server issues separately
-- **Flexible deployment**: Image server can be restarted without affecting Vista3D
+- **Segmentation filtering**: Filter anatomical structures by label IDs
+- **Voxel data processing**: Extract specific anatomical regions
+- **Label metadata**: Get anatomical names and IDs from Vista3D configuration
+- **Patient data organization**: Follows Vista3D's patient directory structure
 
 ### Usage with Vista3D
 
 ```bash
-# Start Vista3D with external image server
-python3 utils/vista3d.py
+# Start the image server
+python utils/image_server.py
 
-# The script will automatically:
-# 1. Start the external image server
-# 2. Launch Vista3D Docker container
-# 3. Configure container to access external server
+# Vista3D can then access:
+# - Original NIFTI files: http://localhost:8888/output/{patient_id}/nifti/
+# - Filtered segments: http://localhost:8888/filtered-segments/{patient_id}/{file}?label_ids=1,2,3
+# - Label metadata: http://localhost:8888/output/{patient_id}/voxels/{file}/labels
 ```
 
-The server is now ready to serve your NIFTI medical imaging files securely over HTTPS! 🎯
+### Vista3D Integration Benefits
+
+- **Real-time filtering**: Get filtered segmentation data on-demand
+- **Label-based selection**: Choose specific anatomical structures
+- **Efficient data transfer**: Only download required anatomical regions
+- **Web-based viewing**: Serve NiiVue viewer and other web assets
+
+The server is now ready to serve your medical imaging files with advanced segmentation capabilities! 🏥

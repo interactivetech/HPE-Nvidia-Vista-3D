@@ -83,5 +83,5 @@ CONFIG_FILES = {
 
 # Template paths
 TEMPLATE_FILES = {
-    'viewer': 'templates/niivue_viewer.html'
+    'viewer': 'assets/niivue_viewer.html'
 }
