@@ -213,6 +213,7 @@ def render_threejs_viewer(mesh_files: List[Dict[str, str]], show_wireframe: bool
                             
                             // DON'T center individual meshes - preserve their spatial relationships
                             // The STL files now contain real-world coordinates in mm with correct positioning
+                            // These coordinates are properly transformed using affine matrices from the original DICOM data
                             
                             scene.add(currentMesh);
                             loadedMeshes.push(currentMesh);
@@ -281,6 +282,8 @@ def render_threejs_viewer(mesh_files: List[Dict[str, str]], show_wireframe: bool
                         }},
                         function (error) {{
                             console.error(`Error loading STL file ${{meshFile.name}}:`, error);
+                            console.error(`This may be due to an invalid STL file or network issues.`);
+                            console.error(`Please check if the mesh file was generated correctly.`);
                         }}
                     );
                 }});
@@ -343,6 +346,9 @@ def render_sidebar():
             return None, None, None
         
         st.success("✅ Image Server Online")
+        
+        # Add note about improved mesh quality
+        st.info("💡 Meshes now use improved VTK generation with proper coordinate alignment")
         
         # Patient selection
         patient_folders = data_manager.get_server_data('', 'folders', ('',))
@@ -423,6 +429,21 @@ def main():
     
     st.title("🔺 3D Mesh Viewer")
     st.markdown("Navigate and view STL mesh files from the image server")
+    
+    # Add information about improved mesh quality
+    with st.expander("ℹ️ About Mesh Quality", expanded=False):
+        st.markdown("""
+        **Improved Mesh Generation:**
+        - Meshes are generated using VTK with proper affine transformations
+        - Coordinates are accurately positioned in real-world space (mm)
+        - Meshes are cleaned and optimized for better visualization
+        - Spatial relationships between anatomical structures are preserved
+        
+        **Controls:**
+        - **Mouse**: Rotate, zoom, and pan the 3D view
+        - **R key**: Reset view to fit all meshes
+        - **Wireframe**: Toggle wireframe overlay in sidebar
+        """)
     
     # Render sidebar and get selections
     selected_patient, selected_ct_scan, selected_meshes = render_sidebar()
