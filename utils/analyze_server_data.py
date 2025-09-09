@@ -7,11 +7,13 @@ CURRENT STRUCTURE:
 - output/{patient_id}/nifti/         (CT scan files)
 - output/{patient_id}/segments/      (full segmentation files)
 - output/{patient_id}/voxels/{ct_scan_name}/  (individual voxel files)
+- output/{patient_id}/mesh/{ct_scan_name}/    (STL mesh files)
 
 OLD STRUCTURE (legacy):
 - output/nifti/{patient_id}/         (CT scan files)
 - output/segments/{patient_id}/      (segmentation files)
 - output/segments/{patient_id}/voxels/  (voxel files)
+- output/segments/{patient_id}/mesh/    (STL mesh files)
 
 Usage:
     python utils/analyze_server_data.py
@@ -245,6 +247,18 @@ def get_voxel_files(segments_folder_contents: List[Dict[str, str]]) -> List[Dict
             })
     return voxel_files
 
+def get_mesh_files(mesh_folder_contents: List[Dict[str, str]]) -> List[Dict[str, any]]:
+    """Extract mesh files (STL) from mesh folder contents with size info."""
+    mesh_files = []
+    for item in mesh_folder_contents:
+        if not item['is_directory'] and item['name'].endswith('.stl'):
+            mesh_files.append({
+                'name': item['name'],
+                'size_bytes': item.get('size_bytes', 0),
+                'size_display': item.get('size', 'Unknown')
+            })
+    return mesh_files
+
 # Removed get_voxel_folder_contents - now handled directly in analyze_patient_data
 
 def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool = False) -> Dict:
@@ -256,11 +270,13 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
         nifti_folder_path = f"nifti/{patient_id}"
         segments_folder_path = f"segments/{patient_id}"
         voxel_folder_path = f"segments/{patient_id}/voxels"
+        mesh_folder_path = f"segments/{patient_id}/mesh"
         structure_type = "old"
     else:
         nifti_folder_path = f"{patient_id}/nifti"
         segments_folder_path = f"{patient_id}/segments"
         voxel_folder_path = f"{patient_id}/voxels"
+        mesh_folder_path = f"{patient_id}/mesh"
         structure_type = "current"
     
     print(f"    Using {structure_type} folder structure")
@@ -277,6 +293,9 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
             'voxel_data': {},
             'total_voxel_files': 0,
             'total_voxel_size_bytes': 0,
+            'mesh_data': {},
+            'total_mesh_files': 0,
+            'total_mesh_size_bytes': 0,
             'total_patient_size_bytes': 0,
             'error': f'Could not access nifti folder ({structure_type} structure)',
             'structure_type': structure_type
@@ -295,12 +314,19 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     total_voxel_files = 0
     total_voxel_size_bytes = 0
     
+    mesh_data = {}
+    total_mesh_files = 0
+    total_mesh_size_bytes = 0
+    
     # Get voxel folder contents (different logic for new vs old structure)
     if use_old_structure:
         voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
     else:
         # In current structure, voxels are organized by CT scan subfolders
         voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
+    
+    # Get mesh folder contents (same structure as voxels)
+    mesh_folder_contents = get_folder_contents(base_url, mesh_folder_path)
     
     if segments_contents:
         # For each CT scan, check for corresponding voxel data
@@ -361,6 +387,47 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
                                     })
                                     scan_voxel_size_bytes += item.get('size_bytes', 0)
             
+            # Count mesh files for this specific scan
+            scan_mesh_files = []
+            scan_mesh_size_bytes = 0
+            
+            if mesh_folder_contents:
+                if use_old_structure:
+                    # Old structure: Find mesh files that start with the scan name
+                    scan_base_name = ct_scan_name.replace('.nii.gz', '')
+                    for item in mesh_folder_contents:
+                        if not item['is_directory'] and item['name'].startswith(scan_base_name + '_') and item['name'].endswith('.stl'):
+                            scan_mesh_files.append({
+                                'name': item['name'],
+                                'size_bytes': item.get('size_bytes', 0),
+                                'size_display': item.get('size', 'Unknown')
+                            })
+                            scan_mesh_size_bytes += item.get('size_bytes', 0)
+                else:
+                    # Current structure: Look for CT scan subfolder in mesh directory
+                    scan_base_name = ct_scan_name.replace('.nii.gz', '').replace('.nii', '')
+                    ct_scan_mesh_folder = None
+                    
+                    # Find the subfolder for this CT scan
+                    for item in mesh_folder_contents:
+                        if item['is_directory'] and item['name'] == scan_base_name:
+                            ct_scan_mesh_folder = item['name']
+                            break
+                    
+                    # If found, get contents of the CT scan mesh subfolder
+                    if ct_scan_mesh_folder:
+                        ct_scan_mesh_path = f"{mesh_folder_path}/{ct_scan_mesh_folder}"
+                        ct_scan_mesh_contents = get_folder_contents(base_url, ct_scan_mesh_path)
+                        if ct_scan_mesh_contents:
+                            for item in ct_scan_mesh_contents:
+                                if not item['is_directory'] and item['name'].endswith('.stl'):
+                                    scan_mesh_files.append({
+                                        'name': item['name'],
+                                        'size_bytes': item.get('size_bytes', 0),
+                                        'size_display': item.get('size', 'Unknown')
+                                    })
+                                    scan_mesh_size_bytes += item.get('size_bytes', 0)
+            
             voxel_data[ct_scan_name] = {
                 'has_voxel_file': has_voxel_file,
                 'voxel_file_name': ct_scan_name if has_voxel_file else None,
@@ -371,14 +438,22 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
                 'total_size_bytes': segmentation_size_bytes + scan_voxel_size_bytes
             }
             
+            mesh_data[ct_scan_name] = {
+                'mesh_folder_files': scan_mesh_files,
+                'mesh_count': len(scan_mesh_files),
+                'mesh_size_bytes': scan_mesh_size_bytes
+            }
+            
             total_voxel_files += len(scan_voxel_files)
             if has_voxel_file:
                 total_voxel_files += 1
             
             total_voxel_size_bytes += segmentation_size_bytes + scan_voxel_size_bytes
+            total_mesh_files += len(scan_mesh_files)
+            total_mesh_size_bytes += scan_mesh_size_bytes
     
     # Calculate total patient data size
-    total_patient_size_bytes = total_ct_size_bytes + total_voxel_size_bytes
+    total_patient_size_bytes = total_ct_size_bytes + total_voxel_size_bytes + total_mesh_size_bytes
     
     return {
         'patient_id': patient_id,
@@ -388,6 +463,9 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
         'voxel_data': voxel_data,
         'total_voxel_files': total_voxel_files,
         'total_voxel_size_bytes': total_voxel_size_bytes,
+        'mesh_data': mesh_data,
+        'total_mesh_files': total_mesh_files,
+        'total_mesh_size_bytes': total_mesh_size_bytes,
         'total_patient_size_bytes': total_patient_size_bytes,
         'structure_type': structure_type,
         'error': None
@@ -434,11 +512,13 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     total_ct_scans = sum(patient.get('total_ct_scans', 0) for patient in analysis_data)
     total_ct_size_bytes = sum(patient.get('total_ct_size_bytes', 0) for patient in analysis_data)
     total_voxel_size_bytes = sum(patient.get('total_voxel_size_bytes', 0) for patient in analysis_data)
+    total_mesh_size_bytes = sum(patient.get('total_mesh_size_bytes', 0) for patient in analysis_data)
     total_data_size_bytes = sum(patient.get('total_patient_size_bytes', 0) for patient in analysis_data)
     
     # Calculate statistics
     patients_with_data = len([p for p in analysis_data if p.get('total_ct_scans', 0) > 0])
     patients_with_voxels = len([p for p in analysis_data if p.get('total_voxel_files', 0) > 0])
+    patients_with_meshes = len([p for p in analysis_data if p.get('total_mesh_files', 0) > 0])
     
     # Generate report
     report_lines = []
@@ -454,12 +534,14 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     report_lines.append(f"Total Patients Found: {total_patients}")
     report_lines.append(f"Patients with CT Scans: {patients_with_data}")
     report_lines.append(f"Patients with Voxel Data: {patients_with_voxels}")
+    report_lines.append(f"Patients with Mesh Data: {patients_with_meshes}")
     report_lines.append(f"Total CT Scans: {total_ct_scans}")
     report_lines.append("")
     report_lines.append("💾 DATA SIZE SUMMARY")
     report_lines.append("-" * 40)
     report_lines.append(f"Total CT Scan Data: {format_file_size(total_ct_size_bytes)}")
     report_lines.append(f"Total Voxel Data: {format_file_size(total_voxel_size_bytes)}")
+    report_lines.append(f"Total Mesh Data: {format_file_size(total_mesh_size_bytes)}")
     report_lines.append(f"Total Data Size: {format_file_size(total_data_size_bytes)}")
     report_lines.append("")
     
@@ -477,6 +559,7 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
         
         report_lines.append(f"   📊 CT Scans: {patient.get('total_ct_scans', 0)} ({format_file_size(patient.get('total_ct_size_bytes', 0))})")
         report_lines.append(f"   🧬 Voxel Files: {patient.get('total_voxel_files', 0)} ({format_file_size(patient.get('total_voxel_size_bytes', 0))})")
+        report_lines.append(f"   🔺 Mesh Files: {patient.get('total_mesh_files', 0)} ({format_file_size(patient.get('total_mesh_size_bytes', 0))})")
         report_lines.append(f"   💾 Total Data: {format_file_size(patient.get('total_patient_size_bytes', 0))}")
         
         if patient.get('ct_scans'):
@@ -485,23 +568,32 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
                 ct_scan_name = ct_scan_info.get('name', 'Unknown')
                 ct_scan_size = ct_scan_info.get('size_bytes', 0)
                 voxel_info = patient.get('voxel_data', {}).get(ct_scan_name, {})
+                mesh_info = patient.get('mesh_data', {}).get(ct_scan_name, {})
                 has_voxel_file = voxel_info.get('has_voxel_file', False)
                 voxel_count = voxel_info.get('voxel_count', 0)
-                total_scan_size = voxel_info.get('total_size_bytes', 0)
+                mesh_count = mesh_info.get('mesh_count', 0)
+                total_scan_size = voxel_info.get('total_size_bytes', 0) + mesh_info.get('mesh_size_bytes', 0)
                 
                 # Remove .nii.gz extension for display
                 scan_display_name = ct_scan_name.replace('.nii.gz', '')
                 
                 voxel_status = "✅" if has_voxel_file or voxel_count > 0 else "❌"
+                mesh_status = "✅" if mesh_count > 0 else "❌"
                 voxel_details = []
                 if has_voxel_file:
                     voxel_details.append("segmentation file")
                 if voxel_count > 0:
                     voxel_details.append(f"{voxel_count} voxels")
                 
+                mesh_details = []
+                if mesh_count > 0:
+                    mesh_details.append(f"{mesh_count} meshes")
+                
                 voxel_text = f" ({', '.join(voxel_details)})" if voxel_details else " (no voxel data)"
+                mesh_text = f" ({', '.join(mesh_details)})" if mesh_details else " (no mesh data)"
                 size_text = f" [{format_file_size(ct_scan_size)} + {format_file_size(total_scan_size - ct_scan_size)} = {format_file_size(total_scan_size)}]"
-                report_lines.append(f"      {voxel_status} {scan_display_name}{voxel_text}{size_text}")
+                report_lines.append(f"      {voxel_status} {scan_display_name}{voxel_text}")
+                report_lines.append(f"      {mesh_status} {scan_display_name}{mesh_text}{size_text}")
     
     # File structure overview
     report_lines.append("\n📁 FILE STRUCTURE OVERVIEW")
@@ -516,20 +608,29 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     report_lines.append("│   ├── segments/")
     report_lines.append("│   │   ├── 1.25_mm_4.nii.gz  (full segmentation)")
     report_lines.append("│   │   └── 2.5_mm_STD_-_30%_ASIR_2.nii.gz")
-    report_lines.append("│   └── voxels/")
+    report_lines.append("│   ├── voxels/")
+    report_lines.append("│   │   ├── 1.25_mm_4/")
+    report_lines.append("│   │   │   ├── aorta.nii.gz")
+    report_lines.append("│   │   │   └── inferior_vena_cava.nii.gz")
+    report_lines.append("│   │   └── 2.5_mm_STD_-_30%_ASIR_2/")
+    report_lines.append("│   │       ├── aorta.nii.gz")
+    report_lines.append("│   │       └── inferior_vena_cava.nii.gz")
+    report_lines.append("│   └── mesh/")
     report_lines.append("│       ├── 1.25_mm_4/")
-    report_lines.append("│       │   ├── aorta.nii.gz")
-    report_lines.append("│       │   └── inferior_vena_cava.nii.gz")
+    report_lines.append("│       │   ├── aorta.stl")
+    report_lines.append("│       │   └── inferior_vena_cava.stl")
     report_lines.append("│       └── 2.5_mm_STD_-_30%_ASIR_2/")
-    report_lines.append("│           ├── aorta.nii.gz")
-    report_lines.append("│           └── inferior_vena_cava.nii.gz")
+    report_lines.append("│           ├── aorta.stl")
+    report_lines.append("│           └── inferior_vena_cava.stl")
     report_lines.append("└── PA00000003/")
     report_lines.append("    (same structure...)")
     report_lines.append("")
     report_lines.append("OLD STRUCTURE (still supported):")
     report_lines.append("output/")
     report_lines.append("├── nifti/PA00000002/")
-    report_lines.append("└── segments/PA00000002/")
+    report_lines.append("├── segments/PA00000002/")
+    report_lines.append("│   ├── voxels/")
+    report_lines.append("│   └── mesh/")
     
     report_lines.append("\n" + "=" * 80)
     report_lines.append("✅ Analysis Complete")
@@ -628,6 +729,9 @@ def main():
                 'voxel_data': {},
                 'total_voxel_files': 0,
                 'total_voxel_size_bytes': 0,
+                'mesh_data': {},
+                'total_mesh_files': 0,
+                'total_mesh_size_bytes': 0,
                 'total_patient_size_bytes': 0,
                 'error': f'Analysis failed: {str(e)}',
                 'structure_type': 'unknown'
