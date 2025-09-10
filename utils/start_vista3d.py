@@ -90,6 +90,51 @@ class Vista3DManager:
             'ALLOW_HTTP_ACCESS': os.getenv('ALLOW_HTTP_ACCESS', 'True'),
             'ALLOW_HTTPS_ACCESS': os.getenv('ALLOW_HTTPS_ACCESS', 'True'),
             
+            # Additional Network Access Configuration
+            'ALLOW_REMOTE_ACCESS': os.getenv('ALLOW_REMOTE_ACCESS', 'True'),
+            'ALLOW_CROSS_ORIGIN': os.getenv('ALLOW_CROSS_ORIGIN', 'True'),
+            'DISABLE_CORS': os.getenv('DISABLE_CORS', 'True'),
+            'ALLOW_ANY_ORIGIN': os.getenv('ALLOW_ANY_ORIGIN', 'True'),
+            'ALLOW_ANY_HOST': os.getenv('ALLOW_ANY_HOST', 'True'),
+            'DISABLE_ORIGIN_VALIDATION': os.getenv('DISABLE_ORIGIN_VALIDATION', 'True'),
+            'ALLOW_WILDCARD_HOSTS': os.getenv('ALLOW_WILDCARD_HOSTS', 'True'),
+            'DISABLE_IP_VALIDATION': os.getenv('DISABLE_IP_VALIDATION', 'True'),
+            'ALLOW_PRIVATE_IPS': os.getenv('ALLOW_PRIVATE_IPS', 'True'),
+            'ALLOW_PUBLIC_IPS': os.getenv('ALLOW_PUBLIC_IPS', 'True'),
+            'ALLOW_LOCALHOST': os.getenv('ALLOW_LOCALHOST', 'True'),
+            'ALLOW_LOOPBACK': os.getenv('ALLOW_LOOPBACK', 'True'),
+            'DISABLE_NETWORK_RESTRICTIONS': os.getenv('DISABLE_NETWORK_RESTRICTIONS', 'True'),
+            'ENABLE_EXTERNAL_ACCESS': os.getenv('ENABLE_EXTERNAL_ACCESS', 'True'),
+            'ALLOW_IMAGE_SERVER_ACCESS': os.getenv('ALLOW_IMAGE_SERVER_ACCESS', 'True'),
+            'DISABLE_IMAGE_SERVER_VALIDATION': os.getenv('DISABLE_IMAGE_SERVER_VALIDATION', 'True'),
+            
+            # CORS and Headers Configuration
+            'CORS_ALLOW_ORIGINS': os.getenv('CORS_ALLOW_ORIGINS', '*'),
+            'CORS_ALLOW_METHODS': os.getenv('CORS_ALLOW_METHODS', 'GET,POST,PUT,DELETE,OPTIONS'),
+            'CORS_ALLOW_HEADERS': os.getenv('CORS_ALLOW_HEADERS', '*'),
+            'CORS_ALLOW_CREDENTIALS': os.getenv('CORS_ALLOW_CREDENTIALS', 'True'),
+            'CORS_EXPOSE_HEADERS': os.getenv('CORS_EXPOSE_HEADERS', '*'),
+            'CORS_MAX_AGE': os.getenv('CORS_MAX_AGE', '3600'),
+            'DISABLE_CORS_CHECKS': os.getenv('DISABLE_CORS_CHECKS', 'True'),
+            'ALLOW_ALL_ORIGINS': os.getenv('ALLOW_ALL_ORIGINS', 'True'),
+            'ALLOW_ALL_METHODS': os.getenv('ALLOW_ALL_METHODS', 'True'),
+            'ALLOW_ALL_HEADERS': os.getenv('ALLOW_ALL_HEADERS', 'True'),
+            
+            # Vista3D Specific Configuration for External Access
+            'VISTA3D_ALLOW_EXTERNAL_IMAGES': os.getenv('VISTA3D_ALLOW_EXTERNAL_IMAGES', 'True'),
+            'VISTA3D_DISABLE_IMAGE_VALIDATION': os.getenv('VISTA3D_DISABLE_IMAGE_VALIDATION', 'True'),
+            'VISTA3D_ALLOW_ANY_URL': os.getenv('VISTA3D_ALLOW_ANY_URL', 'True'),
+            'VISTA3D_DISABLE_URL_VALIDATION': os.getenv('VISTA3D_DISABLE_URL_VALIDATION', 'True'),
+            'VISTA3D_ALLOW_REMOTE_FILES': os.getenv('VISTA3D_ALLOW_REMOTE_FILES', 'True'),
+            'VISTA3D_DISABLE_FILE_VALIDATION': os.getenv('VISTA3D_DISABLE_FILE_VALIDATION', 'True'),
+            'VISTA3D_ENABLE_NETWORK_ACCESS': os.getenv('VISTA3D_ENABLE_NETWORK_ACCESS', 'True'),
+            'VISTA3D_ALLOW_HTTP_DOWNLOADS': os.getenv('VISTA3D_ALLOW_HTTP_DOWNLOADS', 'True'),
+            'VISTA3D_ALLOW_HTTPS_DOWNLOADS': os.getenv('VISTA3D_ALLOW_HTTPS_DOWNLOADS', 'True'),
+            'VISTA3D_DISABLE_SSL_VERIFICATION': os.getenv('VISTA3D_DISABLE_SSL_VERIFICATION', 'True'),
+            'VISTA3D_ALLOW_INSECURE_CONNECTIONS': os.getenv('VISTA3D_ALLOW_INSECURE_CONNECTIONS', 'True'),
+            'VISTA3D_TIMEOUT': os.getenv('VISTA3D_TIMEOUT', '300'),
+            'VISTA3D_MAX_RETRIES': os.getenv('VISTA3D_MAX_RETRIES', '3'),
+            
             # Workspace Configuration
             'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/output/nifti'),
             'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/output'),
@@ -116,13 +161,26 @@ class Vista3DManager:
         # Permissive whitelist to allow any IP address or hostname
         self.domain_whitelist = [
             "*",
-            "http://*", "https://*",
-            "http://*:*", "https://*:*",
+            "**",
+            "http://*",
+            "https://*", 
+            "http://*:*",
+            "https://*:*",
+            "http://**",
+            "https://**",
+            "http://**:**",
+            "https://**:**",
             "file:///*",
+            "file:///**",
             "localhost",
             "127.0.0.1",
             "0.0.0.0",
+            "::1",
+            "10.*",
+            "172.*",
+            "192.168.*",
             "/workspace/output/nifti/*",
+            "/workspace/output/nifti/**",
         ]
 
     def _register_signal_handlers(self):
@@ -239,17 +297,10 @@ class Vista3DManager:
         host_entries = "--add-host=host.docker.internal:host-gateway"
         host_entries += " --add-host=localhost:host-gateway"
         host_entries += " --add-host=127.0.0.1:host-gateway"
+        host_entries += " --add-host=0.0.0.0:host-gateway"
+        host_entries += " --add-host=::1:host-gateway"
         
-        docker_cmd = f"""
-            docker run --gpus all --rm -d --name {self.container_name} \
-            --runtime=nvidia \
-            --shm-size=8G \
-            {host_entries} \
-            {network_config} \
-            {volumes} \
-            {env_vars} \
-            nvcr.io/nim/nvidia/vista3d:1.0.0
-        """
+        docker_cmd = f"""docker run --gpus all --rm -d --name {self.container_name} --runtime=nvidia --shm-size=8G {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
         
         try:
             result = self.run_command(docker_cmd)
@@ -294,6 +345,11 @@ class Vista3DManager:
         logger.info("✅ Vista3D is configured to accept connections from any image server")
         logger.info("✅ External IP access is enabled")
         logger.info("✅ Domain whitelist is permissive")
+        logger.info("✅ CORS is disabled to allow cross-origin requests")
+        logger.info("✅ Network restrictions are disabled")
+        logger.info("✅ Image server validation is disabled")
+        logger.info("✅ URL validation is disabled")
+        logger.info("✅ Host validation is disabled")
     
     def create_systemd_service(self):
         """Create systemd service for automatic startup"""
@@ -384,6 +440,11 @@ WantedBy=multi-user.target
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         logger.info(f"Vista-3D is now running on port {vista3d_port}")
         logger.info("Vista-3D is configured to accept connections from any image server")
+        logger.info("✅ External access is fully enabled")
+        logger.info("✅ Any IP address or hostname is allowed")
+        logger.info("✅ CORS restrictions are disabled")
+        logger.info("✅ Network validation is disabled")
+        logger.info("✅ Image server validation is disabled")
         logger.info("==========================================")
         
         logger.info("\nUseful commands:")
@@ -412,8 +473,9 @@ For automatic startup on boot:
 
 Network Access Configuration:
   Vista3D is configured to accept connections from any image server by default.
+  All network restrictions, CORS checks, and validation are disabled for maximum compatibility.
   
-  Environment Variables:
+  Key Environment Variables:
     USE_HOST_NETWORKING=True            # Use host networking (allows all interfaces)
     VISTA3D_PORT=8000                  # Port for Vista3D (when not using host networking)
     ALLOW_ANY_IMAGE_SERVER_HOST=True   # Allow any host/IP for image server access
@@ -422,6 +484,10 @@ Network Access Configuration:
     DISABLE_HOST_VALIDATION=True       # Disable host validation
     ALLOW_HTTP_ACCESS=True             # Allow HTTP access
     ALLOW_HTTPS_ACCESS=True            # Allow HTTPS access
+    DISABLE_CORS=True                  # Disable CORS restrictions
+    DISABLE_NETWORK_RESTRICTIONS=True  # Disable all network restrictions
+    VISTA3D_ALLOW_EXTERNAL_IMAGES=True # Allow external image access
+    VISTA3D_DISABLE_IMAGE_VALIDATION=True # Disable image validation
   
   Examples:
     # Use host networking for maximum external access
