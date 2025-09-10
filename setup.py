@@ -23,6 +23,10 @@ import platform
 import shutil
 from pathlib import Path
 from typing import Optional, Tuple
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def print_status(message: str, status: str = "info"):
     """Print a formatted status message."""
@@ -649,7 +653,8 @@ def start_vista3d_container(api_key: str, org_id: str) -> bool:
     run_command(["sudo", "docker", "rm", "vista3d"], check=False)
     
     # Create output directory
-    output_dir = Path("output").absolute()
+    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+    output_dir = Path(output_folder).absolute()
     output_dir.mkdir(exist_ok=True)
     
     # Start container
@@ -768,8 +773,9 @@ def setup_vista3d_complete() -> bool:
     
     print_status("🎉 Vista3D setup completed successfully!", "success")
     print()
-    print_status("Vista3D is running on: http://localhost:8000", "server")
-    print_status("API endpoint: http://localhost:8000/v1/vista3d/inference", "server")
+    vista3d_server = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
+    print_status(f"Vista3D is running on: {vista3d_server}", "server")
+    print_status(f"API endpoint: {vista3d_server}/v1/vista3d/inference", "server")
     print()
     print_status("Next steps:", "info")
     print("  1. Run: python setup.py  (for full project setup)")
@@ -789,10 +795,11 @@ def create_output_directories():
     """Create output directories for the project."""
     print_status("Creating output directories...", "directory")
     
+    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
     directories = [
-        "output",
-        "output/nifti", 
-        "output/certs"
+        output_folder,
+        f"{output_folder}/nifti", 
+        f"{output_folder}/certs"
     ]
     
     for directory in directories:

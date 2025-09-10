@@ -3,13 +3,19 @@ Constants for the Vista3D application.
 Centralized location for all magic strings, numbers, and configuration values.
 """
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # File extensions
 NIFTI_EXTENSIONS = ('.nii', '.nii.gz')
 DICOM_EXTENSIONS = ('.dcm',)
 IMAGE_EXTENSIONS = NIFTI_EXTENSIONS + DICOM_EXTENSIONS
 
-# Directory structure
-OUTPUT_DIR = "output"
+# Directory structure - get from environment variables
+OUTPUT_DIR = os.getenv('OUTPUT_FOLDER', 'output')
 SEGMENTS_DIR = "segments"
 VOXELS_DIR = "voxels"
 NIFTI_DIR = "nifti"

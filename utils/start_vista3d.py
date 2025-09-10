@@ -151,7 +151,8 @@ class Vista3DManager:
     def _setup_paths(self):
         """Setup paths from environment variables or use defaults."""
         project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
-        self.local_outputs_path = Path(project_root) / "output"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        self.local_outputs_path = Path(project_root) / output_folder
         self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/output")
         self.local_images_path = self.local_outputs_path / "nifti"
         self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/output/nifti")
@@ -459,8 +460,9 @@ WantedBy=multi-user.target
         logger.info("  View Vista-3D logs: docker logs -f vista3d")
         logger.info("  Stop container: docker stop vista3d")
         logger.info("  Access container shell: docker exec -it vista3d bash")
-        logger.info("  Test Vista-3D endpoint: curl http://localhost:8000/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
-        logger.info("  Test with external image server: curl http://localhost:8000/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"http://your-image-server:port/path/to/image.nii.gz\"}'")
+        vista3d_server = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
+        logger.info(f"  Test Vista-3D endpoint: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
+        logger.info(f"  Test with external image server: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"http://your-image-server:port/path/to/image.nii.gz\"}'")
         
         return True
 

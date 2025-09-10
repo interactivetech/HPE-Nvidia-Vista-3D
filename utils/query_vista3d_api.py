@@ -14,9 +14,15 @@ from pathlib import Path
 from typing import Dict, List, Set, Tuple
 import argparse
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class Vista3DAPIAnalyzer:
-    def __init__(self, api_url: str = "http://localhost:8000", config_dir: str = "conf"):
+    def __init__(self, api_url: str = None, config_dir: str = "conf"):
+        if api_url is None:
+            api_url = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
         self.api_url = api_url.rstrip('/')
         self.config_dir = Path(config_dir)
         self.labels_colors_file = self.config_dir / "vista3d_label_colors.json"
@@ -302,8 +308,9 @@ class Vista3DAPIAnalyzer:
 
 def main():
     parser = argparse.ArgumentParser(description='Query VISTA-3D API and analyze label configuration')
-    parser.add_argument('--api-url', default='http://localhost:8000', 
-                       help='VISTA-3D API URL (default: http://localhost:8000)')
+    default_api_url = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
+    parser.add_argument('--api-url', default=default_api_url, 
+                       help=f'VISTA-3D API URL (default: {default_api_url})')
     parser.add_argument('--config-dir', default='conf', 
                        help='Configuration directory (default: conf)')
     parser.add_argument('--no-report', action='store_true', 

@@ -23,6 +23,9 @@ project_root = Path(__file__).parent.parent
 # Load environment variables
 load_dotenv()
 
+# Get output folder from environment variable
+output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+
 
 def get_server_config():
     """Get server configuration from environment variables."""
@@ -119,7 +122,7 @@ async def get_filtered_segments(
         label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
         
         # Construct path to original segmentation file
-        segment_path = project_root / "output" / "segments" / patient_id / filename
+        segment_path = project_root / output_folder / "segments" / patient_id / filename
         
         if not segment_path.exists():
             raise HTTPException(status_code=404, detail=f"Segmentation file not found: {filename}")
@@ -172,7 +175,7 @@ async def get_filtered_voxels(
         label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
         
         # Construct path to voxels file (strict - no fallback)
-        voxels_dir = project_root / "output" / patient_id / "voxels"
+        voxels_dir = project_root / output_folder / patient_id / "voxels"
         voxels_path = voxels_dir / filename
         if not voxels_path.exists():
             # Attempt to find a voxels file with matching stem or any .nii/.nii.gz in the voxels dir
@@ -237,7 +240,7 @@ async def get_available_voxel_labels(
 ):
     """Return available non-zero label IDs (and names) present in the voxels NIfTI for this patient/file."""
     try:
-        voxels_dir = project_root / "output" / patient_id / "voxels"
+        voxels_dir = project_root / output_folder / patient_id / "voxels"
         voxels_path = voxels_dir / filename
         if not voxels_path.exists():
             # Attempt to find a voxels file with matching stem or any .nii/.nii.gz
