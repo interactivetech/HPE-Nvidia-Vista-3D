@@ -242,7 +242,7 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         return {'status': 'failed', 'error': str(e)}
 
 
-def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=10):
+def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
     """
     Convert DICOM files to NIFTI format using dcm2niix with NiiVue optimization.
     
