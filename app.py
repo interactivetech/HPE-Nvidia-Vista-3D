@@ -518,5 +518,10 @@ elif current_page == 'niivue':
     # Import and run NiiVue content
     sys.path.append(str(Path(__file__).parent))
     exec(open('NiiVue.py').read())
+
+elif current_page == 'dicom':
+    # Import and run DICOM Inspector content
+    sys.path.append(str(Path(__file__).parent))
+    exec(open('DICOM_Inspector.py').read())
     
 
