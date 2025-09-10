@@ -42,13 +42,21 @@ logger = logging.getLogger(__name__)
 
 class Vista3DManager:
     """Manages Vista-3D Docker container with external image server access"""
-    
+
     def __init__(self):
         self.script_dir = Path(__file__).parent
         self.project_root = self.script_dir.parent
         self.container_name = os.getenv('VISTA3D_CONTAINER_NAME', 'vista3d')
-        
-        # Environment variables - load from .env file or use defaults
+
+        self._setup_env_vars()
+        self._setup_paths()
+        self._setup_whitelist()
+
+        self.supported_extensions = [".nrrd", ".nii", ".nii.gz", ".dcm"]
+        self._register_signal_handlers()
+
+    def _setup_env_vars(self):
+        """Load environment variables from .env file or use defaults."""
         self.env_vars = {
             'NGC_API_KEY': os.getenv('NGC_API_KEY'),
             'NGC_ORG_ID': os.getenv('NGC_ORG_ID'),
@@ -66,17 +74,15 @@ class Vista3DManager:
             'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
             'ALLOW_FILE_PROTOCOL': os.getenv('ALLOW_FILE_PROTOCOL', 'True'),
             'ALLOW_LOCAL_PATHS': os.getenv('ALLOW_LOCAL_PATHS', 'True'),
-            'DISABLE_URL_VALIDATION': os.getenv('DISABLE_URL_VALIDATION', 'True'),  # Changed to True to allow any URL
+            'DISABLE_URL_VALIDATION': os.getenv('DISABLE_URL_VALIDATION', 'True'),
             'ALLOW_ABSOLUTE_FILE_PATHS': os.getenv('ALLOW_ABSOLUTE_FILE_PATHS', 'True'),
             'ALLOW_RELATIVE_FILE_PATHS': os.getenv('ALLOW_RELATIVE_FILE_PATHS', 'True'),
             'FILE_ACCESS_MODE': os.getenv('FILE_ACCESS_MODE', 'local'),
             'LOCAL_FILE_ACCESS': os.getenv('LOCAL_FILE_ACCESS', 'True'),
-            # Configure external image server access
             'EXTERNAL_IMAGE_SERVER': os.getenv('EXTERNAL_IMAGE_SERVER', 'https://host.docker.internal:8888'),
             'EXTERNAL_IMAGE_SERVER_HOST': os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'host.docker.internal'),
             'EXTERNAL_IMAGE_SERVER_PORT': os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888'),
-            # Network access control variables
-            'ALLOW_ANY_IMAGE_SERVER_HOST': os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'False'),
+            'ALLOW_ANY_IMAGE_SERVER_HOST': os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'True'),
             'ALLOW_EXTERNAL_NETWORK_ACCESS': os.getenv('ALLOW_EXTERNAL_NETWORK_ACCESS', 'True'),
             'DISABLE_HOST_VALIDATION': os.getenv('DISABLE_HOST_VALIDATION', 'True'),
             'ALLOW_ANY_IP_ACCESS': os.getenv('ALLOW_ANY_IP_ACCESS', 'True'),
@@ -89,82 +95,59 @@ class Vista3DManager:
             'CUDA_LAUNCH_BLOCKING': os.getenv('CUDA_LAUNCH_BLOCKING', '1'),
             'TORCH_USE_CUDA_DSA': '1'
         }
-        
-        # Paths - load from environment variables or use defaults
+
+    def _setup_paths(self):
+        """Setup paths from environment variables or use defaults."""
         project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
         self.local_outputs_path = Path(project_root) / "output"
         self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/output")
         self.local_images_path = self.local_outputs_path / "nifti"
         self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/output/nifti")
-        
-        # Parse IMAGE_SERVER URL to get components
-        image_server_url = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
-        parsed_url = urllib.parse.urlparse(image_server_url)
-        image_server_host = parsed_url.hostname or 'localhost'
-        image_server_port = parsed_url.port or 8888
-        image_server_protocol = parsed_url.scheme or 'https'
-        
-        # Build external image server URLs
-        external_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}"
-        external_server_http = f"http://{image_server_host}:{image_server_port}"
-        
-        # Check if we should allow any host/IP for image server access
-        allow_any_host = os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'False').lower() in ('true', '1', 'yes')
-        
+
+    def _setup_whitelist(self):
+        """Setup the domain whitelist for image server access."""
+        allow_any_host = self.env_vars.get('ALLOW_ANY_IMAGE_SERVER_HOST', 'True').lower() in ('true', '1', 'yes')
+
         if allow_any_host:
-            # Allow any IP address or host for image server access
+            # Simplified and permissive whitelist to allow any IP address or hostname
             self.domain_whitelist = [
-                # Allow any HTTP/HTTPS URL
-                "http://*", "https://*", "http://*:*", "https://*:*",
-                # Allow any IP address
-                "http://0.0.0.0:*", "https://0.0.0.0:*",
-                "http://127.0.0.1:*", "https://127.0.0.1:*",
-                "http://localhost:*", "https://localhost:*",
-                # Allow any hostname
-                "http://*.*", "https://*.*",
-                # Docker host access
-                "https://host.docker.internal:*", "http://host.docker.internal:*",
-                # Local file access
-                "file://*", "file:///*", "file:///home/*", "file:///Users/*",
-                "file:///workspace/*", "file:///workspace/output/*",
-                "file:///workspace/output/nifti/*", "/workspace/output/*",
-                "/workspace/output/nifti/*", "/workspace/output/nifti",
-                # Container paths
-                "/*", "/workspace/*", "/workspace/output/.*", "/workspace/output/**",
-                "/workspace/**", "/workspace/output", "/workspace", "/home/*",
-                "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
-                # Project-specific paths (configurable)
-                f"{project_root}/*", f"{project_root}/output/*", f"{project_root}/output/nifti/*"
+                "*",
+                "http://*", "https://*",
+                "http://*:*", "https://*:*",
+                "file:///*",
             ]
         else:
-            # Original restrictive configuration
+            # Original restrictive configuration, cleaned up for clarity
+            image_server_url = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
+            parsed_url = urllib.parse.urlparse(image_server_url)
+            image_server_host = parsed_url.hostname or 'localhost'
+            image_server_port = parsed_url.port or 8888
+            image_server_protocol = parsed_url.scheme or 'https'
+            
+            external_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}"
+            external_server_http = f"http://{image_server_host}:{image_server_port}"
+            project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
+
             self.domain_whitelist = [
-                # External image server access (configurable)
-                f"{external_server_url}", f"{external_server_http}",
-                f"{image_server_protocol}://{image_server_host}:*", f"http://{image_server_host}:*",
-                # Docker host access
-                "https://host.docker.internal:*", "http://host.docker.internal:*",
-                # Local file access
-                "file://*", "file:///*", "file:///home/*", "file:///Users/*",
-                "file:///workspace/*", "file:///workspace/output/*",
-                "file:///workspace/output/nifti/*", "/workspace/output/*",
-                "/workspace/output/nifti/*", "/workspace/output/nifti",
-                # Container paths
-                "/*", "/workspace/*", "/workspace/output/.*", "/workspace/output/**",
-                "/workspace/**", "/workspace/output", "/workspace", "/home/*",
-                "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
-                # Project-specific paths (configurable)
-                f"{project_root}/*", f"{project_root}/output/*", f"{project_root}/output/nifti/*"
+                f"{external_server_url}",
+                f"{external_server_http}",
+                f"{image_server_protocol}://{image_server_host}:*",
+                f"http://{image_server_host}:*",
+                "https://host.docker.internal:*",
+                "http://host.docker.internal:*",
+                "file:///*",
+                "/workspace/output/nifti/*",
+                "localhost",
+                "127.0.0.1",
+                f"{project_root}/output/nifti/*",
             ]
-        
-        # Supported image extensions
-        self.supported_extensions = [".nrrd", ".nii", ".nii.gz", ".dcm"]
-        
-        # Setup cleanup handlers
+
+    def _register_signal_handlers(self):
+        """Register signal handlers for graceful shutdown."""
         atexit.register(self.cleanup)
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
-    
+
     def signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
         logger.info(f"Received signal {signum}, shutting down gracefully...")
@@ -237,14 +220,6 @@ class Vista3DManager:
         (self.local_outputs_path / "segments").mkdir(parents=True, exist_ok=True)
         
         logger.info(f"✅ Output directory created: {self.local_outputs_path}")
-        
-        # List any existing output
-        if any(self.local_outputs_path.iterdir()):
-            logger.info(f"Found existing output in {self.local_outputs_path}:")
-            for item in self.local_outputs_path.iterdir():
-                logger.info(f"  {item.name}")
-        else:
-            logger.info("No output found. Please place your .nii.gz, .nii, .nrrd, or .dcm files in the nifti subdirectory")
     
     def check_external_image_server(self) -> bool:
         """Check if the external image server is accessible"""
