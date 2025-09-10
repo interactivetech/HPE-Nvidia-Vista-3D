@@ -26,6 +26,9 @@ OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER', 'output')
 NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
 PATIENT_OUTPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
 
+# Remote Vista3D configuration
+EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER_URL', IMAGE_SERVER_URL)
+
 # Load label dictionaries
 LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
 with open(LABEL_DICT_PATH, 'r') as f:
@@ -184,16 +187,29 @@ def main():
                 # Use the original nifti file path for inference
                 relative_path_to_nifti = nifti_file_path.relative_to(PROJECT_ROOT)
                 
-                # When the inference server is running in a container, it needs to access the image server
-                # running on the host. 'host.docker.internal' is a special DNS name for that.
-                docker_accessible_url = IMAGE_SERVER_URL.replace('localhost', 'host.docker.internal').replace('127.0.0.1', 'host.docker.internal')
+                # Vista3D is always remote, image server is always local
+                # Use the external image server URL that Vista3D can access from remote location
+                vista3d_input_url = f"{EXTERNAL_IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"
                 
-                vista3d_input_url = f"{docker_accessible_url.rstrip('/')}/{relative_path_to_nifti}"
                 payload = {"image": vista3d_input_url, "prompts": {"labels": target_vessels}}
                 headers = {"Content-Type": "application/json"}
 
                 print(f"\n  Processing: {nifti_file_path.name}")
+                print(f"    Vista3D Server: {VISTA3D_SERVER}")
+                print(f"    Image URL: {vista3d_input_url}")
+                print(f"    Target vessels: {target_vessels}")
+                
                 inference_response = requests.post(VISTA3D_INFERENCE_URL, json=payload, headers=headers, verify=False)
+                
+                # Add detailed error information
+                if not inference_response.ok:
+                    print(f"    ❌ API Error: {inference_response.status_code} {inference_response.reason}")
+                    try:
+                        error_detail = inference_response.json()
+                        print(f"    Error details: {error_detail}")
+                    except:
+                        print(f"    Response content: {inference_response.text}")
+                
                 inference_response.raise_for_status()
 
                 with zipfile.ZipFile(io.BytesIO(inference_response.content), 'r') as zip_ref:

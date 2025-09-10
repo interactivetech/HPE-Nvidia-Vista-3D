@@ -66,6 +66,53 @@ The setup process may take 10-30 minutes depending on your internet connection a
 - `.env` file with your NGC credentials and Vista3D settings
 - Docker daemon configuration for NVIDIA runtime
 
+## 🔑 Critical: External IP Configuration
+
+**Important:** After Vista3D setup, you must configure your external IP address for the image server to work with remote Vista3D.
+
+### Why This is Required
+- Vista3D runs on a **remote server** (not on your local machine)
+- Your image server runs **locally** and serves files from your `output/` folder
+- Vista3D needs a **publicly accessible URL** to download images from your local server
+
+### Find Your Public IP Address
+```bash
+# Method 1: Using curl (Recommended)
+curl ifconfig.me
+
+# Method 2: Using wget
+wget -qO- ifconfig.me
+
+# Method 3: Using dig
+dig +short myip.opendns.com @resolver1.opendns.com
+```
+
+### Update Your .env File
+Add this line to your `.env` file with your actual public IP:
+```bash
+EXTERNAL_IMAGE_SERVER_URL="http://YOUR_PUBLIC_IP:8888"
+```
+
+**Example:**
+```bash
+EXTERNAL_IMAGE_SERVER_URL="http://203.0.113.1:8888"
+```
+
+### Firewall Configuration
+Ensure port 8888 is open in your firewall/router to allow external access to your image server.
+
+### Alternative: Using ngrok (if firewall configuration is not possible)
+```bash
+# Install ngrok
+curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+sudo apt update && sudo apt install ngrok
+
+# Create tunnel
+ngrok http 8888
+# Use the provided https URL as your EXTERNAL_IMAGE_SERVER_URL
+```
+
 ## Usage Examples
 
 ### Complete Vista3D Setup

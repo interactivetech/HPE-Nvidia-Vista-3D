@@ -102,7 +102,63 @@ Nvidia-Vista3d-segmenation/
 ```bash
 PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
 IMAGE_SERVER="http://localhost:8888"
+
+# CRITICAL: External image server URL for remote Vista3D access
+# This must be a publicly accessible URL that Vista3D can reach from remote locations
+EXTERNAL_IMAGE_SERVER_URL="http://YOUR_PUBLIC_IP:8888"
+
+# Remote Vista3D server URL
+VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
+
+# Output folder (relative to PROJECT_ROOT)
+OUTPUT_FOLDER="output"
+
+# Vessels of interest for segmentation
+VESSELS_OF_INTEREST="all"
 ```
+
+### **🔑 Critical Configuration: External IP Address**
+
+**Why EXTERNAL_IMAGE_SERVER_URL is Required:**
+- Vista3D runs on a **remote server** (not on your local machine)
+- Your image server runs **locally** and serves files from your `output/` folder
+- Vista3D needs a **publicly accessible URL** to download images from your local server
+- `localhost:8888` only works for local connections, not remote ones
+
+**How to Find Your Public IP Address:**
+
+**Method 1: Using curl (Recommended)**
+```bash
+curl ifconfig.me
+# or
+curl -s ifconfig.me
+```
+
+**Method 2: Using wget**
+```bash
+wget -qO- ifconfig.me
+```
+
+**Method 3: Using dig**
+```bash
+dig +short myip.opendns.com @resolver1.opendns.com
+```
+
+**Method 4: Using online services**
+- Visit: https://whatismyipaddress.com/
+- Visit: https://ifconfig.me/
+
+**Example Configuration:**
+If your public IP is `203.0.113.1`, set:
+```bash
+EXTERNAL_IMAGE_SERVER_URL="http://203.0.113.1:8888"
+```
+
+**⚠️ Important Notes:**
+- **Firewall**: Ensure port 8888 is open in your firewall/router
+- **Dynamic IP**: Your IP may change if you have a dynamic IP from your ISP
+- **Security**: Consider using HTTPS and authentication for production use
+- **Alternative**: Use ngrok for tunneling if you can't configure firewall rules
 
 ### **Command Line Options**
 - `--port`: Server port (default: 8888)

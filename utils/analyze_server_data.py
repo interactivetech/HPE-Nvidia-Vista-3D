@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
 Script to analyze the image server data and generate a comprehensive report.
-Supports both old and new folder structures:
+Supports both old and new folder structures. Analyzes all folders in the output directory.
 
 CURRENT STRUCTURE:
-- output/{patient_id}/nifti/         (CT scan files)
-- output/{patient_id}/segments/      (full segmentation files)
-- output/{patient_id}/voxels/{ct_scan_name}/  (individual voxel files)
-- output/{patient_id}/mesh/{ct_scan_name}/    (STL mesh files)
+- output/{folder_name}/nifti/         (CT scan files)
+- output/{folder_name}/segments/      (full segmentation files)
+- output/{folder_name}/voxels/{ct_scan_name}/  (individual voxel files)
+- output/{folder_name}/mesh/{ct_scan_name}/    (STL mesh files)
 
 OLD STRUCTURE (legacy):
-- output/nifti/{patient_id}/         (CT scan files)
-- output/segments/{patient_id}/      (segmentation files)
-- output/segments/{patient_id}/voxels/  (voxel files)
-- output/segments/{patient_id}/mesh/    (STL mesh files)
+- output/nifti/{folder_name}/         (CT scan files)
+- output/segments/{folder_name}/      (segmentation files)
+- output/segments/{folder_name}/voxels/  (voxel files)
+- output/segments/{folder_name}/mesh/    (STL mesh files)
 
 Usage:
     python utils/analyze_server_data.py
@@ -220,8 +220,10 @@ def get_folder_contents(base_url: str, folder_path: str) -> Optional[List[Dict[s
         return None
 
 def is_patient_folder(folder_name: str) -> bool:
-    """Check if a folder name matches the patient pattern (PA00000002)."""
-    return bool(re.match(r'^PA\d{8}$', folder_name))
+    """Check if a folder should be analyzed as a patient folder.
+    Skip common non-patient folders like .git, __pycache__, etc."""
+    skip_folders = {'.git', '__pycache__', '.DS_Store', 'node_modules', '.env'}
+    return folder_name not in skip_folders and not folder_name.startswith('.')
 
 def get_ct_scan_files(patient_folder_contents: List[Dict[str, str]]) -> List[Dict[str, any]]:
     """Extract CT scan files (nii.gz) from patient folder contents with size info."""
@@ -591,7 +593,8 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
                 
                 voxel_text = f" ({', '.join(voxel_details)})" if voxel_details else " (no voxel data)"
                 mesh_text = f" ({', '.join(mesh_details)})" if mesh_details else " (no mesh data)"
-                size_text = f" [{format_file_size(ct_scan_size)} + {format_file_size(total_scan_size - ct_scan_size)} = {format_file_size(total_scan_size)}]"
+                additional_size = max(0, total_scan_size - ct_scan_size)  # Ensure non-negative
+                size_text = f" [{format_file_size(ct_scan_size)} + {format_file_size(additional_size)} = {format_file_size(total_scan_size)}]"
                 report_lines.append(f"      {voxel_status} {scan_display_name}{voxel_text}")
                 report_lines.append(f"      {mesh_status} {scan_display_name}{mesh_text}{size_text}")
     
@@ -696,12 +699,8 @@ def main():
                 folder['old_structure'] = True
     
     if not patient_folders:
-        print("❌ No patient folders found (expected format: PA00000002)")
+        print("❌ No patient folders found in output directory")
         print("   Checked both current structure (output/{patient}/) and old structure (output/nifti/{patient}/)")
-        sys.exit(1)
-    
-    if not patient_folders:
-        print("❌ No patient folders found (expected format: PA00000002)")
         sys.exit(1)
     
     if not args.quiet:

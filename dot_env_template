@@ -2,8 +2,20 @@ PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
 
 # DICOM folder location (relative to PROJECT_ROOT or absolute path)
 DICOM_FOLDER="dicom"
-# External HTTP Image Server
+
+# Local HTTP Image Server (for your local machine)
 IMAGE_SERVER="http://localhost:8888"
+
+# CRITICAL: External image server URL for remote Vista3D access
+# This must be a publicly accessible URL that Vista3D can reach from remote locations
+# Find your public IP with: curl ifconfig.me
+EXTERNAL_IMAGE_SERVER_URL="http://YOUR_PUBLIC_IP:8888"
+
+# Remote Vista3D server URL
+VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
+
+# Output folder (relative to PROJECT_ROOT)
+OUTPUT_FOLDER="output"
 
 # Vessels of interest for segmentation analysis or "all"
 #VESSELS_OF_INTEREST="aorta,left iliac artery,right iliac artery"

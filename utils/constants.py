@@ -55,8 +55,41 @@ WINDOW_PRESETS = {
 }
 
 # Color maps available for NIfTI images
+# Includes medical imaging optimized colormaps and NiiVue's built-in colormaps
 AVAILABLE_COLOR_MAPS = [
-    'gray', 'viridis', 'plasma', 'inferno', 'magma'
+    # Standard grayscale (default for medical imaging)
+    'gray',
+    
+    # Perceptually uniform colormaps (good for scientific visualization)
+    'viridis', 'plasma', 'inferno', 'magma',
+    
+    # Medical imaging specific colormaps
+    'bone', 'cool', 'hot', 'warm',
+    
+    # High contrast colormaps for enhanced visualization
+    'turbo', 'jet', 'hsv', 'parula', 'cubehelix', 'batlow',
+    
+    # Additional high contrast options
+    'rainbow', 'spectral', 'prism', 'flag', 'gist_rainbow',
+    'gist_earth', 'gist_heat', 'gist_ncar', 'gist_stern',
+    
+    # CT-specific colormaps
+    'ct_skull', 'ct_bone', 'ct_soft', 'ct_lung',
+    
+    # Alternative grayscale variations
+    'copper', 'pink', 'spring', 'summer', 'autumn', 'winter',
+    
+    # High contrast diverging colormaps
+    'seismic', 'coolwarm', 'bwr', 'RdYlBu', 'RdYlGn',
+    'RdBu', 'PiYG', 'PRGn', 'BrBG', 'PuOr',
+    
+    # Additional high contrast sequential colormaps
+    'Blues', 'Greens', 'Reds', 'Oranges', 'Purples',
+    'YlOrRd', 'YlOrBr', 'YlGnBu', 'YlGn', 'RdPu',
+    'BuPu', 'GnBu', 'PuBu', 'OrRd', 'BuGn',
+    
+    # Monochrome high contrast
+    'binary', 'gist_yarg', 'gist_gray', 'gray_r'
 ]
 
 # Voxel selection modes
