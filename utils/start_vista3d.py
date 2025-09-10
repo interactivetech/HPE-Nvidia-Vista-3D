@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Vista-3D Docker Startup Script
-Python version with enhanced error handling and monitoring capabilities
+Clean version for running Vista-3D on a separate server
+Allows connections from any image server
 """
 
 import os
@@ -10,13 +11,11 @@ import time
 import subprocess
 import argparse
 import logging
-import requests
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 import signal
 import atexit
-import urllib.parse
 
 # Load environment variables from .env file
 try:
@@ -41,7 +40,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class Vista3DManager:
-    """Manages Vista-3D Docker container with external image server access"""
+    """Manages Vista-3D Docker container for remote image server access"""
 
     def __init__(self):
         self.script_dir = Path(__file__).parent
@@ -58,20 +57,22 @@ class Vista3DManager:
     def _setup_env_vars(self):
         """Load environment variables from .env file or use defaults."""
         self.env_vars = {
+            # NVIDIA NGC Configuration
             'NGC_API_KEY': os.getenv('NGC_API_KEY'),
             'NGC_ORG_ID': os.getenv('NGC_ORG_ID'),
             'LOCAL_NIM_CACHE': os.getenv('LOCAL_NIM_CACHE', '~/.cache/nim'),
+            
+            # Vista-3D Configuration
             'IGNORE_SSL_ERRORS': os.getenv('IGNORE_SSL_ERRORS', 'True'),
             'IMAGE_URI_ALLOW_REDIRECTS': os.getenv('IMAGE_URI_ALLOW_REDIRECTS', 'True'),
             'IMAGE_URI_HTTPS_ONLY': os.getenv('IMAGE_URI_HTTPS_ONLY', 'False'),
+            
+            # File Access Configuration - Allow any image server
             'ALLOW_LOCAL_FILES': os.getenv('ALLOW_LOCAL_FILES', 'True'),
             'ENABLE_CONTAINER_PATHS': os.getenv('ENABLE_CONTAINER_PATHS', 'True'),
             'ENABLE_FILE_ACCESS': os.getenv('ENABLE_FILE_ACCESS', 'True'),
             'ALLOW_ABSOLUTE_PATHS': os.getenv('ALLOW_ABSOLUTE_PATHS', 'True'),
             'ALLOW_RELATIVE_PATHS': os.getenv('ALLOW_RELATIVE_PATHS', 'True'),
-            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/output/nifti'),
-            'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/output'),
-            'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
             'ALLOW_FILE_PROTOCOL': os.getenv('ALLOW_FILE_PROTOCOL', 'True'),
             'ALLOW_LOCAL_PATHS': os.getenv('ALLOW_LOCAL_PATHS', 'True'),
             'DISABLE_URL_VALIDATION': os.getenv('DISABLE_URL_VALIDATION', 'True'),
@@ -79,18 +80,24 @@ class Vista3DManager:
             'ALLOW_RELATIVE_FILE_PATHS': os.getenv('ALLOW_RELATIVE_FILE_PATHS', 'True'),
             'FILE_ACCESS_MODE': os.getenv('FILE_ACCESS_MODE', 'local'),
             'LOCAL_FILE_ACCESS': os.getenv('LOCAL_FILE_ACCESS', 'True'),
-            'EXTERNAL_IMAGE_SERVER': os.getenv('EXTERNAL_IMAGE_SERVER', 'https://host.docker.internal:8888'),
-            'EXTERNAL_IMAGE_SERVER_HOST': os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'host.docker.internal'),
-            'EXTERNAL_IMAGE_SERVER_PORT': os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888'),
+            
+            # Network Access Configuration - Allow any image server
             'ALLOW_ANY_IMAGE_SERVER_HOST': os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'True'),
             'ALLOW_EXTERNAL_NETWORK_ACCESS': os.getenv('ALLOW_EXTERNAL_NETWORK_ACCESS', 'True'),
             'DISABLE_HOST_VALIDATION': os.getenv('DISABLE_HOST_VALIDATION', 'True'),
             'ALLOW_ANY_IP_ACCESS': os.getenv('ALLOW_ANY_IP_ACCESS', 'True'),
-            'DISABLE_DOMAIN_WHITELIST': os.getenv('DISABLE_DOMAIN_WHITELIST', 'False'),
+            'DISABLE_DOMAIN_WHITELIST': os.getenv('DISABLE_DOMAIN_WHITELIST', 'True'),
             'ALLOW_HTTP_ACCESS': os.getenv('ALLOW_HTTP_ACCESS', 'True'),
             'ALLOW_HTTPS_ACCESS': os.getenv('ALLOW_HTTPS_ACCESS', 'True'),
-            'CUDA_VISIBLE_DEVICES': os.getenv('CUDA_VISIBLE_DEVICES', '1'),
-            'NVIDIA_VISIBLE_DEVICES': os.getenv('NVIDIA_VISIBLE_DEVICES', '1'),
+            
+            # Workspace Configuration
+            'WORKSPACE_IMAGES_PATH': os.getenv('WORKSPACE_IMAGES_PATH', '/workspace/output/nifti'),
+            'WORKSPACE_OUTPUTS_PATH': os.getenv('WORKSPACE_OUTPUTS_PATH', '/workspace/output'),
+            'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
+            
+            # CUDA Configuration
+            'CUDA_VISIBLE_DEVICES': os.getenv('CUDA_VISIBLE_DEVICES', '0'),
+            'NVIDIA_VISIBLE_DEVICES': os.getenv('NVIDIA_VISIBLE_DEVICES', '0'),
             'NVIDIA_DRIVER_CAPABILITIES': os.getenv('NVIDIA_DRIVER_CAPABILITIES', 'compute,utility'),
             'CUDA_LAUNCH_BLOCKING': os.getenv('CUDA_LAUNCH_BLOCKING', '1'),
             'TORCH_USE_CUDA_DSA': '1'
@@ -105,42 +112,18 @@ class Vista3DManager:
         self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/output/nifti")
 
     def _setup_whitelist(self):
-        """Setup the domain whitelist for image server access."""
-        allow_any_host = self.env_vars.get('ALLOW_ANY_IMAGE_SERVER_HOST', 'True').lower() in ('true', '1', 'yes')
-
-        if allow_any_host:
-            # Simplified and permissive whitelist to allow any IP address or hostname
-            self.domain_whitelist = [
-                "*",
-                "http://*", "https://*",
-                "http://*:*", "https://*:*",
-                "file:///*",
-            ]
-        else:
-            # Original restrictive configuration, cleaned up for clarity
-            image_server_url = os.getenv('IMAGE_SERVER', 'https://localhost:8888')
-            parsed_url = urllib.parse.urlparse(image_server_url)
-            image_server_host = parsed_url.hostname or 'localhost'
-            image_server_port = parsed_url.port or 8888
-            image_server_protocol = parsed_url.scheme or 'https'
-            
-            external_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}"
-            external_server_http = f"http://{image_server_host}:{image_server_port}"
-            project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
-
-            self.domain_whitelist = [
-                f"{external_server_url}",
-                f"{external_server_http}",
-                f"{image_server_protocol}://{image_server_host}:*",
-                f"http://{image_server_host}:*",
-                "https://host.docker.internal:*",
-                "http://host.docker.internal:*",
-                "file:///*",
-                "/workspace/output/nifti/*",
-                "localhost",
-                "127.0.0.1",
-                f"{project_root}/output/nifti/*",
-            ]
+        """Setup the domain whitelist for image server access - allows any image server."""
+        # Permissive whitelist to allow any IP address or hostname
+        self.domain_whitelist = [
+            "*",
+            "http://*", "https://*",
+            "http://*:*", "https://*:*",
+            "file:///*",
+            "localhost",
+            "127.0.0.1",
+            "0.0.0.0",
+            "/workspace/output/nifti/*",
+        ]
 
     def _register_signal_handlers(self):
         """Register signal handlers for graceful shutdown."""
@@ -221,85 +204,13 @@ class Vista3DManager:
         
         logger.info(f"✅ Output directory created: {self.local_outputs_path}")
     
-    def check_external_image_server(self) -> bool:
-        """Check if the external image server is accessible"""
-        logger.info("Checking external image server accessibility...")
-        
-        try:
-            # Test local access first
-            image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
-            image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'http')
-            image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
-            
-            response = requests.get(image_server_url, timeout=10)
-            if response.status_code == 200:
-                logger.info("✅ External image server is accessible locally")
-                return True
-        except requests.RequestException as e:
-            logger.warning(f"External image server not accessible locally: {e}")
-        
-        # Check if the image server process is running
-        try:
-            result = subprocess.run(
-                "pgrep -f 'image_server.py'",
-                shell=True,
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                logger.info("✅ External image server process is running")
-                return True
-            else:
-                logger.warning("⚠️  External image server process not found")
-                logger.info("Please start the image server with: python3 utils/image_server.py")
-                return False
-        except Exception as e:
-            logger.error(f"Error checking image server process: {e}")
-            return False
-    
-    def start_external_image_server(self) -> bool:
-        """Start the external image server if not already running"""
-        logger.info("Starting external image server...")
-        
-        # Check if already running
-        if self.check_external_image_server():
-            logger.info("✅ External image server is already running")
-            return True
-        
-        # Start the image server
-        image_server_script = self.script_dir / "image_server.py"
-        if not image_server_script.exists():
-            logger.error(f"❌ Image server script not found: {image_server_script}")
-            return False
-        
-        try:
-            # Start image server in background
-            cmd = f"nohup {sys.executable} {image_server_script} > /tmp/image_server.log 2>&1 &"
-            self.run_command(cmd)
-            
-            # Wait for server to start
-            logger.info("Waiting for external image server to start...")
-            time.sleep(5)
-            
-            # Check if server is now accessible
-            if self.check_external_image_server():
-                logger.info("✅ External image server started successfully")
-                return True
-            else:
-                logger.error("❌ External image server failed to start")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error starting external image server: {e}")
-            return False
     
     def start_vista3d_container(self) -> bool:
         """Start the Vista-3D Docker container"""
         logger.info("Starting Vista-3D container...")
         
         # Build environment variables string
-        env_vars = " ".join([f"-e {k}={v}" for k, v in self.env_vars.items()])
+        env_vars = " ".join([f"-e {k}={v}" for k, v in self.env_vars.items() if v is not None])
         
         # Build domain whitelist
         domain_whitelist_str = json.dumps(self.domain_whitelist)
@@ -313,31 +224,21 @@ class Vista3DManager:
         volumes = f"-v {self.local_outputs_path}:{self.container_outputs_path}"
         volumes += f" -v {self.project_root}:{self.project_root}:ro"
         
-        # Docker run command with configurable networking
+        # Network configuration - allow external access by default
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
-        use_host_networking = os.getenv('USE_HOST_NETWORKING', 'False').lower() in ('true', '1', 'yes')
-        allow_external_access = os.getenv('ALLOW_EXTERNAL_ACCESS', 'False').lower() in ('true', '1', 'yes')
+        use_host_networking = os.getenv('USE_HOST_NETWORKING', 'True').lower() in ('true', '1', 'yes')
         
-        # Build network configuration
-        network_config = ""
         if use_host_networking:
             network_config = "--network=host"
             logger.info("Using host networking mode - Vista3D will be accessible on all interfaces")
         else:
-            # Standard port mapping with optional external access
-            if allow_external_access:
-                network_config = f"-p 0.0.0.0:{vista3d_port}:8000"
-                logger.info(f"Vista3D will be accessible externally on port {vista3d_port}")
-            else:
-                network_config = f"-p {vista3d_port}:8000"
-                logger.info(f"Vista3D will be accessible on localhost:{vista3d_port}")
+            network_config = f"-p 0.0.0.0:{vista3d_port}:8000"
+            logger.info(f"Vista3D will be accessible externally on port {vista3d_port}")
         
         # Add host entries for external access
         host_entries = "--add-host=host.docker.internal:host-gateway"
-        if allow_external_access or use_host_networking:
-            # Add additional host entries for external access
-            host_entries += " --add-host=localhost:host-gateway"
-            host_entries += " --add-host=127.0.0.1:host-gateway"
+        host_entries += " --add-host=localhost:host-gateway"
+        host_entries += " --add-host=127.0.0.1:host-gateway"
         
         docker_cmd = f"""
             docker run --gpus all --rm -d --name {self.container_name} \
@@ -377,69 +278,22 @@ class Vista3DManager:
         """Test the Vista-3D configuration"""
         logger.info("Testing Vista-3D configuration...")
         
-        # Test 1: Local file path access
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
-        logger.info("Test 1: Testing local file path access...")
-        test_data = {"image": "/workspace/output/nifti/test.nii.gz"}
-        try:
-            response = requests.post(
-                f"http://localhost:{vista3d_port}/v1/vista3d/inference",
-                json=test_data,
-                timeout=10
-            )
-            logger.info(f"Response status: {response.status_code}")
-        except requests.RequestException as e:
-            logger.warning(f"Test 1 failed (expected for non-existent file): {e}")
         
-        # Test 2: File protocol access
-        logger.info("Test 2: Testing file:// protocol access...")
-        test_data = {"image": "file:///workspace/output/nifti/test.nii.gz"}
+        # Test 1: Basic connectivity
+        logger.info("Test 1: Testing Vista-3D connectivity...")
         try:
-            response = requests.post(
-                f"http://localhost:{vista3d_port}/v1/vista3d/inference",
-                json=test_data,
-                timeout=10
-            )
-            logger.info(f"Response status: {response.status_code}")
-        except requests.RequestException as e:
-            logger.warning(f"Test 2 failed (expected for non-existent file): {e}")
+            import requests
+            response = requests.get(f"http://localhost:{vista3d_port}/health", timeout=10)
+            logger.info(f"Vista-3D health check response: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Vista-3D health check failed (may be normal during startup): {e}")
         
-        # Test 3: External image server access
-        logger.info("Test 3: Testing external image server access...")
-        try:
-            image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
-            image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'http')
-            image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
-            
-            response = requests.get(image_server_url, timeout=10)
-            logger.info(f"External image server response: {response.status_code}")
-        except requests.RequestException as e:
-            logger.warning(f"Test 3 failed: {e}")
-        
-        # Test 4: Test external IP access (if enabled)
-        allow_any_host = os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'False').lower() in ('true', '1', 'yes')
-        if allow_any_host:
-            logger.info("Test 4: Testing external IP access capability...")
-            logger.info("✅ External IP access is enabled - Vista3D can accept connections from any IP/host")
-        else:
-            logger.info("Test 4: External IP access is disabled (use ALLOW_ANY_IMAGE_SERVER_HOST=True to enable)")
-    
-    def test_external_image_server_access(self, external_url: str) -> bool:
-        """Test access to an external image server"""
-        logger.info(f"Testing access to external image server: {external_url}")
-        
-        try:
-            response = requests.get(external_url, timeout=10)
-            if response.status_code == 200:
-                logger.info(f"✅ Successfully connected to external image server: {external_url}")
-                return True
-            else:
-                logger.warning(f"⚠️  External image server returned status {response.status_code}")
-                return False
-        except requests.RequestException as e:
-            logger.error(f"❌ Failed to connect to external image server: {e}")
-            return False
+        # Test 2: Test external IP access capability
+        logger.info("Test 2: Testing external access configuration...")
+        logger.info("✅ Vista3D is configured to accept connections from any image server")
+        logger.info("✅ External IP access is enabled")
+        logger.info("✅ Domain whitelist is permissive")
     
     def create_systemd_service(self):
         """Create systemd service for automatic startup"""
@@ -455,7 +309,7 @@ class Vista3DManager:
         logger.info("Creating systemd service for automatic startup...")
         
         service_content = f"""[Unit]
-Description=Vista-3D Docker Container with External Image Server Access
+Description=Vista-3D Docker Container for Remote Image Server Access
 After=docker.service
 Requires=docker.service
 Wants=network-online.target
@@ -463,8 +317,8 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-User=hpadmin
-Group=hpadmin
+User=root
+Group=root
 WorkingDirectory={self.script_dir}
 ExecStart={sys.executable} {script_path}
 ExecStop=/usr/bin/docker stop vista3d
@@ -504,162 +358,9 @@ WantedBy=multi-user.target
             logger.error(f"Error creating systemd service: {e}")
             return False
     
-    def create_monitoring_script(self):
-        """Create a monitoring script for the external image server"""
-        monitor_script = self.script_dir / "monitor_image_server.py"
-        
-        logger.info("Creating external image server monitoring script...")
-        
-        script_content = '''#!/usr/bin/env python3
-"""
-External Image Server Health Monitor
-Monitors the external image server started by image_server.py
-"""
-
-import time
-import logging
-import requests
-import subprocess
-from pathlib import Path
-import os
-
-# Configure logging
-log_dir = Path(__file__).resolve().parent.parent / 'output' / 'logs'
-log_dir.mkdir(parents=True, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_dir / 'image_server_monitor.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-def check_image_server_process():
-    """Check if external image server process is running"""
-    try:
-        result = subprocess.run(
-            "pgrep -f 'image_server.py'",
-            shell=True,
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-def restart_image_server():
-    """Restart the external image server"""
-    try:
-        script_path = Path(__file__).parent / "image_server.py"
-        cmd = f"nohup python3 {script_path} > /tmp/image_server.log 2>&1 &"
-        subprocess.run(cmd, shell=True)
-        time.sleep(5)
-        return True
-    except Exception as e:
-        logger.error(f"Error restarting server: {e}")
-        return False
-
-def check_server_response():
-    """Check if external image server is responding to requests"""
-    try:
-        image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
-        image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-        image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'https')
-        image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
-        
-        response = requests.get(
-            image_server_url,
-            verify=False,
-            timeout=10
-        )
-        return response.status_code == 200
-    except Exception:
-        return False
-
-def main():
-    """Main monitoring loop"""
-    logger.info("Starting external image server monitoring...")
-    
-    while True:
-        try:
-            # Check if external image server process is running
-            if not check_image_server_process():
-                logger.warning("⚠️  External image server process not found, restarting...")
-                restart_image_server()
-                time.sleep(60)
-                continue
-            
-            # Check if server is responding
-            if not check_server_response():
-                logger.warning("⚠️  External image server not responding, restarting...")
-                restart_image_server()
-                time.sleep(60)
-                continue
-            
-            logger.info("✅ External image server is healthy and responding")
-            time.sleep(60)  # Check every minute
-            
-        except KeyboardInterrupt:
-            logger.info("Shutting down monitor...")
-            break
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            time.sleep(60)
-
-if __name__ == "__main__":
-    main()
-'''
-        
-        try:
-            with open(monitor_script, 'w') as f:
-                f.write(script_content)
-            
-            # Make the script executable
-            monitor_script.chmod(0o755)
-            
-            logger.info(f"✅ Monitoring script created: {monitor_script}")
-            logger.info("\nTo start monitoring in background:")
-            logger.info(f"  nohup {monitor_script} > /dev/null 2>&1 &")
-            logger.info("\nTo view monitoring logs:")
-            logger.info(f"  tail -f {monitor_script.parent}/image_server_monitor.log")
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error creating monitoring script: {e}")
-            return False
-    
-    def check_image_server_health(self) -> bool:
-        """Check external image server health and restart if needed"""
-        logger.info("Checking external image server health...")
-        
-        # Check if external image server process is running
-        if not self.check_external_image_server():
-            logger.warning("⚠️  External image server not accessible, restarting...")
-            return self.start_external_image_server()
-        
-        # Check if server is responding
-        try:
-            image_server_host = os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'localhost')
-            image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
-            image_server_protocol = os.getenv('EXTERNAL_IMAGE_SERVER_PROTOCOL', 'http')
-            image_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}/"
-            
-            response = requests.get(image_server_url, timeout=10)
-            if response.status_code == 200:
-                logger.info("✅ External image server is healthy and responding")
-                return True
-            else:
-                logger.warning("⚠️  External image server not responding, restarting...")
-                return self.start_external_image_server()
-        except requests.RequestException:
-            logger.warning("⚠️  External image server not responding, restarting...")
-            return self.start_external_image_server()
-    
     def run(self):
         """Main execution logic"""
-        logger.info("Starting Vista-3D container with external image server access...")
+        logger.info("Starting Vista-3D container for remote image server access...")
         
         # Check Docker availability
         if not self.check_docker():
@@ -667,12 +368,6 @@ if __name__ == "__main__":
         
         # Create output directory
         self.create_output_directory()
-        
-        # Start external image server
-        if not self.start_external_image_server():
-            logger.error("❌ Failed to start external image server")
-            logger.error("Vista-3D will not be able to access image files")
-            logger.error("Continuing with Vista-3D setup...")
         
         # Stop existing containers
         self.stop_existing_container()
@@ -687,71 +382,53 @@ if __name__ == "__main__":
         # Success message
         logger.info("==========================================")
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
-        image_server_port = os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888')
         logger.info(f"Vista-3D is now running on port {vista3d_port}")
-        logger.info(f"External image server is running on port {image_server_port}")
+        logger.info("Vista-3D is configured to accept connections from any image server")
         logger.info("==========================================")
         
         logger.info("\nUseful commands:")
         logger.info("  View Vista-3D logs: docker logs -f vista3d")
-        logger.info("  View external image server logs: tail -f /tmp/image_server.log")
         logger.info("  Stop container: docker stop vista3d")
         logger.info("  Access container shell: docker exec -it vista3d bash")
         logger.info("  Test Vista-3D endpoint: curl http://localhost:8000/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
-        logger.info(f"  Test external image server: curl http://localhost:{image_server_port}/")
-        logger.info("  Start external image server manually: python3 utils/image_server.py")
+        logger.info("  Test with external image server: curl http://localhost:8000/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"http://your-image-server:port/path/to/image.nii.gz\"}'")
         
         return True
 
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description="Vista-3D Docker Startup Script with External Image Server",
+        description="Vista-3D Docker Startup Script for Remote Image Server Access",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 start_vista.py                 # Start Vista-3D container with external image server
-  sudo python3 start_vista.py --create-service  # Create systemd service for auto-startup
-  python3 start_vista.py --create-monitor       # Create monitoring script
-  python3 start_vista.py --health-check         # Check external image server health
+  python3 start_vista3d.py                 # Start Vista-3D container
+  sudo python3 start_vista3d.py --create-service  # Create systemd service for auto-startup
 
 For automatic startup on boot:
-  1. Run: sudo python3 start_vista.py --create-service
+  1. Run: sudo python3 start_vista3d.py --create-service
   2. The service will start automatically on boot
   3. Check status: sudo systemctl status vista3d
 
-For continuous monitoring:
-  1. Run: python3 start_vista.py --create-monitor
-  2. Start monitoring: nohup python3 utils/monitor_image_server.py > /dev/null 2>&1 &
-  3. View logs: tail -f utils/image_server_monitor.log
-
-External Image Server:
-  The script now starts an external image server (image_server.py) that Vista-3D can access
-  via host.docker.internal:8888. This provides better separation of concerns and allows
-  the image server to run independently of the Docker container.
-
 Network Access Configuration:
-  To allow Vista3D to accept image server connections from any IP address or host:
+  Vista3D is configured to accept connections from any image server by default.
   
   Environment Variables:
-    ALLOW_ANY_IMAGE_SERVER_HOST=True    # Allow any host/IP for image server access
-    ALLOW_EXTERNAL_ACCESS=True          # Allow external access to Vista3D container
     USE_HOST_NETWORKING=True            # Use host networking (allows all interfaces)
-    DISABLE_URL_VALIDATION=True         # Disable URL validation restrictions
-    ALLOW_ANY_IP_ACCESS=True            # Allow any IP address access
-    DISABLE_HOST_VALIDATION=True        # Disable host validation
-    ALLOW_HTTP_ACCESS=True              # Allow HTTP access
-    ALLOW_HTTPS_ACCESS=True             # Allow HTTPS access
+    VISTA3D_PORT=8000                  # Port for Vista3D (when not using host networking)
+    ALLOW_ANY_IMAGE_SERVER_HOST=True   # Allow any host/IP for image server access
+    DISABLE_URL_VALIDATION=True        # Disable URL validation restrictions
+    ALLOW_ANY_IP_ACCESS=True           # Allow any IP address access
+    DISABLE_HOST_VALIDATION=True       # Disable host validation
+    ALLOW_HTTP_ACCESS=True             # Allow HTTP access
+    ALLOW_HTTPS_ACCESS=True            # Allow HTTPS access
   
   Examples:
-    # Allow any image server host
-    ALLOW_ANY_IMAGE_SERVER_HOST=True python3 start_vista3d.py
-    
     # Use host networking for maximum external access
     USE_HOST_NETWORKING=True python3 start_vista3d.py
     
-    # Allow external access on specific port
-    ALLOW_EXTERNAL_ACCESS=True VISTA3D_PORT=8000 python3 start_vista3d.py
+    # Use specific port with external access
+    USE_HOST_NETWORKING=False VISTA3D_PORT=8000 python3 start_vista3d.py
         """
     )
     
@@ -759,22 +436,6 @@ Network Access Configuration:
         '--create-service',
         action='store_true',
         help='Create systemd service for automatic startup (requires root)'
-    )
-    parser.add_argument(
-        '--create-monitor',
-        action='store_true',
-        help='Create monitoring script for external image server health checks'
-    )
-    parser.add_argument(
-        '--health-check',
-        action='store_true',
-        help='Check external image server health and restart if needed'
-    )
-    parser.add_argument(
-        '--test-external',
-        type=str,
-        metavar='URL',
-        help='Test access to an external image server URL'
     )
     
     args = parser.parse_args()
@@ -785,17 +446,8 @@ Network Access Configuration:
         if args.create_service:
             success = manager.create_systemd_service()
             sys.exit(0 if success else 1)
-        elif args.create_monitor:
-            success = manager.create_monitoring_script()
-            sys.exit(0 if success else 1)
-        elif args.health_check:
-            success = manager.check_image_server_health()
-            sys.exit(0 if success else 1)
-        elif args.test_external:
-            success = manager.test_external_image_server_access(args.test_external)
-            sys.exit(0 if success else 1)
         else:
-            # Default behavior - start the container with external image server
+            # Default behavior - start the container
             success = manager.run()
             sys.exit(0 if success else 1)
     except KeyboardInterrupt:
@@ -807,4 +459,3 @@ Network Access Configuration:
 
 if __name__ == "__main__":
     main()
-()
