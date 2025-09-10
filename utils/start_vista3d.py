@@ -60,7 +60,7 @@ class Vista3DManager:
             # NVIDIA NGC Configuration
             'NGC_API_KEY': os.getenv('NGC_API_KEY'),
             'NGC_ORG_ID': os.getenv('NGC_ORG_ID'),
-            'LOCAL_NIM_CACHE': os.getenv('LOCAL_NIM_CACHE', '~/.cache/nim'),
+            'LOCAL_NIM_CACHE': os.path.expanduser(os.getenv('LOCAL_NIM_CACHE', '~/.cache/nim')),
             
             # Vista-3D Configuration
             'IGNORE_SSL_ERRORS': os.getenv('IGNORE_SSL_ERRORS', 'True'),
@@ -268,8 +268,18 @@ class Vista3DManager:
         logger.info("Starting Vista-3D container...")
         
         # Build environment variables string
-        env_vars = " ".join([f"-e {k}={v}" for k, v in self.env_vars.items() if v is not None])
-        
+        env_vars_list = []
+        for k, v in self.env_vars.items():
+            if v is not None:
+                v_str = str(v)
+                if ' ' in v_str or '\'' in v_str or '"' in v_str:
+                    # Use single quotes and escape existing single quotes
+                    escaped_v = v_str.replace("'", "'\\''")
+                    env_vars_list.append(f"-e {k}='{escaped_v}'")
+                else:
+                    env_vars_list.append(f"-e {k}={v_str}")
+        env_vars = " ".join(env_vars_list)
+
         # Build domain whitelist
         domain_whitelist_str = json.dumps(self.domain_whitelist)
         env_vars += f" -e DOMAIN_WHITELIST='{domain_whitelist_str}'"
@@ -279,8 +289,8 @@ class Vista3DManager:
         env_vars += f" -e SUPPORTED_IMAGE_EXT='{extensions_str}'"
         
         # Build volume mounts
-        volumes = f"-v {self.local_outputs_path}:{self.container_outputs_path}"
-        volumes += f" -v {self.project_root}:{self.project_root}:ro"
+        volumes = f'-v "{self.local_outputs_path}:{self.container_outputs_path}"'
+        volumes += f' -v "{self.project_root}:{self.project_root}:ro"'
         
         # Network configuration - allow external access by default
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
@@ -297,8 +307,6 @@ class Vista3DManager:
         host_entries = "--add-host=host.docker.internal:host-gateway"
         host_entries += " --add-host=localhost:host-gateway"
         host_entries += " --add-host=127.0.0.1:host-gateway"
-        host_entries += " --add-host=0.0.0.0:host-gateway"
-        host_entries += " --add-host=::1:host-gateway"
         
         docker_cmd = f"""docker run --gpus all --rm -d --name {self.container_name} --runtime=nvidia --shm-size=8G {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
         
