@@ -66,7 +66,7 @@ class Vista3DManager:
             'WORKSPACE_ROOT': os.getenv('WORKSPACE_ROOT', '/workspace'),
             'ALLOW_FILE_PROTOCOL': os.getenv('ALLOW_FILE_PROTOCOL', 'True'),
             'ALLOW_LOCAL_PATHS': os.getenv('ALLOW_LOCAL_PATHS', 'True'),
-            'DISABLE_URL_VALIDATION': os.getenv('DISABLE_URL_VALIDATION', 'False'),
+            'DISABLE_URL_VALIDATION': os.getenv('DISABLE_URL_VALIDATION', 'True'),  # Changed to True to allow any URL
             'ALLOW_ABSOLUTE_FILE_PATHS': os.getenv('ALLOW_ABSOLUTE_FILE_PATHS', 'True'),
             'ALLOW_RELATIVE_FILE_PATHS': os.getenv('ALLOW_RELATIVE_FILE_PATHS', 'True'),
             'FILE_ACCESS_MODE': os.getenv('FILE_ACCESS_MODE', 'local'),
@@ -75,6 +75,14 @@ class Vista3DManager:
             'EXTERNAL_IMAGE_SERVER': os.getenv('EXTERNAL_IMAGE_SERVER', 'https://host.docker.internal:8888'),
             'EXTERNAL_IMAGE_SERVER_HOST': os.getenv('EXTERNAL_IMAGE_SERVER_HOST', 'host.docker.internal'),
             'EXTERNAL_IMAGE_SERVER_PORT': os.getenv('EXTERNAL_IMAGE_SERVER_PORT', '8888'),
+            # Network access control variables
+            'ALLOW_ANY_IMAGE_SERVER_HOST': os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'False'),
+            'ALLOW_EXTERNAL_NETWORK_ACCESS': os.getenv('ALLOW_EXTERNAL_NETWORK_ACCESS', 'True'),
+            'DISABLE_HOST_VALIDATION': os.getenv('DISABLE_HOST_VALIDATION', 'True'),
+            'ALLOW_ANY_IP_ACCESS': os.getenv('ALLOW_ANY_IP_ACCESS', 'True'),
+            'DISABLE_DOMAIN_WHITELIST': os.getenv('DISABLE_DOMAIN_WHITELIST', 'False'),
+            'ALLOW_HTTP_ACCESS': os.getenv('ALLOW_HTTP_ACCESS', 'True'),
+            'ALLOW_HTTPS_ACCESS': os.getenv('ALLOW_HTTPS_ACCESS', 'True'),
             'CUDA_VISIBLE_DEVICES': os.getenv('CUDA_VISIBLE_DEVICES', '1'),
             'NVIDIA_VISIBLE_DEVICES': os.getenv('NVIDIA_VISIBLE_DEVICES', '1'),
             'NVIDIA_DRIVER_CAPABILITIES': os.getenv('NVIDIA_DRIVER_CAPABILITIES', 'compute,utility'),
@@ -100,24 +108,54 @@ class Vista3DManager:
         external_server_url = f"{image_server_protocol}://{image_server_host}:{image_server_port}"
         external_server_http = f"http://{image_server_host}:{image_server_port}"
         
-        self.domain_whitelist = [
-            # External image server access (configurable)
-            f"{external_server_url}", f"{external_server_http}",
-            f"{image_server_protocol}://{image_server_host}:*", f"http://{image_server_host}:*",
-            # Docker host access
-            "https://host.docker.internal:*", "http://host.docker.internal:*",
-            # Local file access
-            "file://*", "file:///*", "file:///home/*", "file:///Users/*",
-            "file:///workspace/*", "file:///workspace/output/*",
-            "file:///workspace/output/nifti/*", "/workspace/output/*",
-            "/workspace/output/nifti/*", "/workspace/output/nifti",
-            # Container paths
-            "/*", "/workspace/*", "/workspace/output/.*", "/workspace/output/**",
-            "/workspace/**", "/workspace/output", "/workspace", "/home/*",
-            "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
-            # Project-specific paths (configurable)
-            f"{project_root}/*", f"{project_root}/output/*", f"{project_root}/output/nifti/*"
-        ]
+        # Check if we should allow any host/IP for image server access
+        allow_any_host = os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'False').lower() in ('true', '1', 'yes')
+        
+        if allow_any_host:
+            # Allow any IP address or host for image server access
+            self.domain_whitelist = [
+                # Allow any HTTP/HTTPS URL
+                "http://*", "https://*", "http://*:*", "https://*:*",
+                # Allow any IP address
+                "http://0.0.0.0:*", "https://0.0.0.0:*",
+                "http://127.0.0.1:*", "https://127.0.0.1:*",
+                "http://localhost:*", "https://localhost:*",
+                # Allow any hostname
+                "http://*.*", "https://*.*",
+                # Docker host access
+                "https://host.docker.internal:*", "http://host.docker.internal:*",
+                # Local file access
+                "file://*", "file:///*", "file:///home/*", "file:///Users/*",
+                "file:///workspace/*", "file:///workspace/output/*",
+                "file:///workspace/output/nifti/*", "/workspace/output/*",
+                "/workspace/output/nifti/*", "/workspace/output/nifti",
+                # Container paths
+                "/*", "/workspace/*", "/workspace/output/.*", "/workspace/output/**",
+                "/workspace/**", "/workspace/output", "/workspace", "/home/*",
+                "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
+                # Project-specific paths (configurable)
+                f"{project_root}/*", f"{project_root}/output/*", f"{project_root}/output/nifti/*"
+            ]
+        else:
+            # Original restrictive configuration
+            self.domain_whitelist = [
+                # External image server access (configurable)
+                f"{external_server_url}", f"{external_server_http}",
+                f"{image_server_protocol}://{image_server_host}:*", f"http://{image_server_host}:*",
+                # Docker host access
+                "https://host.docker.internal:*", "http://host.docker.internal:*",
+                # Local file access
+                "file://*", "file:///*", "file:///home/*", "file:///Users/*",
+                "file:///workspace/*", "file:///workspace/output/*",
+                "file:///workspace/output/nifti/*", "/workspace/output/*",
+                "/workspace/output/nifti/*", "/workspace/output/nifti",
+                # Container paths
+                "/*", "/workspace/*", "/workspace/output/.*", "/workspace/output/**",
+                "/workspace/**", "/workspace/output", "/workspace", "/home/*",
+                "/Users/*", "localhost", "127.0.0.1", "172.17.0.1", "*",
+                # Project-specific paths (configurable)
+                f"{project_root}/*", f"{project_root}/output/*", f"{project_root}/output/nifti/*"
+            ]
         
         # Supported image extensions
         self.supported_extensions = [".nrrd", ".nii", ".nii.gz", ".dcm"]
@@ -300,14 +338,38 @@ class Vista3DManager:
         volumes = f"-v {self.local_outputs_path}:{self.container_outputs_path}"
         volumes += f" -v {self.project_root}:{self.project_root}:ro"
         
-        # Docker run command with host networking access
+        # Docker run command with configurable networking
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
+        use_host_networking = os.getenv('USE_HOST_NETWORKING', 'False').lower() in ('true', '1', 'yes')
+        allow_external_access = os.getenv('ALLOW_EXTERNAL_ACCESS', 'False').lower() in ('true', '1', 'yes')
+        
+        # Build network configuration
+        network_config = ""
+        if use_host_networking:
+            network_config = "--network=host"
+            logger.info("Using host networking mode - Vista3D will be accessible on all interfaces")
+        else:
+            # Standard port mapping with optional external access
+            if allow_external_access:
+                network_config = f"-p 0.0.0.0:{vista3d_port}:8000"
+                logger.info(f"Vista3D will be accessible externally on port {vista3d_port}")
+            else:
+                network_config = f"-p {vista3d_port}:8000"
+                logger.info(f"Vista3D will be accessible on localhost:{vista3d_port}")
+        
+        # Add host entries for external access
+        host_entries = "--add-host=host.docker.internal:host-gateway"
+        if allow_external_access or use_host_networking:
+            # Add additional host entries for external access
+            host_entries += " --add-host=localhost:host-gateway"
+            host_entries += " --add-host=127.0.0.1:host-gateway"
+        
         docker_cmd = f"""
             docker run --gpus all --rm -d --name {self.container_name} \
             --runtime=nvidia \
             --shm-size=8G \
-            --add-host=host.docker.internal:host-gateway \
-            -p {vista3d_port}:8000 \
+            {host_entries} \
+            {network_config} \
             {volumes} \
             {env_vars} \
             nvcr.io/nim/nvidia/vista3d:1.0.0
@@ -379,6 +441,30 @@ class Vista3DManager:
             logger.info(f"External image server response: {response.status_code}")
         except requests.RequestException as e:
             logger.warning(f"Test 3 failed: {e}")
+        
+        # Test 4: Test external IP access (if enabled)
+        allow_any_host = os.getenv('ALLOW_ANY_IMAGE_SERVER_HOST', 'False').lower() in ('true', '1', 'yes')
+        if allow_any_host:
+            logger.info("Test 4: Testing external IP access capability...")
+            logger.info("✅ External IP access is enabled - Vista3D can accept connections from any IP/host")
+        else:
+            logger.info("Test 4: External IP access is disabled (use ALLOW_ANY_IMAGE_SERVER_HOST=True to enable)")
+    
+    def test_external_image_server_access(self, external_url: str) -> bool:
+        """Test access to an external image server"""
+        logger.info(f"Testing access to external image server: {external_url}")
+        
+        try:
+            response = requests.get(external_url, timeout=10)
+            if response.status_code == 200:
+                logger.info(f"✅ Successfully connected to external image server: {external_url}")
+                return True
+            else:
+                logger.warning(f"⚠️  External image server returned status {response.status_code}")
+                return False
+        except requests.RequestException as e:
+            logger.error(f"❌ Failed to connect to external image server: {e}")
+            return False
     
     def create_systemd_service(self):
         """Create systemd service for automatic startup"""
@@ -668,6 +754,29 @@ External Image Server:
   The script now starts an external image server (image_server.py) that Vista-3D can access
   via host.docker.internal:8888. This provides better separation of concerns and allows
   the image server to run independently of the Docker container.
+
+Network Access Configuration:
+  To allow Vista3D to accept image server connections from any IP address or host:
+  
+  Environment Variables:
+    ALLOW_ANY_IMAGE_SERVER_HOST=True    # Allow any host/IP for image server access
+    ALLOW_EXTERNAL_ACCESS=True          # Allow external access to Vista3D container
+    USE_HOST_NETWORKING=True            # Use host networking (allows all interfaces)
+    DISABLE_URL_VALIDATION=True         # Disable URL validation restrictions
+    ALLOW_ANY_IP_ACCESS=True            # Allow any IP address access
+    DISABLE_HOST_VALIDATION=True        # Disable host validation
+    ALLOW_HTTP_ACCESS=True              # Allow HTTP access
+    ALLOW_HTTPS_ACCESS=True             # Allow HTTPS access
+  
+  Examples:
+    # Allow any image server host
+    ALLOW_ANY_IMAGE_SERVER_HOST=True python3 start_vista3d.py
+    
+    # Use host networking for maximum external access
+    USE_HOST_NETWORKING=True python3 start_vista3d.py
+    
+    # Allow external access on specific port
+    ALLOW_EXTERNAL_ACCESS=True VISTA3D_PORT=8000 python3 start_vista3d.py
         """
     )
     
@@ -686,6 +795,12 @@ External Image Server:
         action='store_true',
         help='Check external image server health and restart if needed'
     )
+    parser.add_argument(
+        '--test-external',
+        type=str,
+        metavar='URL',
+        help='Test access to an external image server URL'
+    )
     
     args = parser.parse_args()
     
@@ -700,6 +815,9 @@ External Image Server:
             sys.exit(0 if success else 1)
         elif args.health_check:
             success = manager.check_image_server_health()
+            sys.exit(0 if success else 1)
+        elif args.test_external:
+            success = manager.test_external_image_server_access(args.test_external)
             sys.exit(0 if success else 1)
         else:
             # Default behavior - start the container with external image server

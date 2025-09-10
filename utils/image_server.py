@@ -394,6 +394,7 @@ async def serve_file_with_range(request: Request, file_path: Path):
         media_type="application/octet-stream"
     )
 
+# Configure CORS to allow access from any origin
 origins = ["*"]
 
 app.add_middleware(
@@ -427,11 +428,13 @@ if __name__ == "__main__":
     print(f"  URL: http://{host}:{port}")
     print(f"  Serving from: {project_root.absolute()}")
     print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
+    print(f"  CORS: Enabled for all origins")
+    print(f"  Binding to: 0.0.0.0 (all interfaces)")
     print(f"  Press Ctrl+C to stop the server")
     print("-" * 60)
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="0.0.0.0",  # Bind to all interfaces to allow external access
         port=port,
         log_level="info"
     )
