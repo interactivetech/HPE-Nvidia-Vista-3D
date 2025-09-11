@@ -61,8 +61,6 @@ def run_server_analysis():
                 stats['patients_with_ct'] = line.split(":")[1].strip()
             elif "Patients with Voxel Data:" in line:
                 stats['patients_with_voxels'] = line.split(":")[1].strip()
-            elif "Patients with Mesh Data:" in line:
-                stats['patients_with_meshes'] = line.split(":")[1].strip()
             elif "TOTAL DATA SIZE:" in line:
                 stats['total_data_size'] = line.split(":")[1].strip()
         
@@ -95,7 +93,6 @@ def run_server_analysis():
                     'data_size': data_size,
                     'ct_scans': 0,
                     'voxel_files': 0,
-                    'mesh_files': 0,
                     'scans': []
                 }
             elif "CT Scans:" in line and current_patient:
@@ -116,15 +113,6 @@ def run_server_analysis():
                     current_patient['voxel_files'] = int(voxel_number)
                 except (ValueError, IndexError):
                     current_patient['voxel_files'] = 0
-            elif "Mesh Files:" in line and current_patient:
-                # Extract just the number, ignoring size info like "8 (45.2 MB)"
-                mesh_text = line.split(":")[1].strip()
-                try:
-                    # Try to extract just the number part
-                    mesh_number = mesh_text.split()[0]  # Get first part before space
-                    current_patient['mesh_files'] = int(mesh_number)
-                except (ValueError, IndexError):
-                    current_patient['mesh_files'] = 0
             elif "✅" in line and current_patient and "(" in line:
                 # Parse scan details like "✅ 2.5_mm_STD_-_30%_ASIR_2 (segmentation file, 84 voxels)"
                 scan_line = line.strip()
@@ -165,7 +153,6 @@ def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:
         patient_id = patient.get('id', 'Unknown')
         ct_scans = patient.get('ct_scans', 0)
         voxel_files = patient.get('voxel_files', 0)
-        mesh_files = patient.get('mesh_files', 0)
         
         # Calculate segments - this is the number of individual voxel files per patient
         # In the current data structure, segments are represented by voxel files
@@ -196,7 +183,6 @@ def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:
             'CT Scans': ct_scans,
             'Segments': segments,
             'Voxels': voxel_files,  # Using voxel_files as the voxel count
-            'Meshes': mesh_files,
             'Size (MB)': size_mb,
             'Scan Names': scan_names
         })
@@ -220,7 +206,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
         chart_df = pd.melt(
             df, 
             id_vars=['Patient'], 
-            value_vars=['CT Scans', 'Segments', 'Voxels', 'Meshes'],
+            value_vars=['CT Scans', 'Segments', 'Voxels'],
             var_name='Data Type', 
             value_name='Count'
         )
@@ -236,13 +222,12 @@ def render_patient_data_chart(patients_data: List[Dict]):
             x='Patient', 
             y='Count', 
             color='Data Type',
-            title='Patient File Counts - CT Scans, Segments, Voxels, and Meshes',
+            title='Patient File Counts - CT Scans, Segments, and Voxels',
             labels={'Count': 'Number of Files', 'Patient': 'Patient ID'},
             color_discrete_map={
                 'CT Scans': '#1f77b4',
                 'Segments': '#ff7f0e', 
-                'Voxels': '#2ca02c',
-                'Meshes': '#d62728'
+                'Voxels': '#2ca02c'
             },
             hover_data={'Scan Names Text': True}
         )
@@ -287,7 +272,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
         chart_df = pd.melt(
             df, 
             id_vars=['Patient'], 
-            value_vars=['CT Scans', 'Segments', 'Voxels', 'Meshes'],
+            value_vars=['CT Scans', 'Segments', 'Voxels'],
             var_name='Data Type', 
             value_name='Count'
         )
@@ -298,7 +283,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
             lambda x: '<br>'.join(x) if x else 'No scan data'
         )
         
-        for data_type in ['CT Scans', 'Segments', 'Voxels', 'Meshes']:
+        for data_type in ['CT Scans', 'Segments', 'Voxels']:
             data_subset = chart_df_with_scans[chart_df_with_scans['Data Type'] == data_type]
             fig.add_trace(
                 go.Bar(
@@ -308,8 +293,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
                     marker_color={
                         'CT Scans': '#1f77b4',
                         'Segments': '#ff7f0e', 
-                        'Voxels': '#2ca02c',
-                        'Meshes': '#d62728'
+                        'Voxels': '#2ca02c'
                     }[data_type],
                     customdata=data_subset['Scan Names Text'],
                     hovertemplate=f'<b>{data_type}</b><br>' +
@@ -372,22 +356,26 @@ def render_patient_details_visualization(patients_data: List[Dict]):
     # Prepare table data
     table_data = []
     for patient in patients_data:
-        # Get scan names for this patient
+        # Get actual NIfTI file names from the analysis data
+        # The scan names are stored in the 'scans' array with the actual file names
         scan_names = []
         if patient.get('scans'):
+            # Extract the actual file names from the scans array
+            # These are the base names without .nii.gz extension
             scan_names = [scan.get('name', 'Unknown') for scan in patient['scans']]
         
-        # Format scan names for display
+        # Format scan names for display - show actual NIfTI file names
         if scan_names:
+            # Join the scan names with commas for display
             scan_names_text = ', '.join(scan_names)
         else:
+            # Fallback to count if no scan names available
             scan_names_text = f"{patient['ct_scans']} scans"
         
         table_data.append({
             'Patient ID': patient['id'],
             'CT Scans': scan_names_text,
             'Voxel Files': patient['voxel_files'],
-            'Mesh Files': patient['mesh_files'],
             'Data Size': patient.get('data_size', 'Unknown')
         })
     
@@ -400,7 +388,6 @@ def render_patient_details_visualization(patients_data: List[Dict]):
             "Patient ID": st.column_config.TextColumn("Patient ID", width="medium"),
             "CT Scans": st.column_config.TextColumn("CT Scans", width="large"),
             "Voxel Files": st.column_config.NumberColumn("Voxel Files", width="small"),
-            "Mesh Files": st.column_config.NumberColumn("Mesh Files", width="small"),
             "Data Size": st.column_config.TextColumn("Data Size", width="medium")
         }
     )
@@ -455,7 +442,7 @@ if current_page == 'home':
             patients = analysis_data['patients']
             
             # Summary Statistics
-            col1, col2, col3, col4, col5 = st.columns(5)
+            col1, col2, col3, col4 = st.columns(4)
             
             with col1:
                 st.metric(
@@ -481,15 +468,6 @@ if current_page == 'home':
                 )
             
             with col4:
-                # Calculate total meshes from all patients
-                total_meshes = sum(patient.get('mesh_files', 0) for patient in patients)
-                st.metric(
-                    label="Total Meshes",
-                    value=total_meshes,
-                    help="Total number of mesh files across all patients"
-                )
-            
-            with col5:
                 st.metric(
                     label="Total Data Size",
                     value=stats.get('total_data_size', 'Unknown'),

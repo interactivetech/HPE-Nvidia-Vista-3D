@@ -13,6 +13,14 @@ import numpy as np
 import traceback
 import shutil
 from dotenv import load_dotenv
+try:
+    from utils.config_manager import ConfigManager
+except ModuleNotFoundError:
+    # Allow running as a script: python utils/segment.py
+    import sys as _sys
+    from pathlib import Path as _Path
+    _sys.path.append(str(_Path(__file__).resolve().parents[1]))
+    from utils.config_manager import ConfigManager
 
 # Load environment variables
 load_dotenv()
@@ -26,19 +34,13 @@ OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER', 'output')
 NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
 PATIENT_OUTPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
 
-# Remote Vista3D configuration
-EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER_URL', IMAGE_SERVER_URL)
+# Image server configuration (local by default)
+# Use IMAGE_SERVER only; external URL env is no longer used
 
-# Load label dictionaries
-LABEL_DICT_PATH = PROJECT_ROOT / "conf" / "vista3d_label_colors.json"
-with open(LABEL_DICT_PATH, 'r') as f:
-    label_colors_list = json.load(f)
-
-    # Convert list to a dictionary for easier lookup by ID
-    LABEL_DICT = {item['id']: item for item in label_colors_list}
-
-    # Create a name-to-id map for target_vessels processing
-    NAME_TO_ID_MAP = {item['name']: item['id'] for item in label_colors_list}
+config_manager = ConfigManager(config_dir=str(PROJECT_ROOT / "conf"))
+label_colors_list = config_manager.label_colors
+LABEL_DICT = {item['id']: item for item in label_colors_list}
+NAME_TO_ID_MAP = {item['name']: item['id'] for item in label_colors_list}
 
 
 
@@ -147,7 +149,16 @@ def main():
         print(f"\nProcessing patient folder: {patient_base_path}")
 
         vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower()
-        target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()] if vessels_of_interest_env != "all" else list(NAME_TO_ID_MAP.keys())
+        label_set_name = os.getenv('LABEL_SET', '').strip()
+        target_vessels = []
+        if label_set_name:
+            try:
+                label_sets = config_manager.label_sets
+                target_vessels = label_sets.get(label_set_name, [])
+            except Exception:
+                target_vessels = []
+        if not target_vessels:
+            target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()] if vessels_of_interest_env != "all" else list(NAME_TO_ID_MAP.keys())
         
         if not target_vessels:
             print("No VESSELS_OF_INTEREST specified in .env. Skipping patient.")
@@ -155,8 +166,10 @@ def main():
 
         target_vessel_ids = []
         for v in target_vessels:
-            if v in NAME_TO_ID_MAP:
-                target_vessel_ids.append(NAME_TO_ID_MAP[v])
+            name_key = v
+            # Ensure exact match with case and spacing as in config
+            if name_key in NAME_TO_ID_MAP:
+                target_vessel_ids.append(NAME_TO_ID_MAP[name_key])
         
         # Create folder structure (will ensure segments and voxels directories exist)
         print(f"  Ensuring folder structure for patient: {patient_folder_name}")
@@ -187,9 +200,8 @@ def main():
                 # Use the original nifti file path for inference
                 relative_path_to_nifti = nifti_file_path.relative_to(PROJECT_ROOT)
                 
-                # Vista3D is always remote, image server is always local
-                # Use the external image server URL that Vista3D can access from remote location
-                vista3d_input_url = f"{EXTERNAL_IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"
+                # Build URL using local image server configuration
+                vista3d_input_url = f"{IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"
                 
                 payload = {"image": vista3d_input_url, "prompts": {"labels": target_vessels}}
                 headers = {"Content-Type": "application/json"}

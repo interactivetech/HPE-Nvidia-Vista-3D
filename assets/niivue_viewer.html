@@ -114,6 +114,14 @@
                     }
                 }
 
+                // Re-enforce main volume colormap after overlay processing to prevent interference
+                {% if main_is_nifti and main_vol %}
+                if ({{ main_is_nifti|lower }} && mainVol) {
+                    nv.setColormap(mainVol.id, {{ color_map_js|safe }});
+                    console.log('Re-applied main volume colormap after overlay processing');
+                }
+                {% endif %}
+
                 // Honor requested slice type
                 nv.setSliceType({{ actual_slice_type }});
                 {% if actual_slice_type == 3 %}

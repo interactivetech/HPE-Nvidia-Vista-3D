@@ -90,6 +90,8 @@ python3 utils/dicom2nifti.py
 ### 7. Run Segmentation
 ```bash
 # Process NIFTI files with Vista3D
+# Option A: use a predefined label set
+echo "LABEL_SET=HeadNeckCore" >> .env
 python3 utils/segment.py
 ```
 

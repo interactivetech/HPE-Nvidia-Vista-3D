@@ -6,10 +6,7 @@ DICOM_FOLDER="dicom"
 # Local HTTP Image Server (for your local machine)
 IMAGE_SERVER="http://localhost:8888"
 
-# CRITICAL: External image server URL for remote Vista3D access
-# This must be a publicly accessible URL that Vista3D can reach from remote locations
-# Find your public IP with: curl ifconfig.me
-EXTERNAL_IMAGE_SERVER_URL="http://YOUR_PUBLIC_IP:8888"
+# External image server variable is deprecated; use IMAGE_SERVER only
 
 # Remote Vista3D server URL
 VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
@@ -18,5 +15,9 @@ VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
 OUTPUT_FOLDER="output"
 
 # Vessels of interest for segmentation analysis or "all"
-#VESSELS_OF_INTEREST="aorta,left iliac artery,right iliac artery"
+# Example: VESSELS_OF_INTEREST="brain,skull,spinal cord,left common carotid artery,right common carotid artery"
 VESSELS_OF_INTEREST="all"
+
+# Alternatively, choose a predefined label set from conf/vista3d_label_sets.json
+# Examples: HeadNeckCore, HeadNeckExtended
+#LABEL_SET="HeadNeckCore"

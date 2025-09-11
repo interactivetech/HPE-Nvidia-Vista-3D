@@ -65,6 +65,7 @@ The setup process may take 10-30 minutes depending on your internet connection a
 ### Configuration Files
 - `.env` file with your NGC credentials and Vista3D settings
 - Docker daemon configuration for NVIDIA runtime
+ - `conf/vista3d_label_sets.json` predefined label sets (e.g., Head/Neck)
 
 ## 🔑 Critical: External IP Configuration
 
@@ -90,12 +91,12 @@ dig +short myip.opendns.com @resolver1.opendns.com
 ### Update Your .env File
 Add this line to your `.env` file with your actual public IP:
 ```bash
-EXTERNAL_IMAGE_SERVER_URL="http://YOUR_PUBLIC_IP:8888"
+IMAGE_SERVER="http://localhost:8888"
 ```
 
 **Example:**
 ```bash
-EXTERNAL_IMAGE_SERVER_URL="http://203.0.113.1:8888"
+IMAGE_SERVER="http://203.0.113.1:8888"
 ```
 
 ### Firewall Configuration
@@ -110,7 +111,7 @@ sudo apt update && sudo apt install ngrok
 
 # Create tunnel
 ngrok http 8888
-# Use the provided https URL as your EXTERNAL_IMAGE_SERVER_URL
+# Use the provided https URL as your IMAGE_SERVER
 ```
 
 ## Usage Examples
@@ -310,6 +311,10 @@ PROJECT_ROOT=/path/to/your/project
 DICOM_FOLDER=dicom
 IMAGE_SERVER=http://localhost:8888
 VESSELS_OF_INTEREST=all
+
+# Optional: Use a predefined label set from conf/vista3d_label_sets.json
+# Examples: HeadNeckCore, HeadNeckExtended
+#LABEL_SET=HeadNeckCore
 
 # File Access Configuration
 ALLOW_LOCAL_FILES=True

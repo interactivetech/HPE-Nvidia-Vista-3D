@@ -212,6 +212,27 @@ streamlit run app.py
 - **Real-Time Processing**: Real-time segmentation capabilities for live imaging on HPE infrastructure
 - **HPE Innovation**: Leveraging HPE's latest AI/ML innovations and technologies
 
+## 🎛️ Label Sets
+
+Predefined label sets let you target groups of anatomical structures without listing them manually.
+
+- Config file: `conf/vista3d_label_sets.json`
+- Examples:
+  - `HeadNeckCore`: brain, skull, spinal cord, C1–C7, thyroid, trachea, airway, carotids, subclavians, brachiocephalic veins/trunk, SVC
+  - `HeadNeckExtended`: HeadNeckCore plus T1–T2, sternum, clavicles, first ribs
+
+Usage:
+```bash
+# In .env
+LABEL_SET=HeadNeckCore
+
+# Or override per-run
+LABEL_SET=HeadNeckExtended python3 utils/segment.py
+```
+
+Fallback:
+- If `LABEL_SET` is not set, the script uses `VESSELS_OF_INTEREST` (comma-separated names) or `all`.
+
 ---
 
 **Built with ❤️ for Healthcare AI Innovation**

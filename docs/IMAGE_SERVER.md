@@ -103,9 +103,7 @@ Nvidia-Vista3d-segmenation/
 PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
 IMAGE_SERVER="http://localhost:8888"
 
-# CRITICAL: External image server URL for remote Vista3D access
-# This must be a publicly accessible URL that Vista3D can reach from remote locations
-EXTERNAL_IMAGE_SERVER_URL="http://YOUR_PUBLIC_IP:8888"
+# Note: External image server variable is deprecated. Use IMAGE_SERVER.
 
 # Remote Vista3D server URL
 VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
@@ -119,7 +117,7 @@ VESSELS_OF_INTEREST="all"
 
 ### **🔑 Critical Configuration: External IP Address**
 
-**Why EXTERNAL_IMAGE_SERVER_URL is Required:**
+Deprecated: EXTERNAL_IMAGE_SERVER_URL
 - Vista3D runs on a **remote server** (not on your local machine)
 - Your image server runs **locally** and serves files from your `output/` folder
 - Vista3D needs a **publicly accessible URL** to download images from your local server
@@ -151,7 +149,7 @@ dig +short myip.opendns.com @resolver1.opendns.com
 **Example Configuration:**
 If your public IP is `203.0.113.1`, set:
 ```bash
-EXTERNAL_IMAGE_SERVER_URL="http://203.0.113.1:8888"
+IMAGE_SERVER="http://203.0.113.1:8888"
 ```
 
 **⚠️ Important Notes:**
