@@ -11,6 +11,7 @@
     <canvas id="niivue-canvas"></canvas>
     <script>{{ niivue_lib_content|safe }}</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="/utils/colormap_manager.js"></script>
     <script>
         if (typeof niivue === 'undefined') {
             console.error('Niivue library not loaded!');
@@ -51,6 +52,7 @@
 
                 {% if main_is_nifti and main_vol %}
                 if ({{ main_is_nifti|lower }} && mainVol) {
+                    // MAIN VOLUME COLORMAP APPLICATION - DO NOT MODIFY WITHOUT CAREFUL TESTING
                     nv.setColormap(mainVol.id, {{ color_map_js|safe }});
                     nv.setGamma({{ nifti_gamma }});
                     mainVol.opacity = {{ nifti_opacity }};
@@ -114,7 +116,7 @@
                     }
                 }
 
-                // Re-enforce main volume colormap after overlay processing to prevent interference
+                // PROTECTED: Re-enforce main volume colormap after overlay processing to prevent interference
                 {% if main_is_nifti and main_vol %}
                 if ({{ main_is_nifti|lower }} && mainVol) {
                     nv.setColormap(mainVol.id, {{ color_map_js|safe }});

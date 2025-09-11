@@ -15,12 +15,14 @@ import shutil
 from dotenv import load_dotenv
 try:
     from utils.config_manager import ConfigManager
+    from utils.constants import MIN_FILE_SIZE_MB
 except ModuleNotFoundError:
     # Allow running as a script: python utils/segment.py
     import sys as _sys
     from pathlib import Path as _Path
     _sys.path.append(str(_Path(__file__).resolve().parents[1]))
     from utils.config_manager import ConfigManager
+    from utils.constants import MIN_FILE_SIZE_MB
 
 # Load environment variables
 load_dotenv()
@@ -45,10 +47,28 @@ NAME_TO_ID_MAP = {item['name']: item['id'] for item in label_colors_list}
 
 
 def get_nifti_files_in_folder(folder_path: Path):
-    """Scans a specific folder for NIfTI files and returns their absolute paths."""
+    """Scans a specific folder for NIfTI files and returns their absolute paths, filtering by minimum file size."""
     if not folder_path.exists() or not folder_path.is_dir():
         return []
-    return [folder_path / f for f in os.listdir(folder_path) if f.endswith(('.nii', '.nii.gz'))]
+    
+    nifti_files = []
+    filtered_count = 0
+    
+    for f in os.listdir(folder_path):
+        if f.endswith(('.nii', '.nii.gz')):
+            file_path = folder_path / f
+            file_size_mb = file_path.stat().st_size / (1024 * 1024)
+            
+            if file_size_mb >= MIN_FILE_SIZE_MB:
+                nifti_files.append(file_path)
+            else:
+                filtered_count += 1
+                print(f"    Skipping small file: {f} ({file_size_mb:.2f} MB < {MIN_FILE_SIZE_MB} MB)")
+    
+    if filtered_count > 0:
+        print(f"    Filtered out {filtered_count} files smaller than {MIN_FILE_SIZE_MB} MB")
+    
+    return nifti_files
 
 def create_patient_folder_structure(patient_id: str):
     """Create the new folder structure for a patient."""

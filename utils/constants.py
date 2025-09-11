@@ -55,9 +55,37 @@ WINDOW_PRESETS = {
 }
 
 # Color maps available for NIfTI images
-AVAILABLE_COLOR_MAPS = [
-    'gray', 'viridis', 'plasma', 'inferno', 'magma'
-]
+def load_colormaps():
+    """Load colormap names from all JSON files, with fallback to basic set."""
+    import json
+    import os
+    import glob
+    
+    try:
+        colormaps_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'colormaps')
+        colormap_files = glob.glob(os.path.join(colormaps_dir, '*.json'))
+        
+        all_colormaps = []
+        for colormap_file in colormap_files:
+            try:
+                with open(colormap_file, 'r') as f:
+                    data = json.load(f)
+                    if 'colormaps' in data and isinstance(data['colormaps'], dict):
+                        # Extract colormap names from the keys
+                        all_colormaps.extend(list(data['colormaps'].keys()))
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
+                continue
+        
+        # Remove duplicates and return
+        return list(set(all_colormaps)) if all_colormaps else ['gray', 'viridis', 'plasma', 'inferno', 'magma']
+        
+    except Exception as e:
+        print(f"Warning: Could not load colormaps from JSON files, using fallback: {e}")
+        # Fallback to basic set
+        return ['gray', 'viridis', 'plasma', 'inferno', 'magma']
+
+AVAILABLE_COLOR_MAPS = load_colormaps()
 
 # Voxel selection modes
 VOXEL_MODES = ["All", "Individual Voxels"]
@@ -79,6 +107,9 @@ MESSAGES = {
 
 # Debug settings
 DEBUG_MODE = False
+
+# File size filtering
+MIN_FILE_SIZE_MB = 5.0  # Minimum file size in MB for processing
 
 # Configuration file paths
 CONFIG_FILES = {
