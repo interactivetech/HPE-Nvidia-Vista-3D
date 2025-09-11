@@ -231,14 +231,12 @@ Predefined label sets let you target groups of anatomical structures without lis
 Usage:
 ```bash
 # In .env
-LABEL_SET=HeadNeckCore
+# Vessels of interest for segmentation analysis or "all"
+# Example: VESSELS_OF_INTEREST="brain,skull,spinal cord,left common carotid artery,right common carotid artery"
+VESSELS_OF_INTEREST="all"
 
-# Or override per-run
-LABEL_SET=HeadNeckExtended python3 utils/segment.py
 ```
 
-Fallback:
-- If `LABEL_SET` is not set, the script uses `VESSELS_OF_INTEREST` (comma-separated names) or `all`.
 
 ---
 
