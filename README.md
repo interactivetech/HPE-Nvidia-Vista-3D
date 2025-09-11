@@ -4,7 +4,7 @@
 
 The **HPE GreenLake Medical AI Platform** is a comprehensive healthcare AI solution that combines Hewlett Packard Enterprise's industry-leading GreenLake High Performance Compute infrastructure with NVIDIA's cutting-edge Vista3D technology to deliver automated vessel segmentation on DICOM medical imaging data. This enterprise-grade platform leverages HPE's Private Cloud AI capabilities to transform raw medical imaging data into actionable clinical insights through advanced AI-powered segmentation and 3D visualization.
 
-<img src="assets/images/1.png" height=200 ><img src="assets/images/2.png" height=200 ><img src="assets/images/3.png" height=200 >
+<img src="assets/images/1.png" height=200 style="padding: 10px" > <img src="assets/images/2.png" height=200 style="padding: 10px" ><img src="assets/images/3.png" height=200 style="padding: 10px" >
 
 ## 🎯 Business Value
 
