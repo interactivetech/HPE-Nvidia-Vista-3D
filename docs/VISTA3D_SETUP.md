@@ -6,6 +6,20 @@ This guide explains how to use the automated setup script to install and configu
 
 The `setup.py` script now includes a complete Vista3D setup mode (`--setup-vista3d`) that will:
 
+### **VISTA3D Model Capabilities & Limitations**
+
+**Important Note**: The VISTA3D model does not segment the entire brain because it was specifically trained and intended for segmenting body structures and lesions in 3D Computed Tomography (CT) images. While it supports segmenting many anatomical structures, it was not developed or trained on the necessary datasets for a full, detailed brain segmentation, which is a complex and specialized task in medical imaging.
+
+**Model Focus Areas**:
+- Abdominal and thoracic organ segmentation
+- Vascular structure identification
+- Body lesion detection and segmentation
+- Soft tissue and bone structure analysis (excluding detailed brain anatomy)
+
+### **Setup Process**
+
+The automated setup will:
+
 1. ✅ Check system requirements (Ubuntu, sudo access)
 2. ✅ Verify NVIDIA GPU and drivers
 3. ✅ Install Docker (if not present)

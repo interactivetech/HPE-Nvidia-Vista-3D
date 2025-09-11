@@ -28,6 +28,11 @@ The **HPE GreenLake Medical AI Platform** is a comprehensive healthcare AI solut
 - **Clinical Workflow Integration**: Seamless integration with existing medical imaging workflows
 - **Research & Development**: Advanced analytics for medical research and clinical studies
 
+### **Model Capabilities & Limitations**
+- **Optimized for Body Structures**: The VISTA3D model does not segment the entire brain because it was specifically trained and intended for segmenting body structures and lesions in 3D Computed Tomography (CT) images. While it supports segmenting many anatomical structures, it was not developed or trained on the necessary datasets for a full, detailed brain segmentation, which is a complex and specialized task in medical imaging.
+- **CT Scan Focus**: Designed primarily for abdominal, thoracic, and body vessel segmentation
+- **Anatomical Scope**: Supports segmentation of organs, vessels, bones, and soft tissue structures outside the brain
+
 ### **Target Users**
 - **Radiologists**: Enhanced diagnostic capabilities with AI-assisted segmentation on HPE infrastructure
 - **Medical Researchers**: Advanced tools for clinical research and analysis powered by HPE GreenLake HPC
