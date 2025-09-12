@@ -40,6 +40,7 @@ from pathlib import Path
 import tempfile
 import os
 import io
+import requests
 from typing import Dict, List, Tuple, Optional, Union
 import trimesh
 from scipy.spatial import cKDTree
@@ -53,21 +54,43 @@ from utils.data_manager import DataManager
 def load_ply_file_open3d(file_path: str) -> Tuple[o3d.geometry.TriangleMesh, Dict]:
     """
     Load a PLY file using Open3D and return mesh with metadata.
+    Supports both local file paths and HTTP URLs.
     
     Args:
-        file_path (str): Path to the PLY file
+        file_path (str): Path to the PLY file (local path or HTTP URL)
         
     Returns:
         Tuple[o3d.geometry.TriangleMesh, Dict]: Mesh object and metadata
     """
     try:
-        # Load mesh using Open3D
-        mesh = o3d.io.read_triangle_mesh(file_path)
+        # Check if it's an HTTP URL
+        if file_path.startswith('http'):
+            # Download the file to a temporary location
+            response = requests.get(file_path, timeout=30)
+            response.raise_for_status()
+            
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
+                tmp_file.write(response.content)
+                local_file_path = tmp_file.name
+            
+            # Load mesh using Open3D from local file
+            mesh = o3d.io.read_triangle_mesh(local_file_path)
+            
+            # Get file size from response
+            file_size = len(response.content)
+            
+            # Clean up temporary file
+            os.unlink(local_file_path)
+        else:
+            # Local file path
+            mesh = o3d.io.read_triangle_mesh(file_path)
+            file_size = os.path.getsize(file_path)
         
         # Get metadata
         metadata = {
             "file_path": file_path,
-            "file_size": os.path.getsize(file_path),
+            "file_size": file_size,
             "has_vertices": len(mesh.vertices) > 0,
             "has_faces": len(mesh.triangles) > 0,
             "has_vertex_colors": len(mesh.vertex_colors) > 0,
@@ -254,23 +277,18 @@ def create_open3d_3d_plot(mesh: o3d.geometry.TriangleMesh, color: str = "lightbl
         ))
     
     # Update layout
-    title = "3D PLY Mesh Visualization (Open3D)"
-    if has_vertex_colors:
-        title += " (Vertex Colors)"
-    
     fig.update_layout(
-        title=title,
         scene=dict(
-            xaxis_title="X",
-            yaxis_title="Y",
-            zaxis_title="Z",
             aspectmode="data",
+            xaxis=dict(showgrid=False, showticklabels=False),
+            yaxis=dict(showgrid=False, showticklabels=False),
+            zaxis=dict(showgrid=False, showticklabels=False),
             camera=dict(
                 eye=dict(x=1.5, y=1.5, z=1.5)
             )
         ),
-        width=800,
-        height=600
+        width=1200,
+        height=800
     )
     
     return fig
@@ -333,13 +351,13 @@ def create_point_cloud_plot_open3d(mesh: o3d.geometry.TriangleMesh, color: str =
     fig.update_layout(
         title="PLY Point Cloud View (Open3D)",
         scene=dict(
-            xaxis_title="X",
-            yaxis_title="Y",
-            zaxis_title="Z",
-            aspectmode="data"
+            aspectmode="data",
+            xaxis=dict(showgrid=False, showticklabels=False),
+            yaxis=dict(showgrid=False, showticklabels=False),
+            zaxis=dict(showgrid=False, showticklabels=False)
         ),
-        width=800,
-        height=600
+        width=1200,
+        height=800
     )
     
     return fig
@@ -646,13 +664,15 @@ def main():
                         )
                         
                         if selected_ply_file != "None":
-                            # Use DataManager to get the full URL path
-                            file_to_load = data_manager.get_file_url(selected_patient, f"ply/{ct_scan_folder_name}/{selected_ply_file}")
+                            # Construct URL the same way as voxels in NiiVue viewer
+                            file_to_load = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
                         else:
                             file_to_load = None
                     else:
                         st.sidebar.warning(f"No PLY files found for CT scan: {selected_display_name}")
-                        st.sidebar.caption(f"PLY directory: {data_manager.get_ply_directory_url(selected_patient, selected_file)}")
+                        # Show URL the same way as NiiVue viewer
+                        ply_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
+                        st.sidebar.caption(f"PLY directory: {ply_url}")
                         file_to_load = None
                 else:
                     file_to_load = None
@@ -675,7 +695,7 @@ def main():
     
     mesh_color = st.sidebar.color_picker(
         "Mesh Color",
-        value="#87CEEB",
+        value="#10CE61",
         help="Color for the solid mesh (if no vertex colors)"
     )
     
@@ -709,7 +729,7 @@ def main():
     st.sidebar.header("Processing Options")
     repair_mesh = st.sidebar.checkbox(
         "Auto-repair mesh",
-        value=False,
+        value=True,
         help="Automatically repair common mesh issues"
     )
     
@@ -719,11 +739,6 @@ def main():
         help="Compute vertex normals for better rendering"
     )
     
-    show_bounding_box = st.sidebar.checkbox(
-        "Show Bounding Box",
-        value=False,
-        help="Display the mesh bounding box"
-    )
     
     show_center_mass = st.sidebar.checkbox(
         "Show Center of Mass",
@@ -767,12 +782,34 @@ def main():
     
     # Process mesh if loaded
     if mesh is not None and not mesh.is_empty():
+        # Get mesh information
+        mesh_info = get_open3d_mesh_info(mesh)
+        
         # Apply processing options
         if repair_mesh:
             mesh = repair_mesh_open3d(mesh)
+            st.info("🔧 Mesh repair applied")
         
         if compute_normals and len(mesh.vertex_normals) == 0:
             mesh.compute_vertex_normals()
+            st.info("📐 Vertex normals computed")
+        
+        # Show detailed mesh information
+        with st.expander("Detailed Mesh Information"):
+            if mesh_info:
+                # Create a more detailed view
+                detailed_info = pd.DataFrame([
+                    {"Property": "File Size", "Value": f"{metadata.get('file_size', 0) / 1024:.1f} KB"},
+                    {"Property": "Vertices", "Value": mesh_info.get("Vertices", "N/A")},
+                    {"Property": "Triangles", "Value": mesh_info.get("Triangles", "N/A")},
+                    {"Property": "Volume", "Value": mesh_info.get("Volume", "N/A")},
+                    {"Property": "Surface Area", "Value": mesh_info.get("Surface Area", "N/A")},
+                    {"Property": "Is Watertight", "Value": mesh_info.get("Is Watertight", "N/A")},
+                    {"Property": "Is Orientable", "Value": mesh_info.get("Is Orientable", "N/A")},
+                    {"Property": "Has Vertex Colors", "Value": mesh_info.get("Has Vertex Colors", "N/A")},
+                    {"Property": "Has Vertex Normals", "Value": mesh_info.get("Has Vertex Normals", "N/A")},
+                ])
+                st.dataframe(detailed_info, use_container_width=True, hide_index=True)
         
         # 3D Visualization
         if view_mode == "Solid":
@@ -797,63 +834,9 @@ def main():
             st.plotly_chart(fig, use_container_width=True)
         
         
-        # Advanced analysis - Bounding Box and Center of Mass
-        if show_bounding_box or show_center_mass:
+        # Advanced analysis - Center of Mass
+        if show_center_mass:
             st.header("Advanced Analysis")
-            
-            if show_bounding_box:
-                try:
-                    bbox = mesh.get_axis_aligned_bounding_box()
-                    bbox_vertices = np.asarray(bbox.get_box_points())
-                    bbox_triangles = np.array([
-                        [0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7],
-                        [0, 1, 5], [0, 5, 4], [2, 3, 7], [2, 7, 6],
-                        [0, 3, 7], [0, 7, 4], [1, 2, 6], [1, 6, 5]
-                    ])
-                    
-                    vertices = np.asarray(mesh.vertices)
-                    triangles = np.asarray(mesh.triangles)
-                    
-                    bbox_fig = go.Figure(data=[
-                        go.Mesh3d(
-                            x=bbox_vertices[:, 0],
-                            y=bbox_vertices[:, 1],
-                            z=bbox_vertices[:, 2],
-                            i=bbox_triangles[:, 0],
-                            j=bbox_triangles[:, 1],
-                            k=bbox_triangles[:, 2],
-                            color="red",
-                            opacity=0.3,
-                            name="Bounding Box"
-                        ),
-                        go.Mesh3d(
-                            x=vertices[:, 0],
-                            y=vertices[:, 1],
-                            z=vertices[:, 2],
-                            i=triangles[:, 0],
-                            j=triangles[:, 1],
-                            k=triangles[:, 2],
-                            color=mesh_color,
-                            opacity=opacity,
-                            name="Mesh"
-                        )
-                    ])
-                    
-                    bbox_fig.update_layout(
-                        title="Mesh with Bounding Box",
-                        scene=dict(
-                            xaxis_title="X",
-                            yaxis_title="Y",
-                            zaxis_title="Z",
-                            aspectmode="data"
-                        ),
-                        width=800,
-                        height=600
-                    )
-                    
-                    st.plotly_chart(bbox_fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error displaying bounding box: {e}")
             
             if show_center_mass:
                 try:
@@ -929,7 +912,6 @@ def main():
     
     else:
         st.info("👆 Please select a patient, CT scan, and PLY file from the sidebar, or upload a PLY file to get started.")
-        st.caption("💡 The PLY files are organized by CT scan in subfolders within each patient's ply directory, similar to how voxels are organized.")
 
 
 if __name__ == "__main__":
