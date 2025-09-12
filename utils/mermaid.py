@@ -24,16 +24,29 @@ def render_workflow_diagram(mermaid_file_path: str = None, height: int = 600, ke
         with open(mermaid_file_path, 'r') as file:
             mermaid_content = file.read()
         
-        # Display the Mermaid diagram with full width
-        # Add CSS to ensure full width
+        # Display the Mermaid diagram with enhanced width styling
+        # Add CSS to ensure maximum width and better responsiveness
         st.markdown("""
         <style>
         .mermaid {
             width: 100% !important;
+            max-width: none !important;
+            min-width: 100% !important;
+        }
+        .stMermaid {
+            width: 100% !important;
+            max-width: none !important;
+        }
+        div[data-testid="stMermaid"] {
+            width: 100% !important;
+            max-width: none !important;
         }
         </style>
         """, unsafe_allow_html=True)
-        st_mermaid(mermaid_content, height=height, key=key)
+        
+        # Use container to ensure full width
+        with st.container():
+            st_mermaid(mermaid_content, height=height, key=key)
         return True
         
     except FileNotFoundError:
@@ -59,11 +72,13 @@ def render_workflow_section():
     """
     Render the complete workflow section with title and diagram.
     """
-    st.subheader("🔄 Workflow")
+    st.header("🔄 Workflow")
     #st.markdown("The diagram below shows the complete Vista3D segmentation workflow:")
     
-    # Render the workflow diagram
-    success = render_workflow_diagram()
+    # Use full width container for the workflow diagram
+    with st.container():
+        # Render the workflow diagram with enhanced width
+        success = render_workflow_diagram(height=700)  # Increased height for better visibility
     
     if success:
         st.markdown("*Diagram showing the data flow from DICOM images through Vista3D processing to 3D visualization.*")
