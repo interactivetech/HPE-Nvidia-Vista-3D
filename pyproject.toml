@@ -28,4 +28,5 @@ dependencies = [
     "pydicom>=2.4.0",
     "matplotlib>=3.7.0",
     "pillow>=10.0.0",
+    "scikit-image>=0.25.2",
 ]
