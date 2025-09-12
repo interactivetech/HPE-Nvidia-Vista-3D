@@ -139,3 +139,12 @@ class DataManager:
         """Generate the URL for the voxel directory."""
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
         return f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
+    
+    def get_ply_directory_url(self, patient_id: str, filename: str) -> str:
+        """Generate the URL for the PLY directory."""
+        ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
+        return f"{self.image_server_url}/output/{patient_id}/ply/{ct_scan_folder_name}/"
+    
+    def get_file_url(self, patient_id: str, file_path: str) -> str:
+        """Generate the full URL for a file within a patient's directory."""
+        return f"{self.image_server_url}/output/{patient_id}/{file_path}"

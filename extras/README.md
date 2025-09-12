@@ -146,6 +146,35 @@ streamlit run ply_viewer.py
 - `analyze_ply_quality(mesh)` - Analyze mesh quality and detect issues
 - `export_ply_mesh_data(mesh, format)` - Export mesh in various formats
 
+### ply_viewer_open3d.py
+
+Advanced Streamlit web application for viewing and analyzing PLY files using Open3D's powerful 3D processing capabilities.
+
+**Features:**
+- Upload and view PLY files with Open3D's advanced rendering
+- Interactive 3D visualization with multiple view modes
+- Comprehensive mesh statistics and quality analysis
+- Export to multiple formats (PLY, STL, OBJ, OFF, XYZ)
+- Point cloud processing and filtering
+- Mesh quality analysis and automatic repair tools
+- Color and texture support with advanced analysis
+- Performance optimization for large meshes
+- Medical imaging integration
+
+**Usage:**
+```bash
+streamlit run ply_viewer_open3d.py
+```
+
+**Key Functions:**
+- `load_ply_file_open3d(file_path)` - Load PLY file using Open3D
+- `get_open3d_mesh_info(mesh)` - Extract comprehensive Open3D mesh statistics
+- `create_open3d_3d_plot(mesh)` - Create interactive 3D visualization with Open3D
+- `analyze_mesh_quality_open3d(mesh)` - Advanced mesh quality analysis
+- `repair_mesh_open3d(mesh)` - Automatic mesh repair and optimization
+- `export_mesh_open3d(mesh, format)` - Export mesh in various formats
+- `create_mesh_statistics_plot(mesh)` - Generate statistical analysis plots
+
 ### nifti_viewer.py
 
 Interactive Streamlit web application for viewing and analyzing NIfTI medical imaging files with 3D volume rendering and 2D slice viewing.
@@ -235,6 +264,7 @@ extras/
 ├── nifti_viewer.py            # Interactive NIfTI viewer (Streamlit)
 ├── stl_viewer.py              # Interactive STL viewer (Streamlit)
 ├── ply_viewer.py              # Interactive PLY viewer (Streamlit)
+├── ply_viewer_open3d.py       # Advanced PLY viewer with Open3D (Streamlit)
 ├── requirements_stl_viewer.txt # Viewer dependencies
 ├── example_usage.py           # Comprehensive usage examples
 └── README.md                  # This documentation
@@ -302,13 +332,23 @@ The NIfTI, STL, and PLY viewers provide interactive interfaces for different sta
 4. **Export**: Convert to different formats or download processed files
 5. **Advanced Features**: Bounding box analysis, center of mass calculation
 
-#### PLY Viewer
+#### PLY Viewer (Basic)
 1. **Load PLY Files**: Upload new PLY files or select from existing ones
 2. **3D Visualization**: Interactive 3D viewing with support for vertex colors and textures
 3. **Multiple View Modes**: Solid, wireframe, point cloud, or all combined
 4. **Color Analysis**: Analyze vertex colors and create color histograms
 5. **Quality Analysis**: Detect degenerate faces, duplicate vertices, and mesh issues
 6. **Export**: Convert to different formats (PLY, STL, OBJ, OFF)
+
+#### PLY Viewer (Open3D Advanced)
+1. **Load PLY Files**: Upload new PLY files or select from existing ones using Open3D
+2. **Advanced 3D Visualization**: Interactive 3D viewing with Open3D's rendering engine
+3. **Multiple View Modes**: Solid, wireframe, point cloud, solid+wireframe, statistics
+4. **Mesh Processing**: Automatic mesh repair, normal computation, and optimization
+5. **Quality Analysis**: Comprehensive mesh quality metrics and statistical analysis
+6. **Color Analysis**: Advanced color analysis with histogram visualization
+7. **Export**: Convert to multiple formats (PLY, STL, OBJ, OFF, XYZ)
+8. **Performance**: Optimized for large meshes with point sampling options
 
 Both viewers automatically scan common output directories for existing files and provide user-friendly interfaces for exploring the 3D models created by the pipeline.
 
