@@ -36,7 +36,9 @@ def render_sidebar():
     with st.sidebar:
         # Patient folders are now directly in the output directory
         patient_folders = data_manager.get_server_data('', 'folders', ('',))
-        selected_patient = st.selectbox("Select Patient", patient_folders)
+        # Add None option at the beginning
+        patient_options = [None] + patient_folders
+        selected_patient = st.selectbox("Select Patient", patient_options, index=0)
 
         selected_file = None
         if selected_patient:
@@ -48,7 +50,9 @@ def render_sidebar():
                     filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
                     for filename in filenames
                 ]
-                selected_display_name = st.selectbox("Select Scan", display_names)
+                # Add None option at the beginning
+                scan_options = [None] + display_names
+                selected_display_name = st.selectbox("Select Scan", scan_options, index=0)
                 # Map back to the actual filename
                 if selected_display_name:
                     selected_index = display_names.index(selected_display_name)
@@ -198,6 +202,9 @@ def render_viewer(selected_patient: str, selected_file: str):
 # --- Main Application Flow ---
 def main():
     """Main application entry point."""
+    # Set page title
+    st.title("🩻 NiiVue Viewer")
+    
     # Render sidebar and get selections
     selected_patient, selected_file = render_sidebar()
 

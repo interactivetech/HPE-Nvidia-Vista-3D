@@ -62,7 +62,11 @@ def load_colormaps():
     import glob
     
     try:
-        colormaps_dir = os.path.join(os.path.dirname(__file__), '..', 'assets', 'colormaps')
+        # Use absolute path to avoid issues with exec() context
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        colormaps_dir = os.path.join(current_dir, '..', 'assets', 'colormaps')
+        colormaps_dir = os.path.abspath(colormaps_dir)
+        
         colormap_files = glob.glob(os.path.join(colormaps_dir, '*.json'))
         
         all_colormaps = []

@@ -50,14 +50,18 @@ from dotenv import load_dotenv
 # Import our data management modules
 from utils.data_manager import DataManager
 
+# PLY selection modes (similar to VOXEL_MODES)
+PLY_MODES = ["Single PLY", "Multiple PLY Files"]
 
-def load_ply_file_open3d(file_path: str) -> Tuple[o3d.geometry.TriangleMesh, Dict]:
+
+def load_ply_file_open3d(file_path: str, timeout: int = 15) -> Tuple[o3d.geometry.TriangleMesh, Dict]:
     """
     Load a PLY file using Open3D and return mesh with metadata.
     Supports both local file paths and HTTP URLs.
     
     Args:
         file_path (str): Path to the PLY file (local path or HTTP URL)
+        timeout (int): Timeout in seconds for HTTP requests
         
     Returns:
         Tuple[o3d.geometry.TriangleMesh, Dict]: Mesh object and metadata
@@ -65,8 +69,8 @@ def load_ply_file_open3d(file_path: str) -> Tuple[o3d.geometry.TriangleMesh, Dic
     try:
         # Check if it's an HTTP URL
         if file_path.startswith('http'):
-            # Download the file to a temporary location
-            response = requests.get(file_path, timeout=30)
+            # Download the file to a temporary location with timeout
+            response = requests.get(file_path, timeout=timeout)
             response.raise_for_status()
             
             # Create temporary file
@@ -103,6 +107,9 @@ def load_ply_file_open3d(file_path: str) -> Tuple[o3d.geometry.TriangleMesh, Dic
         
         return mesh, metadata
         
+    except requests.exceptions.Timeout:
+        st.error(f"Timeout loading PLY file: {file_path}")
+        return None, {}
     except Exception as e:
         st.error(f"Error loading PLY file with Open3D: {e}")
         return None, {}
@@ -199,6 +206,114 @@ def get_open3d_mesh_info(mesh: o3d.geometry.TriangleMesh) -> Dict:
                 info["Min Edge Length"] = f"{np.min(edges):.6f}"
     
     return info
+
+
+def create_multi_mesh_3d_plot(meshes: List[Tuple[o3d.geometry.TriangleMesh, str, str]], 
+                             opacity: float = 0.8, show_wireframe: bool = False) -> go.Figure:
+    """
+    Create a 3D plotly visualization of multiple Open3D meshes.
+    
+    Args:
+        meshes (List[Tuple[o3d.geometry.TriangleMesh, str, str]]): List of (mesh, name, color) tuples
+        opacity (float): Opacity of the meshes (0-1)
+        show_wireframe (bool): Whether to show wireframe overlay
+        
+    Returns:
+        go.Figure: Plotly figure object
+    """
+    if not meshes:
+        return go.Figure()
+    
+    fig = go.Figure()
+    
+    # Limit the number of meshes for performance
+    max_meshes = 10
+    if len(meshes) > max_meshes:
+        st.warning(f"Too many meshes selected ({len(meshes)}). Showing only the first {max_meshes} for performance.")
+        meshes = meshes[:max_meshes]
+    
+    for mesh, name, color in meshes:
+        if mesh is None or mesh.is_empty():
+            continue
+            
+        vertices = np.asarray(mesh.vertices)
+        triangles = np.asarray(mesh.triangles)
+        
+        # Skip wireframe for performance if too many triangles
+        if show_wireframe and len(triangles) > 20000:
+            st.warning(f"Skipping wireframe for {name} due to high triangle count ({len(triangles)})")
+            show_wireframe = False
+        
+        # Check for vertex colors
+        has_vertex_colors = len(mesh.vertex_colors) > 0
+        
+        if has_vertex_colors:
+            vertex_colors = np.asarray(mesh.vertex_colors)
+            # Calculate average color for the mesh
+            avg_color = np.mean(vertex_colors, axis=0)
+            colors = f"rgb({int(avg_color[0]*255)},{int(avg_color[1]*255)},{int(avg_color[2]*255)})"
+        else:
+            colors = color
+        
+        # Create the mesh plot
+        fig.add_trace(go.Mesh3d(
+            x=vertices[:, 0],
+            y=vertices[:, 1],
+            z=vertices[:, 2],
+            i=triangles[:, 0],
+            j=triangles[:, 1],
+            k=triangles[:, 2],
+            color=colors,
+            opacity=opacity,
+            lighting=dict(ambient=0.3, diffuse=0.8, specular=0.2),
+            lightposition=dict(x=100, y=100, z=100),
+            name=name,
+            showlegend=True
+        ))
+        
+        # Add wireframe if requested and not too complex
+        if show_wireframe and len(triangles) <= 20000:
+            # Create wireframe by plotting edges
+            edges = set()
+            for triangle in triangles:
+                edges.add((triangle[0], triangle[1]))
+                edges.add((triangle[1], triangle[2]))
+                edges.add((triangle[2], triangle[0]))
+            
+            edge_x, edge_y, edge_z = [], [], []
+            for edge in edges:
+                x0, y0, z0 = vertices[edge[0]]
+                x1, y1, z1 = vertices[edge[1]]
+                edge_x.extend([x0, x1, None])
+                edge_y.extend([y0, y1, None])
+                edge_z.extend([z0, z1, None])
+            
+            fig.add_trace(go.Scatter3d(
+                x=edge_x,
+                y=edge_y,
+                z=edge_z,
+                mode='lines',
+                line=dict(color='red', width=1),
+                name=f'{name} Wireframe',
+                showlegend=True
+            ))
+    
+    # Update layout
+    fig.update_layout(
+        scene=dict(
+            aspectmode="data",
+            xaxis=dict(showgrid=False, showticklabels=False),
+            yaxis=dict(showgrid=False, showticklabels=False),
+            zaxis=dict(showgrid=False, showticklabels=False),
+            camera=dict(
+                eye=dict(x=1.5, y=1.5, z=1.5)
+            )
+        ),
+        width=1200,
+        height=800
+    )
+    
+    return fig
 
 
 def create_open3d_3d_plot(mesh: o3d.geometry.TriangleMesh, color: str = "lightblue", 
@@ -598,6 +713,84 @@ def create_mesh_statistics_plot(mesh: o3d.geometry.TriangleMesh) -> go.Figure:
     return fig
 
 
+def render_ply_selection(selected_patient: str, selected_file: str, data_manager: DataManager, IMAGE_SERVER_URL: str):
+    """Render the PLY selection interface similar to voxel selection."""
+    with st.sidebar.expander("Select PLY Files", expanded=False):
+        # PLY selection mode
+        ply_mode = st.radio(
+            "Choose PLY selection mode:",
+            PLY_MODES,
+            index=0,
+            help="Select how you want to choose which PLY files to display"
+        )
+        
+        selected_ply_files = []
+        file_to_load = None
+        
+        if ply_mode == "Single PLY":
+            # Get PLY files from the CT scan's subfolder within ply directory
+            if selected_patient and selected_file:
+                ct_scan_folder_name = selected_file.replace('.nii.gz', '').replace('.nii', '')
+                ply_files = data_manager.get_server_data(f"{selected_patient}/ply/{ct_scan_folder_name}", 'files', ('.ply',))
+                
+                if ply_files:
+                    # Create display names without .ply extensions
+                    display_names = [filename.replace('.ply', '') for filename in ply_files]
+                    selected_display_name = st.selectbox(
+                        "Choose a single PLY file:",
+                        ["None"] + display_names,
+                        help="Choose a PLY file from the selected CT scan"
+                    )
+                    
+                    if selected_display_name != "None":
+                        # Map back to the actual filename
+                        selected_index = display_names.index(selected_display_name)
+                        selected_ply_file = ply_files[selected_index]
+                        file_to_load = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
+                        selected_ply_files = [selected_ply_file]
+                else:
+                    st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
+                    ply_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    st.caption(f"PLY directory: {ply_url}")
+        
+        elif ply_mode == "Multiple PLY Files":
+            if selected_patient and selected_file:
+                ct_scan_folder_name = selected_file.replace('.nii.gz', '').replace('.nii', '')
+                ply_files = data_manager.get_server_data(f"{selected_patient}/ply/{ct_scan_folder_name}", 'files', ('.ply',))
+                
+                if ply_files:
+                    # Create display names without .ply extensions
+                    display_names = [filename.replace('.ply', '') for filename in ply_files]
+                    selected_display_names = st.multiselect(
+                        "Choose multiple PLY files to overlay:",
+                        display_names,
+                        default=[],
+                        help="Select specific PLY files to display together"
+                    )
+                    
+                    # Map back to actual filenames
+                    selected_ply_files = []
+                    for display_name in selected_display_names:
+                        selected_index = display_names.index(display_name)
+                        selected_ply_files.append(ply_files[selected_index])
+                    
+                    # Display selection status
+                    if selected_ply_files:
+                        st.info(f"Will display {len(selected_ply_files)} PLY files from the PLY directory.")
+                        if len(selected_ply_files) > 5:
+                            st.warning("⚠️ Selecting many PLY files may cause slow loading. Consider selecting fewer files for better performance.")
+                    else:
+                        st.info("No PLY files selected. Select specific files to display.")
+                else:
+                    st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
+                    ply_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    st.caption(f"PLY directory: {ply_url}")
+            else:
+                st.info("Please select a patient and CT scan first.")
+    
+    return ply_mode, selected_ply_files, file_to_load
+
+
 def main():
     """Main Streamlit application."""
     st.set_page_config(
@@ -615,14 +808,12 @@ def main():
     data_manager = DataManager(IMAGE_SERVER_URL)
     
     # Patient folder selection
-    st.sidebar.header("Patient Data")
     
     # Get patient folders using DataManager (same as NiiVue_Viewer.py)
     patient_folders = data_manager.get_server_data('', 'folders', ('',))
     
     selected_patient = None
     selected_file = None
-    file_to_load = None
     
     if patient_folders:
         selected_patient = st.sidebar.selectbox(
@@ -651,39 +842,19 @@ def main():
                 if selected_display_name != "None":
                     selected_index = display_names.index(selected_display_name)
                     selected_file = filenames[selected_index]
-                    
-                    # Get PLY files from the CT scan's subfolder within ply directory
-                    ct_scan_folder_name = selected_file.replace('.nii.gz', '').replace('.nii', '')
-                    ply_files = data_manager.get_server_data(f"{selected_patient}/ply/{ct_scan_folder_name}", 'files', ('.ply',))
-                    
-                    if ply_files:
-                        selected_ply_file = st.sidebar.selectbox(
-                            "Select PLY File:",
-                            ["None"] + ply_files,
-                            help="Choose a PLY file from the selected CT scan"
-                        )
-                        
-                        if selected_ply_file != "None":
-                            # Construct URL the same way as voxels in NiiVue viewer
-                            file_to_load = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
-                        else:
-                            file_to_load = None
-                    else:
-                        st.sidebar.warning(f"No PLY files found for CT scan: {selected_display_name}")
-                        # Show URL the same way as NiiVue viewer
-                        ply_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
-                        st.sidebar.caption(f"PLY directory: {ply_url}")
-                        file_to_load = None
                 else:
-                    file_to_load = None
+                    selected_file = None
             else:
                 st.sidebar.warning("No NIfTI files found in this patient folder")
-                file_to_load = None
+                selected_file = None
         else:
-            file_to_load = None
+            selected_file = None
     else:
         st.sidebar.warning("No patient folders found")
-        file_to_load = None
+        selected_file = None
+    
+    # PLY file selection (similar to voxel selection)
+    ply_mode, selected_ply_files, file_to_load = render_ply_selection(selected_patient, selected_file, data_manager, IMAGE_SERVER_URL)
     
     # Visualization controls
     st.sidebar.header("Visualization Controls")
@@ -762,8 +933,8 @@ def main():
         help="Upload a PLY file to view and analyze with Open3D"
     )
     
-    # Load mesh
-    mesh = None
+    # Load mesh(es)
+    meshes = []  # List of (mesh, name, color) tuples
     metadata = {}
     
     if uploaded_file is not None:
@@ -773,65 +944,151 @@ def main():
             tmp_file_path = tmp_file.name
         
         mesh, metadata = load_ply_file_open3d(tmp_file_path)
+        if mesh is not None and not mesh.is_empty():
+            meshes = [(mesh, uploaded_file.name, mesh_color)]
         
         # Clean up temporary file
         os.unlink(tmp_file_path)
         
-    elif file_to_load is not None:
+    elif ply_mode == "Single PLY" and file_to_load is not None:
         mesh, metadata = load_ply_file_open3d(file_to_load)
+        if mesh is not None and not mesh.is_empty():
+            meshes = [(mesh, selected_ply_files[0] if selected_ply_files else "Single PLY", mesh_color)]
     
-    # Process mesh if loaded
-    if mesh is not None and not mesh.is_empty():
-        # Get mesh information
-        mesh_info = get_open3d_mesh_info(mesh)
+    elif ply_mode == "Multiple PLY Files" and selected_ply_files:
+        # Load multiple PLY files with progress indicator
+        ct_scan_folder_name = selected_file.replace('.nii.gz', '').replace('.nii', '') if selected_file else ""
         
-        # Apply processing options
-        if repair_mesh:
-            mesh = repair_mesh_open3d(mesh)
-            st.info("🔧 Mesh repair applied")
+        # Define colors for different PLY files
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F']
         
-        if compute_normals and len(mesh.vertex_normals) == 0:
-            mesh.compute_vertex_normals()
-            st.info("📐 Vertex normals computed")
+        # Show progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, ply_file in enumerate(selected_ply_files):
+            try:
+                # Update progress
+                progress = (i + 1) / len(selected_ply_files)
+                progress_bar.progress(progress)
+                status_text.text(f"Loading PLY file {i+1}/{len(selected_ply_files)}: {ply_file}")
+                
+                file_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
+                mesh, _ = load_ply_file_open3d(file_url)
+                
+                if mesh is not None and not mesh.is_empty():
+                    # Simplify mesh if it's too complex
+                    vertex_count = len(mesh.vertices)
+                    if vertex_count > 50000:  # If mesh has more than 50k vertices
+                        # Simplify the mesh for better performance
+                        mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=10000)
+                        st.info(f"Simplified {ply_file} from {vertex_count} to {len(mesh.vertices)} vertices for better performance")
+                    
+                    color = colors[i % len(colors)]  # Cycle through colors
+                    meshes.append((mesh, ply_file, color))
+                else:
+                    st.warning(f"Failed to load or empty mesh: {ply_file}")
+                    
+            except Exception as e:
+                st.error(f"Error loading {ply_file}: {str(e)}")
+                continue
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        if not meshes:
+            st.error("No PLY files could be loaded")
+    
+    # Process meshes if loaded
+    if meshes:
+        # Apply processing options to all meshes
+        processed_meshes = []
+        for mesh, name, color in meshes:
+            if mesh is not None and not mesh.is_empty():
+                if repair_mesh:
+                    mesh = repair_mesh_open3d(mesh)
+                
+                if compute_normals and len(mesh.vertex_normals) == 0:
+                    mesh.compute_vertex_normals()
+                
+                processed_meshes.append((mesh, name, color))
+        
         
         # Show detailed mesh information
         with st.expander("Detailed Mesh Information"):
-            if mesh_info:
-                # Create a more detailed view
-                detailed_info = pd.DataFrame([
-                    {"Property": "File Size", "Value": f"{metadata.get('file_size', 0) / 1024:.1f} KB"},
-                    {"Property": "Vertices", "Value": mesh_info.get("Vertices", "N/A")},
-                    {"Property": "Triangles", "Value": mesh_info.get("Triangles", "N/A")},
-                    {"Property": "Volume", "Value": mesh_info.get("Volume", "N/A")},
-                    {"Property": "Surface Area", "Value": mesh_info.get("Surface Area", "N/A")},
-                    {"Property": "Is Watertight", "Value": mesh_info.get("Is Watertight", "N/A")},
-                    {"Property": "Is Orientable", "Value": mesh_info.get("Is Orientable", "N/A")},
-                    {"Property": "Has Vertex Colors", "Value": mesh_info.get("Has Vertex Colors", "N/A")},
-                    {"Property": "Has Vertex Normals", "Value": mesh_info.get("Has Vertex Normals", "N/A")},
-                ])
-                st.dataframe(detailed_info, use_container_width=True, hide_index=True)
+            if len(processed_meshes) == 1:
+                # Single mesh - show detailed info
+                mesh, name, color = processed_meshes[0]
+                mesh_info = get_open3d_mesh_info(mesh)
+                if mesh_info:
+                    detailed_info = pd.DataFrame([
+                        {"Property": "File Size", "Value": f"{metadata.get('file_size', 0) / 1024:.1f} KB"},
+                        {"Property": "Vertices", "Value": mesh_info.get("Vertices", "N/A")},
+                        {"Property": "Triangles", "Value": mesh_info.get("Triangles", "N/A")},
+                        {"Property": "Volume", "Value": mesh_info.get("Volume", "N/A")},
+                        {"Property": "Surface Area", "Value": mesh_info.get("Surface Area", "N/A")},
+                        {"Property": "Is Watertight", "Value": mesh_info.get("Is Watertight", "N/A")},
+                        {"Property": "Is Orientable", "Value": mesh_info.get("Is Orientable", "N/A")},
+                        {"Property": "Has Vertex Colors", "Value": mesh_info.get("Has Vertex Colors", "N/A")},
+                        {"Property": "Has Vertex Normals", "Value": mesh_info.get("Has Vertex Normals", "N/A")},
+                    ])
+                    st.dataframe(detailed_info, use_container_width=True, hide_index=True)
+            else:
+                # Multiple meshes - show summary table
+                summary_data = []
+                for mesh, name, color in processed_meshes:
+                    mesh_info = get_open3d_mesh_info(mesh)
+                    summary_data.append({
+                        "File": name,
+                        "Vertices": mesh_info.get("Vertices", "N/A"),
+                        "Triangles": mesh_info.get("Triangles", "N/A"),
+                        "Volume": mesh_info.get("Volume", "N/A"),
+                        "Surface Area": mesh_info.get("Surface Area", "N/A"),
+                        "Is Watertight": mesh_info.get("Is Watertight", "N/A"),
+                        "Color": color
+                    })
+                
+                if summary_data:
+                    summary_df = pd.DataFrame(summary_data)
+                    st.dataframe(summary_df, use_container_width=True, hide_index=True)
         
         # 3D Visualization
-        if view_mode == "Solid":
-            fig = create_open3d_3d_plot(mesh, color=mesh_color, opacity=opacity)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        elif view_mode == "Wireframe":
-            fig = create_open3d_3d_plot(mesh, color=mesh_color, opacity=opacity, show_wireframe=True)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        elif view_mode == "Point Cloud":
-            fig = create_point_cloud_plot_open3d(mesh, color=mesh_color, size=point_size, 
-                                               sample_ratio=point_sample_ratio)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        elif view_mode == "Solid + Wireframe":
-            fig = create_open3d_3d_plot(mesh, color=mesh_color, opacity=opacity, show_wireframe=True)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        elif view_mode == "Statistics":
-            fig = create_mesh_statistics_plot(mesh)
-            st.plotly_chart(fig, use_container_width=True)
+        with st.spinner("Rendering 3D visualization..."):
+            try:
+                if view_mode == "Solid":
+                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                elif view_mode == "Wireframe":
+                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity, show_wireframe=True)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                elif view_mode == "Point Cloud":
+                    # For point cloud, we'll show the first mesh only for now
+                    if processed_meshes:
+                        mesh, name, color = processed_meshes[0]
+                        fig = create_point_cloud_plot_open3d(mesh, color=color, size=point_size, 
+                                                           sample_ratio=point_sample_ratio)
+                        st.plotly_chart(fig, use_container_width=True)
+                        if len(processed_meshes) > 1:
+                            st.info(f"Point cloud view showing only the first mesh: {name}")
+                
+                elif view_mode == "Solid + Wireframe":
+                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity, show_wireframe=True)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                elif view_mode == "Statistics":
+                    # For statistics, we'll show the first mesh only for now
+                    if processed_meshes:
+                        mesh, name, color = processed_meshes[0]
+                        fig = create_mesh_statistics_plot(mesh)
+                        st.plotly_chart(fig, use_container_width=True)
+                        if len(processed_meshes) > 1:
+                            st.info(f"Statistics view showing only the first mesh: {name}")
+            except Exception as e:
+                st.error(f"Error rendering 3D visualization: {str(e)}")
+                st.info("Try reducing the number of PLY files or simplifying the meshes.")
         
         
         # Advanced analysis - Center of Mass
@@ -840,78 +1097,138 @@ def main():
             
             if show_center_mass:
                 try:
-                    center = mesh.get_center()
-                    st.write(f"Center of Mass: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})")
-                    
-                    # Add center point to visualization
-                    center_fig = create_open3d_3d_plot(mesh, color=mesh_color, opacity=opacity)
-                    center_fig.add_trace(go.Scatter3d(
-                        x=[center[0]],
-                        y=[center[1]],
-                        z=[center[2]],
-                        mode='markers',
-                        marker=dict(size=10, color='red'),
-                        name='Center of Mass'
-                    ))
-                    
-                    st.plotly_chart(center_fig, use_container_width=True)
+                    if len(processed_meshes) == 1:
+                        # Single mesh
+                        mesh, name, color = processed_meshes[0]
+                        center = mesh.get_center()
+                        st.write(f"Center of Mass: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})")
+                        
+                        # Add center point to visualization
+                        center_fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
+                        center_fig.add_trace(go.Scatter3d(
+                            x=[center[0]],
+                            y=[center[1]],
+                            z=[center[2]],
+                            mode='markers',
+                            marker=dict(size=10, color='red'),
+                            name='Center of Mass'
+                        ))
+                        
+                        st.plotly_chart(center_fig, use_container_width=True)
+                    else:
+                        # Multiple meshes - show centers for all
+                        centers_data = []
+                        center_fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
+                        
+                        for i, (mesh, name, color) in enumerate(processed_meshes):
+                            center = mesh.get_center()
+                            centers_data.append({
+                                "File": name,
+                                "Center X": f"{center[0]:.3f}",
+                                "Center Y": f"{center[1]:.3f}",
+                                "Center Z": f"{center[2]:.3f}"
+                            })
+                            
+                            # Add center point to visualization
+                            center_fig.add_trace(go.Scatter3d(
+                                x=[center[0]],
+                                y=[center[1]],
+                                z=[center[2]],
+                                mode='markers',
+                                marker=dict(size=10, color='red'),
+                                name=f'{name} Center'
+                            ))
+                        
+                        # Show centers table
+                        centers_df = pd.DataFrame(centers_data)
+                        st.dataframe(centers_df, use_container_width=True, hide_index=True)
+                        
+                        st.plotly_chart(center_fig, use_container_width=True)
                 except:
                     st.write("Center of Mass: Unable to calculate")
         
         # Color analysis
-        if show_color_analysis and len(mesh.vertex_colors) > 0:
+        if show_color_analysis and processed_meshes:
             st.header("Color Analysis")
             
-            try:
-                colors = np.asarray(mesh.vertex_colors)
-                if len(colors) > 0 and colors.shape[1] >= 3:
-                    # Create color histogram
-                    fig_hist = go.Figure()
-                    
-                    color_names = ['Red', 'Green', 'Blue']
-                    if colors.shape[1] >= 4:
-                        color_names.append('Alpha')
-                    
-                    for i, color_name in enumerate(color_names):
-                        if i < colors.shape[1]:
-                            fig_hist.add_trace(go.Histogram(
-                                x=colors[:, i],
-                                name=color_name,
-                                opacity=0.7
-                            ))
-                    
-                    fig_hist.update_layout(
-                        title="Color Distribution",
-                        xaxis_title="Color Value",
-                        yaxis_title="Frequency",
-                        barmode='overlay'
-                    )
-                    
-                    st.plotly_chart(fig_hist, use_container_width=True)
-                    
-                    # Color statistics
-                    col_stats = {
-                        "Mean Red": f"{np.mean(colors[:, 0]):.3f}",
-                        "Mean Green": f"{np.mean(colors[:, 1]):.3f}",
-                        "Mean Blue": f"{np.mean(colors[:, 2]):.3f}",
-                        "Std Red": f"{np.std(colors[:, 0]):.3f}",
-                        "Std Green": f"{np.std(colors[:, 1]):.3f}",
-                        "Std Blue": f"{np.std(colors[:, 2]):.3f}"
-                    }
-                    
-                    if colors.shape[1] >= 4:
-                        col_stats["Mean Alpha"] = f"{np.mean(colors[:, 3]):.3f}"
-                        col_stats["Std Alpha"] = f"{np.std(colors[:, 3]):.3f}"
-                    
-                    col_df = pd.DataFrame(list(col_stats.items()), columns=['Color Statistic', 'Value'])
-                    st.dataframe(col_df, use_container_width=True)
-                else:
-                    st.info("Color data is not in the expected format (RGB values).")
-            except Exception as e:
-                st.error(f"Error analyzing colors: {e}")
+            # Check if any mesh has vertex colors
+            has_colors = any(len(mesh.vertex_colors) > 0 for mesh, _, _ in processed_meshes)
+            
+            if has_colors:
+                try:
+                    if len(processed_meshes) == 1:
+                        # Single mesh with colors
+                        mesh, name, color = processed_meshes[0]
+                        if len(mesh.vertex_colors) > 0:
+                            colors = np.asarray(mesh.vertex_colors)
+                            if len(colors) > 0 and colors.shape[1] >= 3:
+                                # Create color histogram
+                                fig_hist = go.Figure()
+                                
+                                color_names = ['Red', 'Green', 'Blue']
+                                if colors.shape[1] >= 4:
+                                    color_names.append('Alpha')
+                                
+                                for i, color_name in enumerate(color_names):
+                                    if i < colors.shape[1]:
+                                        fig_hist.add_trace(go.Histogram(
+                                            x=colors[:, i],
+                                            name=color_name,
+                                            opacity=0.7
+                                        ))
+                                
+                                fig_hist.update_layout(
+                                    title="Color Distribution",
+                                    xaxis_title="Color Value",
+                                    yaxis_title="Frequency",
+                                    barmode='overlay'
+                                )
+                                
+                                st.plotly_chart(fig_hist, use_container_width=True)
+                                
+                                # Color statistics
+                                col_stats = {
+                                    "Mean Red": f"{np.mean(colors[:, 0]):.3f}",
+                                    "Mean Green": f"{np.mean(colors[:, 1]):.3f}",
+                                    "Mean Blue": f"{np.mean(colors[:, 2]):.3f}",
+                                    "Std Red": f"{np.std(colors[:, 0]):.3f}",
+                                    "Std Green": f"{np.std(colors[:, 1]):.3f}",
+                                    "Std Blue": f"{np.std(colors[:, 2]):.3f}"
+                                }
+                                
+                                if colors.shape[1] >= 4:
+                                    col_stats["Mean Alpha"] = f"{np.mean(colors[:, 3]):.3f}"
+                                    col_stats["Std Alpha"] = f"{np.std(colors[:, 3]):.3f}"
+                                
+                                col_df = pd.DataFrame(list(col_stats.items()), columns=['Color Statistic', 'Value'])
+                                st.dataframe(col_df, use_container_width=True)
+                            else:
+                                st.info("Color data is not in the expected format (RGB values).")
+                        else:
+                            st.info("This mesh does not have vertex colors.")
+                    else:
+                        # Multiple meshes - show which ones have colors
+                        color_info = []
+                        for mesh, name, color in processed_meshes:
+                            has_vertex_colors = len(mesh.vertex_colors) > 0
+                            color_info.append({
+                                "File": name,
+                                "Has Vertex Colors": has_vertex_colors,
+                                "Assigned Color": color
+                            })
+                        
+                        color_df = pd.DataFrame(color_info)
+                        st.dataframe(color_df, use_container_width=True, hide_index=True)
+                        
+                        if not any(len(mesh.vertex_colors) > 0 for mesh, _, _ in processed_meshes):
+                            st.info("None of the selected meshes have vertex colors.")
+                except Exception as e:
+                    st.error(f"Error analyzing colors: {e}")
+            else:
+                st.info("None of the selected meshes have vertex colors.")
     
     else:
-        st.info("👆 Please select a patient, CT scan, and PLY file from the sidebar, or upload a PLY file to get started.")
+        st.info("Select a patient and file to begin.")
 
 
 if __name__ == "__main__":

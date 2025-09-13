@@ -135,10 +135,23 @@ class ViewerConfig:
 
         if self._settings['show_nifti']:
             with st.expander("NIfTI Image Settings", expanded=False):
+                # Get current color map index, with fallback to 0 if not found
+                current_color_map = self._settings['color_map']
+                try:
+                    color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
+                except ValueError:
+                    # If current color map is not in the list, use 'gray' as fallback
+                    if 'gray' in AVAILABLE_COLOR_MAPS:
+                        color_map_index = AVAILABLE_COLOR_MAPS.index('gray')
+                        self._settings['color_map'] = 'gray'
+                    else:
+                        color_map_index = 0
+                        self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
+                
                 self._settings['color_map'] = st.selectbox(
                     "Color Map",
                     AVAILABLE_COLOR_MAPS,
-                    index=AVAILABLE_COLOR_MAPS.index(self._settings['color_map'])
+                    index=color_map_index
                 )
                 self._settings['nifti_opacity'] = st.slider(
                     "NIfTI Opacity",
