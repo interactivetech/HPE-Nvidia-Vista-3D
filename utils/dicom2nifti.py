@@ -267,7 +267,8 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
         else:
             dicom_data_path = Path(project_root) / dicom_folder
             
-        nifti_base_path = Path(project_root) / "output"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        nifti_base_path = Path(project_root) / output_folder
         
         print(f"🔬 Enhanced DICOM to NIFTI Conversion (dcm2niix + NiiVue)")
         print(f"📁 Project Root: {project_root}")

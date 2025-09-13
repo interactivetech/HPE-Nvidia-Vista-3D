@@ -8,7 +8,11 @@ import re
 import requests
 from typing import List, Dict, Optional, Tuple, Set
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from .constants import SERVER_TIMEOUT
+
+# Load environment variables
+load_dotenv()
 
 
 class DataManager:
@@ -40,7 +44,8 @@ class DataManager:
 
     def get_folder_contents(self, folder_path: str) -> Optional[List[Dict[str, str]]]:
         """Fetch contents of a specific folder from the image server."""
-        url = f"{self.image_server_url}/output/{folder_path.strip('/')}/"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        url = f"{self.image_server_url}/{output_folder}/{folder_path.strip('/')}/"
         try:
             response = requests.get(url, timeout=SERVER_TIMEOUT)
             if response.status_code == 200:
@@ -84,7 +89,8 @@ class DataManager:
             ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
 
             # Check the voxels directory for this CT scan
-            voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
+            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+            voxels_folder_url = f"{self.image_server_url}/{output_folder}/{patient_id}/voxels/{ct_scan_folder_name}/"
 
             if __debug__:
                 print(f"DEBUG: Checking voxels URL: {voxels_folder_url}")
@@ -138,13 +144,16 @@ class DataManager:
     def get_voxel_directory_url(self, patient_id: str, filename: str) -> str:
         """Generate the URL for the voxel directory."""
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
-        return f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        return f"{self.image_server_url}/{output_folder}/{patient_id}/voxels/{ct_scan_folder_name}/"
     
     def get_ply_directory_url(self, patient_id: str, filename: str) -> str:
         """Generate the URL for the PLY directory."""
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
-        return f"{self.image_server_url}/output/{patient_id}/ply/{ct_scan_folder_name}/"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        return f"{self.image_server_url}/{output_folder}/{patient_id}/ply/{ct_scan_folder_name}/"
     
     def get_file_url(self, patient_id: str, file_path: str) -> str:
         """Generate the full URL for a file within a patient's directory."""
-        return f"{self.image_server_url}/output/{patient_id}/{file_path}"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        return f"{self.image_server_url}/{output_folder}/{patient_id}/{file_path}"

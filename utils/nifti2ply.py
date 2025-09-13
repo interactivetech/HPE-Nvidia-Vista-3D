@@ -407,7 +407,8 @@ def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None
         project_root = load_environment()
         
         # Define paths
-        output_base_path = Path(project_root) / "output"
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        output_base_path = Path(project_root) / output_folder
         
         print(f"🔬 Enhanced NIfTI to PLY Conversion (Vista-3D Pipeline)")
         print(f"📁 Project Root: {project_root}")

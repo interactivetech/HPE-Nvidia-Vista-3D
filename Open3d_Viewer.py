@@ -46,6 +46,11 @@ import trimesh
 from scipy.spatial import cKDTree
 import json
 from dotenv import load_dotenv
+from scipy.spatial.distance import cdist
+from scipy.optimize import minimize
+import math
+from PIL import Image
+import base64
 
 # Import our data management modules
 from utils.data_manager import DataManager
@@ -713,9 +718,337 @@ def create_mesh_statistics_plot(mesh: o3d.geometry.TriangleMesh) -> go.Figure:
     return fig
 
 
+# ============================================================================
+# ANALYSIS TOOLS
+# ============================================================================
+
+def calculate_triangle_area(v0: np.ndarray, v1: np.ndarray, v2: np.ndarray) -> float:
+    """
+    Calculate area of a triangle using cross product.
+    
+    Args:
+        v0, v1, v2: Triangle vertices as numpy arrays
+        
+    Returns:
+        float: Triangle area
+    """
+    return 0.5 * np.linalg.norm(np.cross(v1 - v0, v2 - v0))
+
+
+def calculate_surface_area_detailed(mesh: o3d.geometry.TriangleMesh) -> Dict:
+    """
+    Calculate detailed surface area analysis.
+    
+    Args:
+        mesh: Open3D mesh object
+        
+    Returns:
+        Dict: Detailed surface area metrics
+    """
+    if mesh is None or mesh.is_empty():
+        return {}
+    
+    vertices = np.asarray(mesh.vertices)
+    triangles = np.asarray(mesh.triangles)
+    
+    face_areas = []
+    for triangle in triangles:
+        v0, v1, v2 = vertices[triangle]
+        area = calculate_triangle_area(v0, v1, v2)
+        face_areas.append(area)
+    
+    face_areas = np.array(face_areas)
+    
+    return {
+        "Total Surface Area": np.sum(face_areas),
+        "Mean Face Area": np.mean(face_areas),
+        "Max Face Area": np.max(face_areas),
+        "Min Face Area": np.min(face_areas),
+        "Face Area Std": np.std(face_areas),
+        "Number of Faces": len(face_areas)
+    }
+
+
+def calculate_volume_detailed(mesh: o3d.geometry.TriangleMesh) -> Dict:
+    """
+    Calculate detailed volume analysis using multiple methods.
+    
+    Args:
+        mesh: Open3D mesh object
+        
+    Returns:
+        Dict: Detailed volume metrics
+    """
+    if mesh is None or mesh.is_empty():
+        return {}
+    
+    try:
+        # Method 1: Open3D built-in
+        volume_o3d = mesh.get_volume()
+        
+        # Method 2: Divergence theorem (more accurate for complex meshes)
+        vertices = np.asarray(mesh.vertices)
+        triangles = np.asarray(mesh.triangles)
+        
+        volume_div = 0.0
+        for triangle in triangles:
+            v0, v1, v2 = vertices[triangle]
+            # Volume contribution of this triangle
+            volume_div += np.dot(v0, np.cross(v1, v2)) / 6.0
+        
+        # Method 3: Convex hull volume (if mesh is not watertight)
+        try:
+            hull = mesh.get_convex_hull()
+            volume_hull = hull.get_volume()
+        except:
+            volume_hull = 0.0
+        
+        return {
+            "Volume (Open3D)": volume_o3d,
+            "Volume (Divergence)": abs(volume_div),
+            "Volume (Convex Hull)": volume_hull,
+            "Volume Difference": abs(volume_o3d - abs(volume_div)),
+            "Is Watertight": mesh.is_watertight(),
+            "Volume Method": "Open3D" if mesh.is_watertight() else "Convex Hull"
+        }
+        
+    except Exception as e:
+        return {"Error": str(e)}
+
+
+def calculate_surface_roughness(mesh: o3d.geometry.TriangleMesh, radius: float = 0.1) -> Dict:
+    """
+    Calculate surface roughness metrics.
+    
+    Args:
+        mesh: Open3D mesh object
+        radius: Search radius for local surface analysis
+        
+    Returns:
+        Dict: Surface roughness metrics
+    """
+    if mesh is None or mesh.is_empty():
+        return {}
+    
+    try:
+        vertices = np.asarray(mesh.vertices)
+        triangles = np.asarray(mesh.triangles)
+        
+        # Compute vertex normals if not present
+        if len(mesh.vertex_normals) == 0:
+            mesh.compute_vertex_normals()
+        
+        normals = np.asarray(mesh.vertex_normals)
+        
+        # Build KDTree for efficient neighbor search
+        tree = cKDTree(vertices)
+        
+        roughness_values = []
+        curvature_values = []
+        
+        for i, vertex in enumerate(vertices):
+            # Find neighbors within radius
+            neighbor_indices = tree.query_ball_point(vertex, radius)
+            
+            if len(neighbor_indices) > 3:  # Need at least 3 neighbors
+                neighbor_vertices = vertices[neighbor_indices]
+                neighbor_normals = normals[neighbor_indices]
+                
+                # Calculate local surface roughness
+                distances = np.linalg.norm(neighbor_vertices - vertex, axis=1)
+                mean_distance = np.mean(distances)
+                roughness = np.std(distances) / mean_distance if mean_distance > 0 else 0
+                roughness_values.append(roughness)
+                
+                # Calculate local curvature (simplified)
+                if len(neighbor_vertices) > 5:
+                    # Use PCA to find principal directions
+                    centered = neighbor_vertices - np.mean(neighbor_vertices, axis=0)
+                    cov_matrix = np.cov(centered.T)
+                    eigenvalues = np.linalg.eigvals(cov_matrix)
+                    eigenvalues = np.sort(eigenvalues)[::-1]
+                    
+                    if eigenvalues[0] > 0:
+                        curvature = eigenvalues[2] / eigenvalues[0]  # Ratio of smallest to largest
+                        curvature_values.append(curvature)
+        
+        roughness_values = np.array(roughness_values)
+        curvature_values = np.array(curvature_values)
+        
+        return {
+            "Mean Roughness": np.mean(roughness_values) if len(roughness_values) > 0 else 0,
+            "Max Roughness": np.max(roughness_values) if len(roughness_values) > 0 else 0,
+            "Roughness Std": np.std(roughness_values) if len(roughness_values) > 0 else 0,
+            "Mean Curvature": np.mean(curvature_values) if len(curvature_values) > 0 else 0,
+            "Max Curvature": np.max(curvature_values) if len(curvature_values) > 0 else 0,
+            "Curvature Std": np.std(curvature_values) if len(curvature_values) > 0 else 0,
+            "Analysis Radius": radius,
+            "Points Analyzed": len(roughness_values)
+        }
+        
+    except Exception as e:
+        return {"Error": str(e)}
+
+
+def create_cross_section(mesh: o3d.geometry.TriangleMesh, plane_origin: np.ndarray, 
+                        plane_normal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Create a cross-section of the mesh with a plane.
+    
+    Args:
+        mesh: Open3D mesh object
+        plane_origin: Point on the plane
+        plane_normal: Normal vector of the plane
+        
+    Returns:
+        Tuple of (cross_section_points, cross_section_edges)
+    """
+    if mesh is None or mesh.is_empty():
+        return np.array([]), np.array([])
+    
+    try:
+        # Normalize plane normal
+        plane_normal = plane_normal / np.linalg.norm(plane_normal)
+        
+        vertices = np.asarray(mesh.vertices)
+        triangles = np.asarray(mesh.triangles)
+        
+        cross_section_points = []
+        cross_section_edges = []
+        
+        for triangle in triangles:
+            v0, v1, v2 = vertices[triangle]
+            
+            # Check which vertices are on which side of the plane
+            d0 = np.dot(v0 - plane_origin, plane_normal)
+            d1 = np.dot(v1 - plane_origin, plane_normal)
+            d2 = np.dot(v2 - plane_origin, plane_normal)
+            
+            # Find intersections with the plane
+            intersections = []
+            
+            # Edge v0-v1
+            if (d0 > 0) != (d1 > 0):
+                t = -d0 / (d1 - d0)
+                intersection = v0 + t * (v1 - v0)
+                intersections.append(intersection)
+            
+            # Edge v1-v2
+            if (d1 > 0) != (d2 > 0):
+                t = -d1 / (d2 - d1)
+                intersection = v1 + t * (v2 - v1)
+                intersections.append(intersection)
+            
+            # Edge v2-v0
+            if (d2 > 0) != (d0 > 0):
+                t = -d2 / (d0 - d2)
+                intersection = v2 + t * (v0 - v2)
+                intersections.append(intersection)
+            
+            # Add intersections to cross-section
+            if len(intersections) == 2:
+                cross_section_points.extend(intersections)
+                cross_section_edges.append([len(cross_section_points) - 2, len(cross_section_points) - 1])
+        
+        return np.array(cross_section_points), np.array(cross_section_edges)
+        
+    except Exception as e:
+        st.error(f"Error creating cross-section: {e}")
+        return np.array([]), np.array([])
+
+
+
+
+def create_cross_section_visualization(mesh: o3d.geometry.TriangleMesh, 
+                                     cross_section_points: np.ndarray,
+                                     cross_section_edges: np.ndarray) -> go.Figure:
+    """
+    Create visualization of mesh cross-section.
+    
+    Args:
+        mesh: Open3D mesh object
+        cross_section_points: Points on the cross-section
+        cross_section_edges: Edges connecting cross-section points
+        
+    Returns:
+        go.Figure: Plotly figure with cross-section
+    """
+    if mesh is None or mesh.is_empty():
+        return go.Figure()
+    
+    vertices = np.asarray(mesh.vertices)
+    triangles = np.asarray(mesh.triangles)
+    
+    # Create base mesh plot (semi-transparent)
+    fig = go.Figure(data=[
+        go.Mesh3d(
+            x=vertices[:, 0],
+            y=vertices[:, 1],
+            z=vertices[:, 2],
+            i=triangles[:, 0],
+            j=triangles[:, 1],
+            k=triangles[:, 2],
+            color='lightblue',
+            opacity=0.3,
+            name='Original Mesh'
+        )
+    ])
+    
+    # Add cross-section if available
+    if len(cross_section_points) > 0:
+        # Add cross-section points
+        fig.add_trace(go.Scatter3d(
+            x=cross_section_points[:, 0],
+            y=cross_section_points[:, 1],
+            z=cross_section_points[:, 2],
+            mode='markers',
+            marker=dict(size=4, color='red'),
+            name='Cross-section Points'
+        ))
+        
+        # Add cross-section edges
+        if len(cross_section_edges) > 0:
+            edge_x, edge_y, edge_z = [], [], []
+            for edge in cross_section_edges:
+                p1, p2 = cross_section_points[edge]
+                edge_x.extend([p1[0], p2[0], None])
+                edge_y.extend([p1[1], p2[1], None])
+                edge_z.extend([p1[2], p2[2], None])
+            
+            fig.add_trace(go.Scatter3d(
+                x=edge_x,
+                y=edge_y,
+                z=edge_z,
+                mode='lines',
+                line=dict(color='red', width=3),
+                name='Cross-section'
+            ))
+    
+    # Update layout
+    fig.update_layout(
+        scene=dict(
+            aspectmode="data",
+            xaxis=dict(showgrid=False, showticklabels=False),
+            yaxis=dict(showgrid=False, showticklabels=False),
+            zaxis=dict(showgrid=False, showticklabels=False)
+        ),
+        width=1200,
+        height=800,
+        title="Mesh Cross-Section"
+    )
+    
+    return fig
+
+
+
+
+
+
+
+
 def render_ply_selection(selected_patient: str, selected_file: str, data_manager: DataManager, IMAGE_SERVER_URL: str):
     """Render the PLY selection interface similar to voxel selection."""
-    with st.sidebar.expander("Select PLY Files", expanded=False):
+    with st.sidebar.expander("Select PLY Files", expanded=True):
         # PLY selection mode
         ply_mode = st.radio(
             "Choose PLY selection mode:",
@@ -746,11 +1079,13 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                         # Map back to the actual filename
                         selected_index = display_names.index(selected_display_name)
                         selected_ply_file = ply_files[selected_index]
-                        file_to_load = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
+                        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+                        file_to_load = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
                         selected_ply_files = [selected_ply_file]
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
-                    ply_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+                    ply_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
                     st.caption(f"PLY directory: {ply_url}")
         
         elif ply_mode == "Multiple PLY Files":
@@ -783,7 +1118,8 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                         st.info("No PLY files selected. Select specific files to display.")
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
-                    ply_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+                    ply_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
                     st.caption(f"PLY directory: {ply_url}")
             else:
                 st.info("Please select a patient and CT scan first.")
@@ -853,6 +1189,11 @@ def main():
         st.sidebar.warning("No patient folders found")
         selected_file = None
     
+    # If no file selected yet, show guidance and stop
+    if not selected_file:
+        st.info("Select a patient and file to begin.")
+        return
+
     # PLY file selection (similar to voxel selection)
     ply_mode, selected_ply_files, file_to_load = render_ply_selection(selected_patient, selected_file, data_manager, IMAGE_SERVER_URL)
     
@@ -860,7 +1201,7 @@ def main():
     st.sidebar.header("Visualization Controls")
     view_mode = st.sidebar.selectbox(
         "View Mode",
-        ["Solid", "Wireframe", "Point Cloud", "Solid + Wireframe", "Statistics"],
+        ["Solid", "Point Cloud", "Statistics", "Cross-Section"],
         help="Choose how to display the mesh"
     )
     
@@ -923,19 +1264,13 @@ def main():
         help="Display color distribution and statistics"
     )
     
-    # File upload section at the bottom
-    st.sidebar.header("File Upload")
-    
-    # File upload
-    uploaded_file = st.sidebar.file_uploader(
-        "Choose a PLY file",
-        type=['ply'],
-        help="Upload a PLY file to view and analyze with Open3D"
-    )
     
     # Load mesh(es)
+    # Read the upload value from session state since the uploader widget is rendered later
+    uploaded_file = st.session_state.get('ply_uploader', None)
     meshes = []  # List of (mesh, name, color) tuples
     metadata = {}
+    processed_meshes = []  # Always define to avoid UnboundLocalError
     
     if uploaded_file is not None:
         # Save uploaded file to temporary location
@@ -973,7 +1308,8 @@ def main():
                 progress_bar.progress(progress)
                 status_text.text(f"Loading PLY file {i+1}/{len(selected_ply_files)}: {ply_file}")
                 
-                file_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
+                output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+                file_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
                 mesh, _ = load_ply_file_open3d(file_url)
                 
                 if mesh is not None and not mesh.is_empty():
@@ -1014,81 +1350,194 @@ def main():
                 
                 processed_meshes.append((mesh, name, color))
         
+        # Analysis Tools (after meshes are loaded)
+        st.sidebar.header("Analysis Tools")
         
-        # Show detailed mesh information
-        with st.expander("Detailed Mesh Information"):
-            if len(processed_meshes) == 1:
-                # Single mesh - show detailed info
-                mesh, name, color = processed_meshes[0]
-                mesh_info = get_open3d_mesh_info(mesh)
-                if mesh_info:
-                    detailed_info = pd.DataFrame([
-                        {"Property": "File Size", "Value": f"{metadata.get('file_size', 0) / 1024:.1f} KB"},
-                        {"Property": "Vertices", "Value": mesh_info.get("Vertices", "N/A")},
-                        {"Property": "Triangles", "Value": mesh_info.get("Triangles", "N/A")},
-                        {"Property": "Volume", "Value": mesh_info.get("Volume", "N/A")},
-                        {"Property": "Surface Area", "Value": mesh_info.get("Surface Area", "N/A")},
-                        {"Property": "Is Watertight", "Value": mesh_info.get("Is Watertight", "N/A")},
-                        {"Property": "Is Orientable", "Value": mesh_info.get("Is Orientable", "N/A")},
-                        {"Property": "Has Vertex Colors", "Value": mesh_info.get("Has Vertex Colors", "N/A")},
-                        {"Property": "Has Vertex Normals", "Value": mesh_info.get("Has Vertex Normals", "N/A")},
-                    ])
-                    st.dataframe(detailed_info, use_container_width=True, hide_index=True)
+        # Cross-section controls
+        if st.sidebar.checkbox("Enable Cross-Section", value=False):
+            st.sidebar.subheader("Cross-Section Controls")
+            
+            # Plane orientation
+            plane_axis = st.sidebar.selectbox(
+                "Plane Axis",
+                ["X", "Y", "Z", "Custom"],
+                help="Choose the axis perpendicular to the cutting plane"
+            )
+            
+            if plane_axis == "Custom":
+                st.sidebar.write("Custom Plane Normal:")
+                nx = st.sidebar.number_input("Normal X", value=1.0, step=0.1)
+                ny = st.sidebar.number_input("Normal Y", value=0.0, step=0.1)
+                nz = st.sidebar.number_input("Normal Z", value=0.0, step=0.1)
+                plane_normal = np.array([nx, ny, nz])
+                st.session_state.plane_normal = plane_normal
             else:
-                # Multiple meshes - show summary table
-                summary_data = []
-                for mesh, name, color in processed_meshes:
-                    mesh_info = get_open3d_mesh_info(mesh)
-                    summary_data.append({
-                        "File": name,
-                        "Vertices": mesh_info.get("Vertices", "N/A"),
-                        "Triangles": mesh_info.get("Triangles", "N/A"),
-                        "Volume": mesh_info.get("Volume", "N/A"),
-                        "Surface Area": mesh_info.get("Surface Area", "N/A"),
-                        "Is Watertight": mesh_info.get("Is Watertight", "N/A"),
-                        "Color": color
-                    })
-                
-                if summary_data:
-                    summary_df = pd.DataFrame(summary_data)
-                    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                axis_map = {"X": [1, 0, 0], "Y": [0, 1, 0], "Z": [0, 0, 1]}
+                plane_normal = np.array(axis_map[plane_axis])
+                st.session_state.plane_normal = plane_normal
+            
+            st.session_state.plane_axis = plane_axis
+            
+            # Plane position
+            plane_position = st.sidebar.slider(
+                "Plane Position",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.5,
+                step=0.01,
+                help="Position of the cutting plane (0-1)"
+            )
+            st.session_state.plane_position = plane_position
         
-        # 3D Visualization
-        with st.spinner("Rendering 3D visualization..."):
-            try:
-                if view_mode == "Solid":
-                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
+        # Surface analysis
+        if st.sidebar.checkbox("Enable Surface Analysis", value=False):
+            st.sidebar.subheader("Surface Analysis")
+            
+            roughness_radius = st.sidebar.slider(
+                "Roughness Analysis Radius",
+                min_value=0.01,
+                max_value=1.0,
+                value=0.1,
+                step=0.01,
+                help="Radius for local surface roughness analysis"
+            )
+            
+            if st.sidebar.button("Analyze Surface"):
+                st.session_state.surface_analysis = True
+    
+    # File upload section at the bottom
+    st.sidebar.header("File Upload")
+    
+    # File upload
+    uploaded_file = st.sidebar.file_uploader(
+        "Choose a PLY file",
+        type=['ply'],
+        help="Upload a PLY file to view and analyze with Open3D",
+        key="ply_uploader"
+    )
+    
+    # Show detailed mesh information
+    with st.expander("Detailed Mesh Information"):
+        if len(processed_meshes) == 1:
+            # Single mesh - show detailed info
+            mesh, name, color = processed_meshes[0]
+            mesh_info = get_open3d_mesh_info(mesh)
+            if mesh_info:
+                detailed_info = pd.DataFrame([
+                    {"Property": "File Size", "Value": f"{metadata.get('file_size', 0) / 1024:.1f} KB"},
+                    {"Property": "Vertices", "Value": mesh_info.get("Vertices", "N/A")},
+                    {"Property": "Triangles", "Value": mesh_info.get("Triangles", "N/A")},
+                    {"Property": "Volume", "Value": mesh_info.get("Volume", "N/A")},
+                    {"Property": "Surface Area", "Value": mesh_info.get("Surface Area", "N/A")},
+                    {"Property": "Is Watertight", "Value": mesh_info.get("Is Watertight", "N/A")},
+                    {"Property": "Is Orientable", "Value": mesh_info.get("Is Orientable", "N/A")},
+                    {"Property": "Has Vertex Colors", "Value": mesh_info.get("Has Vertex Colors", "N/A")},
+                    {"Property": "Has Vertex Normals", "Value": mesh_info.get("Has Vertex Normals", "N/A")},
+                ])
+                st.dataframe(detailed_info, use_container_width=True, hide_index=True)
+        else:
+            # Multiple meshes - show summary table
+            summary_data = []
+            for mesh, name, color in processed_meshes:
+                mesh_info = get_open3d_mesh_info(mesh)
+                summary_data.append({
+                    "File": name,
+                    "Vertices": mesh_info.get("Vertices", "N/A"),
+                    "Triangles": mesh_info.get("Triangles", "N/A"),
+                    "Volume": mesh_info.get("Volume", "N/A"),
+                    "Surface Area": mesh_info.get("Surface Area", "N/A"),
+                    "Is Watertight": mesh_info.get("Is Watertight", "N/A"),
+                    "Color": color
+                })
+            
+            if summary_data:
+                summary_df = pd.DataFrame(summary_data)
+                st.dataframe(summary_df, use_container_width=True, hide_index=True)
+    
+    # 3D Visualization
+    with st.spinner("Rendering 3D visualization..."):
+        try:
+            if view_mode == "Solid":
+                fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            elif view_mode == "Point Cloud":
+                # For point cloud, we'll show the first mesh only for now
+                if processed_meshes:
+                    mesh, name, color = processed_meshes[0]
+                    fig = create_point_cloud_plot_open3d(mesh, color=color, size=point_size, 
+                                                       sample_ratio=point_sample_ratio)
                     st.plotly_chart(fig, use_container_width=True)
-                
-                elif view_mode == "Wireframe":
-                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity, show_wireframe=True)
+                    if len(processed_meshes) > 1:
+                        st.info(f"Point cloud view showing only the first mesh: {name}")
+            
+            elif view_mode == "Statistics":
+                # For statistics, we'll show the first mesh only for now
+                if processed_meshes:
+                    mesh, name, color = processed_meshes[0]
+                    fig = create_mesh_statistics_plot(mesh)
                     st.plotly_chart(fig, use_container_width=True)
-                
-                elif view_mode == "Point Cloud":
-                    # For point cloud, we'll show the first mesh only for now
-                    if processed_meshes:
-                        mesh, name, color = processed_meshes[0]
-                        fig = create_point_cloud_plot_open3d(mesh, color=color, size=point_size, 
-                                                           sample_ratio=point_sample_ratio)
-                        st.plotly_chart(fig, use_container_width=True)
-                        if len(processed_meshes) > 1:
-                            st.info(f"Point cloud view showing only the first mesh: {name}")
-                
-                elif view_mode == "Solid + Wireframe":
-                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity, show_wireframe=True)
+                    if len(processed_meshes) > 1:
+                        st.info(f"Statistics view showing only the first mesh: {name}")
+            
+            elif view_mode == "Cross-Section":
+                # Show cross-section
+                if processed_meshes:
+                    mesh, name, color = processed_meshes[0]
+                    
+                    # Get cross-section parameters from session state or use defaults
+                    plane_axis = st.session_state.get('plane_axis', 'X')
+                    plane_position = st.session_state.get('plane_position', 0.5)
+                    
+                    # Calculate plane origin based on mesh bounding box
+                    bbox = mesh.get_axis_aligned_bounding_box()
+                    bbox_min = bbox.min_bound
+                    bbox_max = bbox.max_bound
+                    bbox_size = bbox_max - bbox_min
+                    
+                    # Set plane normal
+                    if plane_axis == "Custom":
+                        plane_normal = st.session_state.get('plane_normal', np.array([1, 0, 0]))
+                    else:
+                        axis_map = {"X": [1, 0, 0], "Y": [0, 1, 0], "Z": [0, 0, 1]}
+                        plane_normal = np.array(axis_map[plane_axis])
+                    
+                    # Calculate plane origin
+                    plane_origin = bbox_min + plane_position * bbox_size
+                    
+                    # Create cross-section
+                    cross_section_points, cross_section_edges = create_cross_section(mesh, plane_origin, plane_normal)
+                    
+                    # Visualize cross-section
+                    fig = create_cross_section_visualization(mesh, cross_section_points, cross_section_edges)
                     st.plotly_chart(fig, use_container_width=True)
-                
-                elif view_mode == "Statistics":
-                    # For statistics, we'll show the first mesh only for now
-                    if processed_meshes:
-                        mesh, name, color = processed_meshes[0]
-                        fig = create_mesh_statistics_plot(mesh)
-                        st.plotly_chart(fig, use_container_width=True)
-                        if len(processed_meshes) > 1:
-                            st.info(f"Statistics view showing only the first mesh: {name}")
-            except Exception as e:
-                st.error(f"Error rendering 3D visualization: {str(e)}")
-                st.info("Try reducing the number of PLY files or simplifying the meshes.")
+                    
+                    # Show cross-section info
+                    st.subheader("Cross-Section Information")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write(f"**Plane Axis:** {plane_axis}")
+                        st.write(f"**Plane Position:** {plane_position:.2f}")
+                        st.write(f"**Plane Origin:** ({plane_origin[0]:.3f}, {plane_origin[1]:.3f}, {plane_origin[2]:.3f})")
+                        st.write(f"**Plane Normal:** ({plane_normal[0]:.3f}, {plane_normal[1]:.3f}, {plane_normal[2]:.3f})")
+                    
+                    with col2:
+                        st.write(f"**Cross-section Points:** {len(cross_section_points)}")
+                        st.write(f"**Cross-section Edges:** {len(cross_section_edges)}")
+                        
+                        if len(cross_section_points) > 0:
+                            # Calculate cross-section area (simplified)
+                            if len(cross_section_edges) > 0:
+                                total_length = 0
+                                for edge in cross_section_edges:
+                                    p1, p2 = cross_section_points[edge]
+                                    total_length += np.linalg.norm(p2 - p1)
+                                st.write(f"**Total Perimeter:** {total_length:.3f}")
+        
+        except Exception as e:
+            st.error(f"Error rendering 3D visualization: {str(e)}")
+            st.info("Try reducing the number of PLY files or simplifying the meshes.")
         
         
         # Advanced analysis - Center of Mass
@@ -1226,9 +1675,11 @@ def main():
                     st.error(f"Error analyzing colors: {e}")
             else:
                 st.info("None of the selected meshes have vertex colors.")
+        
+        # (Enhanced Geometric Analysis removed per request)
     
-    else:
-        st.info("Select a patient and file to begin.")
+    # If no meshes are available, guide the user
+    
 
 
 if __name__ == "__main__":

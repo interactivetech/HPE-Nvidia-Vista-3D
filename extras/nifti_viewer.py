@@ -395,7 +395,12 @@ def main():
     )
     
     # Preload the default file
-    default_file = "/Users/dave/AI/HPE/HPE-Nvidia-Vista-3D/output.mesh/left_iliac_artery.nii.gz"
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    project_root = os.getenv('PROJECT_ROOT', '.')
+    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+    default_file = f"{project_root}/{output_folder}.mesh/left_iliac_artery.nii.gz"
     
     # Load from existing files
     st.sidebar.header("Load Files")

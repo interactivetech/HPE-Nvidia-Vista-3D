@@ -139,7 +139,8 @@ def render_viewer(selected_patient: str, selected_file: str):
         return
 
     # Prepare volume URLs and overlays
-    base_file_url = f"{IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
+    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+    base_file_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/nifti/{selected_file}"
 
     # Create overlays based on voxel mode
     overlays = voxel_manager.create_overlays(

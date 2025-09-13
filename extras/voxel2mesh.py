@@ -120,7 +120,12 @@ if __name__ == "__main__":
         nifti_file = sys.argv[1]
     else:
         # Default example file
-        nifti_file = "/Users/dave/AI/HPE/HPE-Nvidia-Vista-3D/output/PA00000002/voxels/2.5MM_ARTERIAL_3/left_iliac_artery.nii.gz"
+        import os
+        from dotenv import load_dotenv
+        load_dotenv()
+        project_root = os.getenv('PROJECT_ROOT', '.')
+        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+        nifti_file = f"{project_root}/{output_folder}/PA00000002/voxels/2.5MM_ARTERIAL_3/left_iliac_artery.nii.gz"
     
     print(f"Converting NIfTI file to mesh: {nifti_file}")
     mesh_data = nifti_to_mesh(nifti_file, threshold=0.5)
