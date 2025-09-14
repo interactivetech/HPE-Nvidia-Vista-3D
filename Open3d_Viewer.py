@@ -96,6 +96,11 @@ def load_ply_file_open3d(file_path: str, timeout: int = 15) -> Tuple[o3d.geometr
             mesh = o3d.io.read_triangle_mesh(file_path)
             file_size = os.path.getsize(file_path)
         
+        # Validate mesh
+        if mesh is None:
+            st.error("Open3D returned None for the mesh")
+            return None, {}
+        
         # Get metadata
         metadata = {
             "file_path": file_path,
@@ -110,13 +115,21 @@ def load_ply_file_open3d(file_path: str, timeout: int = 15) -> Tuple[o3d.geometr
             "is_self_intersecting": mesh.is_self_intersecting()
         }
         
+        
         return mesh, metadata
         
     except requests.exceptions.Timeout:
         st.error(f"Timeout loading PLY file: {file_path}")
         return None, {}
+    except requests.exceptions.RequestException as e:
+        st.error(f"Network error loading PLY file: {e}")
+        return None, {}
+    except FileNotFoundError:
+        st.error(f"File not found: {file_path}")
+        return None, {}
     except Exception as e:
         st.error(f"Error loading PLY file with Open3D: {e}")
+        st.info(f"File path: {file_path}")
         return None, {}
 
 
@@ -260,7 +273,7 @@ def create_multi_mesh_3d_plot(meshes: List[Tuple[o3d.geometry.TriangleMesh, str,
         else:
             colors = color
         
-        # Create the mesh plot
+        # Create the mesh plot with quality optimizations
         fig.add_trace(go.Mesh3d(
             x=vertices[:, 0],
             y=vertices[:, 1],
@@ -273,7 +286,11 @@ def create_multi_mesh_3d_plot(meshes: List[Tuple[o3d.geometry.TriangleMesh, str,
             lighting=dict(ambient=0.3, diffuse=0.8, specular=0.2),
             lightposition=dict(x=100, y=100, z=100),
             name=name,
-            showlegend=True
+            showlegend=True,
+            # Quality optimizations
+            flatshading=False,  # Better quality shading
+            visible=True,
+            hoverinfo='skip'  # Skip hover info for better performance
         ))
         
         # Add wireframe if requested and not too complex
@@ -303,19 +320,28 @@ def create_multi_mesh_3d_plot(meshes: List[Tuple[o3d.geometry.TriangleMesh, str,
                 showlegend=True
             ))
     
-    # Update layout
+    # Update layout with performance optimizations
     fig.update_layout(
         scene=dict(
             aspectmode="data",
-            xaxis=dict(showgrid=False, showticklabels=False),
-            yaxis=dict(showgrid=False, showticklabels=False),
-            zaxis=dict(showgrid=False, showticklabels=False),
+            xaxis=dict(showgrid=False, showticklabels=False, showbackground=False),
+            yaxis=dict(showgrid=False, showticklabels=False, showbackground=False),
+            zaxis=dict(showgrid=False, showticklabels=False, showbackground=False),
             camera=dict(
                 eye=dict(x=1.5, y=1.5, z=1.5)
-            )
+            ),
+            # Performance optimizations
+            bgcolor='rgba(0,0,0,0)',  # Transparent background
+            dragmode='turntable'  # Better performance than orbit
         ),
         width=1200,
-        height=800
+        height=800,
+        # Performance optimizations
+        showlegend=True,
+        legend=dict(x=0, y=1),
+        margin=dict(l=0, r=0, t=0, b=0),  # Reduce margins
+        plot_bgcolor='rgba(0,0,0,0)',  # Transparent plot background
+        paper_bgcolor='rgba(0,0,0,0)'  # Transparent paper background
     )
     
     return fig
@@ -1082,6 +1108,7 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                         output_folder = os.getenv('OUTPUT_FOLDER', 'output')
                         file_to_load = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
                         selected_ply_files = [selected_ply_file]
+                        
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
                     output_folder = os.getenv('OUTPUT_FOLDER', 'output')
@@ -1143,6 +1170,7 @@ def main():
     IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
     data_manager = DataManager(IMAGE_SERVER_URL)
     
+    
     # Patient folder selection
     
     # Get patient folders using DataManager (same as NiiVue_Viewer.py)
@@ -1197,13 +1225,15 @@ def main():
     # PLY file selection (similar to voxel selection)
     ply_mode, selected_ply_files, file_to_load = render_ply_selection(selected_patient, selected_file, data_manager, IMAGE_SERVER_URL)
     
+    
     # Visualization controls
     st.sidebar.header("Visualization Controls")
     view_mode = st.sidebar.selectbox(
         "View Mode",
-        ["Solid", "Point Cloud", "Statistics", "Cross-Section"],
+        ["Solid", "Point Cloud", "Statistics", "Cross-Section", "Simple"],
         help="Choose how to display the mesh"
     )
+    
     
     mesh_color = st.sidebar.color_picker(
         "Mesh Color",
@@ -1252,6 +1282,7 @@ def main():
     )
     
     
+    
     show_center_mass = st.sidebar.checkbox(
         "Show Center of Mass",
         value=False,
@@ -1272,6 +1303,7 @@ def main():
     metadata = {}
     processed_meshes = []  # Always define to avoid UnboundLocalError
     
+    
     if uploaded_file is not None:
         # Save uploaded file to temporary location
         with tempfile.NamedTemporaryFile(delete=False, suffix='.ply') as tmp_file:
@@ -1286,9 +1318,32 @@ def main():
         os.unlink(tmp_file_path)
         
     elif ply_mode == "Single PLY" and file_to_load is not None:
-        mesh, metadata = load_ply_file_open3d(file_to_load)
-        if mesh is not None and not mesh.is_empty():
-            meshes = [(mesh, selected_ply_files[0] if selected_ply_files else "Single PLY", mesh_color)]
+        # Show loading indicator for single PLY
+        # Attempting to load single PLY file
+        with st.spinner(f"Loading PLY file: {selected_ply_files[0] if selected_ply_files else 'Single PLY'}"):
+            try:
+                mesh, metadata = load_ply_file_open3d(file_to_load)
+                if mesh is not None and not mesh.is_empty():
+                    # Simplify mesh if it's too complex for better performance
+                    vertex_count = len(mesh.vertices)
+                    triangle_count = len(mesh.triangles)
+                    
+                    # Apply mesh simplification only for very large meshes
+                    if vertex_count > 50000 or triangle_count > 100000:
+                        try:
+                            target_triangles = min(20000, triangle_count // 2)  # Reduce to 50% or max 20000
+                            mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=target_triangles)
+                        except Exception as e:
+                            pass  # Continue with original mesh if simplification fails
+                    
+                    meshes = [(mesh, selected_ply_files[0] if selected_ply_files else "Single PLY", mesh_color)]
+                else:
+                    st.error("Failed to load PLY file or mesh is empty")
+            except Exception as e:
+                st.error(f"Error loading PLY file: {str(e)}")
+                st.info("Please check if the file exists and is a valid PLY file")
+    elif ply_mode == "Single PLY" and file_to_load is None:
+        st.info("Please select a PLY file to load it.")
     
     elif ply_mode == "Multiple PLY Files" and selected_ply_files:
         # Load multiple PLY files with progress indicator
@@ -1297,28 +1352,23 @@ def main():
         # Define colors for different PLY files
         colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F']
         
-        # Show progress bar
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
         for i, ply_file in enumerate(selected_ply_files):
             try:
-                # Update progress
-                progress = (i + 1) / len(selected_ply_files)
-                progress_bar.progress(progress)
-                status_text.text(f"Loading PLY file {i+1}/{len(selected_ply_files)}: {ply_file}")
-                
                 output_folder = os.getenv('OUTPUT_FOLDER', 'output')
                 file_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
                 mesh, _ = load_ply_file_open3d(file_url)
                 
                 if mesh is not None and not mesh.is_empty():
-                    # Simplify mesh if it's too complex
+                    # Simplify mesh only for very large meshes
                     vertex_count = len(mesh.vertices)
-                    if vertex_count > 50000:  # If mesh has more than 50k vertices
+                    triangle_count = len(mesh.triangles)
+                    if vertex_count > 50000 or triangle_count > 100000:
                         # Simplify the mesh for better performance
-                        mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=10000)
-                        st.info(f"Simplified {ply_file} from {vertex_count} to {len(mesh.vertices)} vertices for better performance")
+                        try:
+                            target_triangles = min(20000, triangle_count // 2)  # Reduce to 50% or max 20000
+                            mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=target_triangles)
+                        except Exception as e:
+                            pass  # Continue with original mesh if simplification fails
                     
                     color = colors[i % len(colors)]  # Cycle through colors
                     meshes.append((mesh, ply_file, color))
@@ -1328,10 +1378,6 @@ def main():
             except Exception as e:
                 st.error(f"Error loading {ply_file}: {str(e)}")
                 continue
-        
-        # Clear progress indicators
-        progress_bar.empty()
-        status_text.empty()
         
         if not meshes:
             st.error("No PLY files could be loaded")
@@ -1455,89 +1501,132 @@ def main():
                 st.dataframe(summary_df, use_container_width=True, hide_index=True)
     
     # 3D Visualization
-    with st.spinner("Rendering 3D visualization..."):
-        try:
-            if view_mode == "Solid":
-                fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            elif view_mode == "Point Cloud":
-                # For point cloud, we'll show the first mesh only for now
-                if processed_meshes:
-                    mesh, name, color = processed_meshes[0]
-                    fig = create_point_cloud_plot_open3d(mesh, color=color, size=point_size, 
-                                                       sample_ratio=point_sample_ratio)
-                    st.plotly_chart(fig, use_container_width=True)
-                    if len(processed_meshes) > 1:
-                        st.info(f"Point cloud view showing only the first mesh: {name}")
-            
-            elif view_mode == "Statistics":
-                # For statistics, we'll show the first mesh only for now
-                if processed_meshes:
-                    mesh, name, color = processed_meshes[0]
-                    fig = create_mesh_statistics_plot(mesh)
-                    st.plotly_chart(fig, use_container_width=True)
-                    if len(processed_meshes) > 1:
-                        st.info(f"Statistics view showing only the first mesh: {name}")
-            
-            elif view_mode == "Cross-Section":
-                # Show cross-section
-                if processed_meshes:
-                    mesh, name, color = processed_meshes[0]
-                    
-                    # Get cross-section parameters from session state or use defaults
-                    plane_axis = st.session_state.get('plane_axis', 'X')
-                    plane_position = st.session_state.get('plane_position', 0.5)
-                    
-                    # Calculate plane origin based on mesh bounding box
-                    bbox = mesh.get_axis_aligned_bounding_box()
-                    bbox_min = bbox.min_bound
-                    bbox_max = bbox.max_bound
-                    bbox_size = bbox_max - bbox_min
-                    
-                    # Set plane normal
-                    if plane_axis == "Custom":
-                        plane_normal = st.session_state.get('plane_normal', np.array([1, 0, 0]))
-                    else:
-                        axis_map = {"X": [1, 0, 0], "Y": [0, 1, 0], "Z": [0, 0, 1]}
-                        plane_normal = np.array(axis_map[plane_axis])
-                    
-                    # Calculate plane origin
-                    plane_origin = bbox_min + plane_position * bbox_size
-                    
-                    # Create cross-section
-                    cross_section_points, cross_section_edges = create_cross_section(mesh, plane_origin, plane_normal)
-                    
-                    # Visualize cross-section
-                    fig = create_cross_section_visualization(mesh, cross_section_points, cross_section_edges)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Show cross-section info
-                    st.subheader("Cross-Section Information")
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write(f"**Plane Axis:** {plane_axis}")
-                        st.write(f"**Plane Position:** {plane_position:.2f}")
-                        st.write(f"**Plane Origin:** ({plane_origin[0]:.3f}, {plane_origin[1]:.3f}, {plane_origin[2]:.3f})")
-                        st.write(f"**Plane Normal:** ({plane_normal[0]:.3f}, {plane_normal[1]:.3f}, {plane_normal[2]:.3f})")
-                    
-                    with col2:
-                        st.write(f"**Cross-section Points:** {len(cross_section_points)}")
-                        st.write(f"**Cross-section Edges:** {len(cross_section_edges)}")
-                        
-                        if len(cross_section_points) > 0:
-                            # Calculate cross-section area (simplified)
-                            if len(cross_section_edges) > 0:
-                                total_length = 0
-                                for edge in cross_section_edges:
-                                    p1, p2 = cross_section_points[edge]
-                                    total_length += np.linalg.norm(p2 - p1)
-                                st.write(f"**Total Perimeter:** {total_length:.3f}")
+    if processed_meshes:
+        # Performance warning for very large meshes
+        total_triangles = sum(len(mesh.triangles) for mesh, _, _ in processed_meshes)
+        if total_triangles > 200000:
+            st.error("Mesh too complex! Maximum 200,000 triangles allowed.")
+            st.stop()
         
-        except Exception as e:
-            st.error(f"Error rendering 3D visualization: {str(e)}")
-            st.info("Try reducing the number of PLY files or simplifying the meshes.")
+        with st.spinner("Rendering 3D visualization..."):
+            try:
+                if view_mode == "Solid":
+                    fig = create_multi_mesh_3d_plot(processed_meshes, opacity=opacity)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                elif view_mode == "Point Cloud":
+                    # For point cloud, we'll show the first mesh only for now
+                    if processed_meshes:
+                        mesh, name, color = processed_meshes[0]
+                        fig = create_point_cloud_plot_open3d(mesh, color=color, size=point_size, 
+                                                           sample_ratio=point_sample_ratio)
+                        st.plotly_chart(fig, use_container_width=True)
+                        if len(processed_meshes) > 1:
+                            st.info(f"Point cloud view showing only the first mesh: {name}")
+                
+                elif view_mode == "Statistics":
+                    # For statistics, we'll show the first mesh only for now
+                    if processed_meshes:
+                        mesh, name, color = processed_meshes[0]
+                        fig = create_mesh_statistics_plot(mesh)
+                        st.plotly_chart(fig, use_container_width=True)
+                        if len(processed_meshes) > 1:
+                            st.info(f"Statistics view showing only the first mesh: {name}")
+                
+                elif view_mode == "Simple":
+                    # Simple mode - point cloud visualization
+                    if processed_meshes:
+                        fig = go.Figure()
+                        for mesh, name, color in processed_meshes:
+                            vertices = np.asarray(mesh.vertices)
+                            # Sample vertices for performance but keep more for better quality
+                            if len(vertices) > 20000:
+                                indices = np.random.choice(len(vertices), 20000, replace=False)
+                                vertices = vertices[indices]
+                            
+                            fig.add_trace(go.Scatter3d(
+                                x=vertices[:, 0],
+                                y=vertices[:, 1], 
+                                z=vertices[:, 2],
+                                mode='markers',
+                                marker=dict(size=2, color=color),
+                                name=name
+                            ))
+                        
+                        fig.update_layout(
+                            title="Simple Point Cloud View",
+                            scene=dict(
+                                aspectmode="data",
+                                xaxis=dict(showgrid=False, showticklabels=False),
+                                yaxis=dict(showgrid=False, showticklabels=False),
+                                zaxis=dict(showgrid=False, showticklabels=False)
+                            ),
+                            width=800,
+                            height=600
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                elif view_mode == "Cross-Section":
+                    # Show cross-section
+                    if processed_meshes:
+                        mesh, name, color = processed_meshes[0]
+                        
+                        # Get cross-section parameters from session state or use defaults
+                        plane_axis = st.session_state.get('plane_axis', 'X')
+                        plane_position = st.session_state.get('plane_position', 0.5)
+                        
+                        # Calculate plane origin based on mesh bounding box
+                        bbox = mesh.get_axis_aligned_bounding_box()
+                        bbox_min = bbox.min_bound
+                        bbox_max = bbox.max_bound
+                        bbox_size = bbox_max - bbox_min
+                        
+                        # Set plane normal
+                        if plane_axis == "Custom":
+                            plane_normal = st.session_state.get('plane_normal', np.array([1, 0, 0]))
+                        else:
+                            axis_map = {"X": [1, 0, 0], "Y": [0, 1, 0], "Z": [0, 0, 1]}
+                            plane_normal = np.array(axis_map[plane_axis])
+                        
+                        # Calculate plane origin
+                        plane_origin = bbox_min + plane_position * bbox_size
+                        
+                        # Create cross-section
+                        cross_section_points, cross_section_edges = create_cross_section(mesh, plane_origin, plane_normal)
+                        
+                        # Visualize cross-section
+                        fig = create_cross_section_visualization(mesh, cross_section_points, cross_section_edges)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Show cross-section info
+                        st.subheader("Cross-Section Information")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write(f"**Plane Axis:** {plane_axis}")
+                            st.write(f"**Plane Position:** {plane_position:.2f}")
+                            st.write(f"**Plane Origin:** ({plane_origin[0]:.3f}, {plane_origin[1]:.3f}, {plane_origin[2]:.3f})")
+                            st.write(f"**Plane Normal:** ({plane_normal[0]:.3f}, {plane_normal[1]:.3f}, {plane_normal[2]:.3f})")
+                        
+                        with col2:
+                            st.write(f"**Cross-section Points:** {len(cross_section_points)}")
+                            st.write(f"**Cross-section Edges:** {len(cross_section_edges)}")
+                            
+                            if len(cross_section_points) > 0:
+                                # Calculate cross-section area (simplified)
+                                if len(cross_section_edges) > 0:
+                                    total_length = 0
+                                    for edge in cross_section_edges:
+                                        p1, p2 = cross_section_points[edge]
+                                        total_length += np.linalg.norm(p2 - p1)
+                                    st.write(f"**Total Perimeter:** {total_length:.3f}")
+            
+            except Exception as e:
+                st.error(f"Error rendering 3D visualization: {str(e)}")
+                st.info("Try reducing the number of PLY files or simplifying the meshes.")
+    else:
+        st.info("No PLY files loaded. Please select a PLY file to display.")
         
         
         # Advanced analysis - Center of Mass
