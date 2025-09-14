@@ -1,0 +1,54 @@
+{
+  "navigation": {
+    "title": "HPE-NVIDIA Vista 3D Navigation",
+    "description": "Configuration for sidebar navigation items and their order",
+    "items": [
+      {
+        "key": "about",
+        "label": "About",
+        "page_key": "home",
+        "icon": "ℹ️",
+        "is_image": false,
+        "enabled": true,
+        "order": 1,
+        "description": "Application information and welcome page"
+      },
+      {
+        "key": "niivue",
+        "label": "NiiVue Viewer",
+        "page_key": "niivue",
+        "icon": "🩻",
+        "is_image": false,
+        "enabled": true,
+        "order": 2,
+        "description": "Medical image viewer interface"
+      },
+      {
+        "key": "ply_viewer",
+        "label": "Open3d Viewer",
+        "page_key": "ply_viewer",
+        "icon": "🔺",
+        "is_image": false,
+        "enabled": true,
+        "order": 3,
+        "description": "3D mesh and point cloud viewer"
+      },
+      {
+        "key": "dicom",
+        "label": "DICOM Inspector",
+        "page_key": "dicom",
+        "icon": "📋",
+        "is_image": false,
+        "enabled": false,
+        "order": 4,
+        "description": "DICOM file inspection and analysis"
+      }
+    ],
+    "settings": {
+      "default_page": "home",
+      "use_container_width": true,
+      "show_logo": true,
+      "logo_path": "assets/HPE-NVIDIA.png"
+    }
+  }
+}

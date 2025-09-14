@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import json
-from typing import List, Dict, Optional
+from typing import Optional
 from dotenv import load_dotenv
 
 # Import our new modules
@@ -131,6 +131,8 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
     status_message = viewer_config.get_status_message()
     if status_message:
         st.info(status_message)
+
+
 # --- Main Application ---
 def render_viewer(selected_patient: str, selected_file: str):
     """Render the main NiiVue viewer."""
@@ -175,8 +177,7 @@ def render_viewer(selected_patient: str, selected_file: str):
     window_center, window_width = viewer_config.get_window_settings()
     actual_slice_type = viewer_config.get_slice_type_index()
 
-    # Debug info checkbox (if it exists) - this line can be removed if no debug checkbox is present
-    # st.checkbox("Show Debug Info", value=False, key="debug_info")
+# Removed unused debug checkbox
 
     # Render the viewer using our template
     html_content = template_renderer.render_viewer(

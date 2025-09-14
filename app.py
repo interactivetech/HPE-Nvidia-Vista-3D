@@ -544,9 +544,8 @@ if current_page == 'home':
     # Add workflow diagram after Image Data section
     st.markdown("---")
     
-    # Use full width for workflow section
-    with st.container():
-        render_workflow_section()
+    # Display workflow section directly
+    render_workflow_section()
     
     # Add definitions section
     st.markdown("---")

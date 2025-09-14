@@ -16,9 +16,9 @@ def render_workflow_diagram(mermaid_file_path: str = None, height: int = 600, ke
         bool: True if diagram was rendered successfully, False otherwise
     """
     if mermaid_file_path is None:
-        # Default to conf/vista3d_workflow.mmd relative to project root
+        # Default to assets/vista3d_workflow.mmd relative to project root
         project_root = Path(__file__).parent.parent
-        mermaid_file_path = project_root / "conf" / "vista3d_workflow.mmd"
+        mermaid_file_path = project_root / "assets" / "vista3d_workflow.mmd"
     
     try:
         with open(mermaid_file_path, 'r') as file:
@@ -83,7 +83,7 @@ def render_workflow_diagram(mermaid_file_path: str = None, height: int = 600, ke
         
     except FileNotFoundError:
         st.error(f"❌ Mermaid file not found at: {mermaid_file_path}")
-        st.markdown("Please ensure the file exists in the conf folder.")
+        st.markdown("Please ensure the file exists in the assets folder.")
         
         # Show example Mermaid content as fallback with full width styling
         st.markdown("### Example Workflow")
@@ -109,7 +109,6 @@ def render_workflow_section():
     Render the complete workflow section with title and diagram.
     """
     st.header("🔄 Workflow")
-    #st.markdown("The diagram below shows the complete Vista3D segmentation workflow:")
     
     # Use full width container for the workflow diagram
     with st.container():

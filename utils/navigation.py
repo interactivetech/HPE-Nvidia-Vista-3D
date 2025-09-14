@@ -45,6 +45,7 @@ Version: 1.0.0
 import streamlit as st
 from typing import Dict, List, Optional
 import base64
+import json
 from pathlib import Path
 
 
@@ -145,33 +146,111 @@ class Navigation:
         >>> nav.add_item("settings", "Settings", "settings")  # Add new item
     """
     
-    def __init__(self):
+    def __init__(self, config_path: Optional[str] = None):
         """
-        Initialize the navigation component with default items.
+        Initialize the navigation component with items from config or defaults.
         
-        Sets up the default navigation structure and initializes the
+        Args:
+            config_path: Optional path to navigation configuration JSON file.
+                        If None, uses default config path: conf/navigation_config.json
+        
+        Sets up the navigation structure from configuration file and initializes the
         Streamlit session state if not already present.
         """
-        self.items: List[NavigationItem] = [
+        self.items: List[NavigationItem] = []
+        self.config = {}
+        
+        # Load navigation configuration
+        self._load_config(config_path)
+        
+        # Initialize session state for navigation if not exists
+        default_page = self.config.get('settings', {}).get('default_page', 'home')
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = default_page
+
+    def _load_config(self, config_path: Optional[str] = None) -> None:
+        """
+        Load navigation configuration from JSON file.
+        
+        Args:
+            config_path: Optional path to configuration file. If None, uses default path.
+        """
+        try:
+            if config_path is None:
+                # Use default config path relative to this file
+                config_path = Path(__file__).parent.parent / "conf" / "navigation_config.json"
+            else:
+                config_path = Path(config_path)
+            
+            if config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.config = data.get('navigation', {})
+                    
+                # Load navigation items from config
+                items_config = self.config.get('items', [])
+                
+                # Sort items by order field
+                items_config.sort(key=lambda x: x.get('order', 999))
+                
+                # Create NavigationItem objects for enabled items
+                for item_config in items_config:
+                    if item_config.get('enabled', True):
+                        nav_item = NavigationItem(
+                            key=item_config['key'],
+                            label=item_config['label'],
+                            page_key=item_config['page_key'],
+                            icon=item_config.get('icon', ''),
+                            is_image=item_config.get('is_image', False)
+                        )
+                        self.items.append(nav_item)
+            else:
+                # Config file doesn't exist, use defaults
+                self._load_default_items()
+                
+        except Exception as e:
+            # Error loading config, fall back to defaults
+            st.warning(f"Error loading navigation config: {e}. Using default navigation.")
+            self._load_default_items()
+    
+    def _load_default_items(self) -> None:
+        """
+        Load default navigation items when config file is not available.
+        """
+        self.items = [
             NavigationItem("about", "About", "home"),
             NavigationItem("niivue", "NiiVue Viewer", "niivue"),
             NavigationItem("ply_viewer", "Open3d Viewer", "ply_viewer", "🔺"),
             NavigationItem("dicom", "DICOM Inspector", "dicom"),
         ]
-        
-        # Initialize session state for navigation if not exists
-        if 'current_page' not in st.session_state:
-            st.session_state.current_page = 'home'
+        # Set default config
+        self.config = {
+            'settings': {
+                'default_page': 'home',
+                'use_container_width': True,
+                'show_logo': True,
+                'logo_path': 'assets/HPE-NVIDIA.png'
+            }
+        }
 
     def get_logo_base64(self) -> str:
         """
-        Get the HPE-NVIDIA logo as a base64 encoded string for HTML embedding.
+        Get the logo as a base64 encoded string for HTML embedding.
+        Uses logo path from configuration or falls back to default.
 
         Returns:
             str: Base64 encoded logo image data
         """
         try:
-            logo_path = Path(__file__).parent.parent / "assets" / "HPE-NVIDIA.png"
+            # Get logo path from config or use default
+            logo_filename = self.config.get('settings', {}).get('logo_path', 'assets/HPE-NVIDIA.png')
+            
+            # Handle both relative and absolute paths
+            if logo_filename.startswith('assets/'):
+                logo_path = Path(__file__).parent.parent / logo_filename
+            else:
+                logo_path = Path(logo_filename)
+                
             if logo_path.exists():
                 with open(logo_path, "rb") as f:
                     return base64.b64encode(f.read()).decode()
@@ -203,7 +282,7 @@ class Navigation:
         
         Creates a button for each navigation item in the sidebar. When a button
         is clicked, it automatically navigates to the corresponding page.
-        All buttons use full container width for consistent appearance.
+        Uses configuration settings for button appearance and behavior.
         
         Note:
             This method should be called within the Streamlit app context.
@@ -214,19 +293,26 @@ class Navigation:
             >>> nav.render_sidebar()  # Renders all navigation buttons
         """
         with st.sidebar:
-            # Add HPE-NVIDIA logo at the top - full sidebar width
-            logo_b64 = self.get_logo_base64()
-            if logo_b64:
-                st.markdown(f"""
-                    <div style="width: 100%; margin: 0; padding: 0; overflow: hidden;">
-                        <img src="data:image/png;base64,{logo_b64}" style="width: 100%; height: auto; display: block;">
-                    </div>
-                """, unsafe_allow_html=True)
-            else:
-                # Fallback to regular st.image if base64 fails
-                st.image("assets/HPE-NVIDIA.png", use_container_width=True)
-            # Add spacing to prevent styling conflicts with other sidebar elements
-            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+            # Show logo if enabled in config
+            show_logo = self.config.get('settings', {}).get('show_logo', True)
+            if show_logo:
+                logo_b64 = self.get_logo_base64()
+                if logo_b64:
+                    st.markdown(f"""
+                        <div style="width: 100%; margin: 0; padding: 0; overflow: hidden;">
+                            <img src="data:image/png;base64,{logo_b64}" style="width: 100%; height: auto; display: block;">
+                        </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    # Fallback to regular st.image if base64 fails
+                    logo_path = self.config.get('settings', {}).get('logo_path', 'assets/HPE-NVIDIA.png')
+                    st.image(logo_path, use_container_width=True)
+                
+                # Add spacing to prevent styling conflicts with other sidebar elements
+                st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+
+            # Get button width setting from config
+            use_container_width = self.config.get('settings', {}).get('use_container_width', True)
 
             for item in self.items:
                 if item.is_image and item.icon:
@@ -235,11 +321,11 @@ class Navigation:
                     with col1:
                         st.image(item.icon, width=40)
                     with col2:
-                        if st.button(item.label, key=item.key, use_container_width=True):
+                        if st.button(item.label, key=item.key, use_container_width=use_container_width):
                             self.navigate_to(item.page_key)
                 else:
-                    # For text-only buttons (no icons), use just the label
-                    if st.button(item.label, key=item.key, use_container_width=True):
+                    # For text icons or no icons, use display_text which includes icon
+                    if st.button(item.display_text, key=item.key, use_container_width=use_container_width):
                         self.navigate_to(item.page_key)
     
     def get_current_page(self) -> str:
@@ -392,43 +478,93 @@ class Navigation:
         """
         return len(self.items)
     
+    def reload_config(self, config_path: Optional[str] = None) -> None:
+        """
+        Reload navigation configuration from JSON file.
+        
+        This method allows for dynamic reloading of the navigation configuration
+        without recreating the Navigation instance.
+        
+        Args:
+            config_path: Optional path to configuration file. If None, uses default path.
+            
+        Example:
+            >>> nav = Navigation()
+            >>> nav.reload_config()  # Reload from default config
+            >>> nav.reload_config("/path/to/custom_nav.json")  # Load custom config
+        """
+        self.items.clear()
+        self.config.clear()
+        self._load_config(config_path)
+        
+        # Update session state default page if needed
+        default_page = self.config.get('settings', {}).get('default_page', 'home')
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = default_page
+    
+    def get_config(self) -> Dict:
+        """
+        Get the current navigation configuration.
+        
+        Returns:
+            Dict: Current navigation configuration
+            
+        Example:
+            >>> nav = Navigation()
+            >>> config = nav.get_config()
+            >>> print(config.get('settings', {}).get('default_page'))
+        """
+        return self.config.copy()
+    
 
 
 # Factory Functions
 
-def create_navigation() -> Navigation:
+def create_navigation(config_path: Optional[str] = None) -> Navigation:
     """
     Factory function to create a navigation instance.
     
     This is a convenience function that creates a new Navigation instance
-    with default configuration. Use this when you need a navigation instance
-    but want to customize it before rendering.
+    with configuration from specified file or default. Use this when you need 
+    a navigation instance but want to customize it before rendering.
+    
+    Args:
+        config_path: Optional path to navigation configuration JSON file
     
     Returns:
-        Navigation: A new navigation instance with default items
+        Navigation: A new navigation instance with configured items
         
     Example:
-        >>> nav = create_navigation()
+        >>> nav = create_navigation()  # Use default config
         >>> nav.add_item("admin", "Admin", "admin")
         >>> nav.render_sidebar()
+        
+        >>> nav = create_navigation("custom_nav.json")  # Use custom config
     """
-    return Navigation()
+    return Navigation(config_path)
 
 
-def render_navigation() -> Navigation:
+def render_navigation(config_path: Optional[str] = None) -> Navigation:
     """
     Convenience function to create and render navigation in sidebar.
     
     This is the most common way to use the navigation component. It creates
-    a navigation instance with default items and immediately renders it in
+    a navigation instance with configuration and immediately renders it in
     the Streamlit sidebar.
+    
+    Args:
+        config_path: Optional path to navigation configuration JSON file
     
     Returns:
         Navigation: The navigation instance for further manipulation
         
     Example:
         Basic usage:
-        >>> nav = render_navigation()
+        >>> nav = render_navigation()  # Use default config
+        >>> current_page = nav.get_current_page()
+        
+        With custom config:
+        >>> nav = render_navigation("custom_nav.json")
         >>> current_page = nav.get_current_page()
         
         With additional customization:
@@ -439,7 +575,7 @@ def render_navigation() -> Navigation:
         This function should be called early in your Streamlit app,
         typically right after st.set_page_config().
     """
-    nav = create_navigation()
+    nav = create_navigation(config_path)
     nav.render_sidebar()
     return nav
 
@@ -448,36 +584,66 @@ def render_navigation() -> Navigation:
 """
 Quick Reference:
 
-1. Simple Usage (Most Common):
+1. Simple Usage (Most Common) - Uses JSON Config:
    ```python
    from utils.navigation import render_navigation
-   nav = render_navigation()
+   nav = render_navigation()  # Loads from conf/navigation_config.json
    current_page = nav.get_current_page()
    ```
 
-2. Custom Navigation:
+2. Custom Config File:
+   ```python
+   from utils.navigation import render_navigation
+   nav = render_navigation("path/to/custom_nav.json")
+   current_page = nav.get_current_page()
+   ```
+
+3. Programmatic Navigation (with config base):
    ```python
    from utils.navigation import Navigation
-   nav = Navigation()
-   nav.add_item("custom", "Custom Page", "custom")
-   nav.add_item("logo", "Logo Page", "logo", "assets/logo.png", is_image=True)
+   nav = Navigation()  # Loads from JSON config first
+   nav.add_item("custom", "Custom Page", "custom")  # Add additional items
    nav.render_sidebar()
    ```
 
-3. Navigation Management:
+4. Configuration Management:
    ```python
+   # Reload configuration
+   nav.reload_config()
+   
+   # Get current config
+   config = nav.get_config()
+   print(config['settings']['default_page'])
+   
    # Check current page
    if nav.is_current_page('niivue'):
        # Render NiiVue content
-   
-   # Get all available pages
-   pages = nav.get_all_pages()
-   
-   # Remove navigation item
-   nav.remove_item("cache")
    ```
 
-4. Error Handling:
+5. JSON Configuration Structure:
+   ```json
+   {
+     "navigation": {
+       "items": [
+         {
+           "key": "home",
+           "label": "Home",
+           "page_key": "home",
+           "icon": "🏠",
+           "enabled": true,
+           "order": 1
+         }
+       ],
+       "settings": {
+         "default_page": "home",
+         "show_logo": true,
+         "logo_path": "assets/HPE-NVIDIA.png"
+       }
+     }
+   }
+   ```
+
+6. Error Handling:
    ```python
    try:
        nav.add_item("", "Invalid", "❌", "invalid")
