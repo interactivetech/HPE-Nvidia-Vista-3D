@@ -3,13 +3,18 @@ graph TD
     B --> C["🩻 NIfTI Files"]
     C --> D["🧠 Segment"]
     C --> I["🖥️ Image Server"]
+    C --> M["🔍 DICOM Inspector"]
     D -->|"📤 NIfTI Images"| E["⚡ Nvidia Vista-3D"]
     E -->|"📥 Processed Data"| D
-    D --> F["🎯 All Voxel Data"]
-    D --> G["🔍 Single Voxel Data"]
+    D --> F["🎯 All Voxel Files"]
+    D --> G["🔍 Single Voxel Files"]
+    G --> L["🔄 NIfTI to PLY<br/>Conversion"]
+    L --> J["🔺 PLY Files"]
+    J --> I["🖥️ Image Server"]
     F --> I["🖥️ Image Server"]
     G --> I["🖥️ Image Server"]
-    I --> H["👁️ NiiVue 3D<br/>Visualization"]
+    I --> H["👁️ NiiVue Viewer"]
+    I --> K["👁️ Open 3D Viewer"]
     
     %% Input/Data nodes - Medical blue theme
     style A fill:transparent,stroke:#1976d2,stroke-width:3px,color:#fff,font-weight:bold
@@ -19,27 +24,36 @@ graph TD
     %% Processing nodes - Tech purple theme
     style D fill:transparent,stroke:#7b1fa2,stroke-width:4px,color:#fff,font-weight:bold
     style E fill:transparent,stroke:#0277bd,stroke-width:4px,color:#fff,font-weight:bold
+    style L fill:transparent,stroke:#7b1fa2,stroke-width:3px,color:#fff,font-weight:bold
+    style M fill:transparent,stroke:#5e35b1,stroke-width:3px,color:#fff,font-weight:bold
     
     %% Output nodes - Success green theme
     style F fill:transparent,stroke:#2e7d32,stroke-width:3px,color:#fff,font-weight:bold
     style G fill:transparent,stroke:#2e7d32,stroke-width:3px,color:#fff,font-weight:bold
+    style J fill:transparent,stroke:#2e7d32,stroke-width:3px,color:#fff,font-weight:bold
     
     %% Image Server - Server blue theme
     style I fill:transparent,stroke:#1565c0,stroke-width:3px,color:#fff,font-weight:bold
     
     %% Final visualization - Premium gold theme
     style H fill:transparent,stroke:#f9a825,stroke-width:4px,color:#fff,font-weight:bold
+    style K fill:transparent,stroke:#f9a825,stroke-width:4px,color:#fff,font-weight:bold
     
     %% Connection styling
     linkStyle 0 stroke:#1976d2,stroke-width:2px
     linkStyle 1 stroke:#388e3c,stroke-width:2px
     linkStyle 2 stroke:#f57c00,stroke-width:2px
     linkStyle 3 stroke:#f57c00,stroke-width:2px
-    linkStyle 4 stroke:#7b1fa2,stroke-width:3px,color:#000,fill:#000
-    linkStyle 5 stroke:#0277bd,stroke-width:3px,color:#000,fill:#000
-    linkStyle 6 stroke:#2e7d32,stroke-width:2px
+    linkStyle 4 stroke:#5e35b1,stroke-width:2px
+    linkStyle 5 stroke:#7b1fa2,stroke-width:3px,color:#000,fill:#000
+    linkStyle 6 stroke:#0277bd,stroke-width:3px,color:#000,fill:#000
     linkStyle 7 stroke:#2e7d32,stroke-width:2px
     linkStyle 8 stroke:#2e7d32,stroke-width:2px
     linkStyle 9 stroke:#2e7d32,stroke-width:2px
-    linkStyle 10 stroke:#1565c0,stroke-width:2px
+    linkStyle 10 stroke:#7b1fa2,stroke-width:2px
+    linkStyle 11 stroke:#2e7d32,stroke-width:2px
+    linkStyle 12 stroke:#2e7d32,stroke-width:2px
+    linkStyle 13 stroke:#2e7d32,stroke-width:2px
+    linkStyle 14 stroke:#1565c0,stroke-width:2px
+    linkStyle 15 stroke:#f9a825,stroke-width:2px
 
