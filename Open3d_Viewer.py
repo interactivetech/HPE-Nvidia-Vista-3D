@@ -916,154 +916,6 @@ def calculate_surface_roughness(mesh: o3d.geometry.TriangleMesh, radius: float =
         return {"Error": str(e)}
 
 
-def create_cross_section(mesh: o3d.geometry.TriangleMesh, plane_origin: np.ndarray, 
-                        plane_normal: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Create a cross-section of the mesh with a plane.
-    
-    Args:
-        mesh: Open3D mesh object
-        plane_origin: Point on the plane
-        plane_normal: Normal vector of the plane
-        
-    Returns:
-        Tuple of (cross_section_points, cross_section_edges)
-    """
-    if mesh is None or mesh.is_empty():
-        return np.array([]), np.array([])
-    
-    try:
-        # Normalize plane normal
-        plane_normal = plane_normal / np.linalg.norm(plane_normal)
-        
-        vertices = np.asarray(mesh.vertices)
-        triangles = np.asarray(mesh.triangles)
-        
-        cross_section_points = []
-        cross_section_edges = []
-        
-        for triangle in triangles:
-            v0, v1, v2 = vertices[triangle]
-            
-            # Check which vertices are on which side of the plane
-            d0 = np.dot(v0 - plane_origin, plane_normal)
-            d1 = np.dot(v1 - plane_origin, plane_normal)
-            d2 = np.dot(v2 - plane_origin, plane_normal)
-            
-            # Find intersections with the plane
-            intersections = []
-            
-            # Edge v0-v1
-            if (d0 > 0) != (d1 > 0):
-                t = -d0 / (d1 - d0)
-                intersection = v0 + t * (v1 - v0)
-                intersections.append(intersection)
-            
-            # Edge v1-v2
-            if (d1 > 0) != (d2 > 0):
-                t = -d1 / (d2 - d1)
-                intersection = v1 + t * (v2 - v1)
-                intersections.append(intersection)
-            
-            # Edge v2-v0
-            if (d2 > 0) != (d0 > 0):
-                t = -d2 / (d0 - d2)
-                intersection = v2 + t * (v0 - v2)
-                intersections.append(intersection)
-            
-            # Add intersections to cross-section
-            if len(intersections) == 2:
-                cross_section_points.extend(intersections)
-                cross_section_edges.append([len(cross_section_points) - 2, len(cross_section_points) - 1])
-        
-        return np.array(cross_section_points), np.array(cross_section_edges)
-        
-    except Exception as e:
-        st.error(f"Error creating cross-section: {e}")
-        return np.array([]), np.array([])
-
-
-
-
-def create_cross_section_visualization(mesh: o3d.geometry.TriangleMesh, 
-                                     cross_section_points: np.ndarray,
-                                     cross_section_edges: np.ndarray) -> go.Figure:
-    """
-    Create visualization of mesh cross-section.
-    
-    Args:
-        mesh: Open3D mesh object
-        cross_section_points: Points on the cross-section
-        cross_section_edges: Edges connecting cross-section points
-        
-    Returns:
-        go.Figure: Plotly figure with cross-section
-    """
-    if mesh is None or mesh.is_empty():
-        return go.Figure()
-    
-    vertices = np.asarray(mesh.vertices)
-    triangles = np.asarray(mesh.triangles)
-    
-    # Create base mesh plot (semi-transparent)
-    fig = go.Figure(data=[
-        go.Mesh3d(
-            x=vertices[:, 0],
-            y=vertices[:, 1],
-            z=vertices[:, 2],
-            i=triangles[:, 0],
-            j=triangles[:, 1],
-            k=triangles[:, 2],
-            color='lightblue',
-            opacity=0.3,
-            name='Original Mesh'
-        )
-    ])
-    
-    # Add cross-section if available
-    if len(cross_section_points) > 0:
-        # Add cross-section points
-        fig.add_trace(go.Scatter3d(
-            x=cross_section_points[:, 0],
-            y=cross_section_points[:, 1],
-            z=cross_section_points[:, 2],
-            mode='markers',
-            marker=dict(size=4, color='red'),
-            name='Cross-section Points'
-        ))
-        
-        # Add cross-section edges
-        if len(cross_section_edges) > 0:
-            edge_x, edge_y, edge_z = [], [], []
-            for edge in cross_section_edges:
-                p1, p2 = cross_section_points[edge]
-                edge_x.extend([p1[0], p2[0], None])
-                edge_y.extend([p1[1], p2[1], None])
-                edge_z.extend([p1[2], p2[2], None])
-            
-            fig.add_trace(go.Scatter3d(
-                x=edge_x,
-                y=edge_y,
-                z=edge_z,
-                mode='lines',
-                line=dict(color='red', width=3),
-                name='Cross-section'
-            ))
-    
-    # Update layout
-    fig.update_layout(
-        scene=dict(
-            aspectmode="data",
-            xaxis=dict(showgrid=False, showticklabels=False),
-            yaxis=dict(showgrid=False, showticklabels=False),
-            zaxis=dict(showgrid=False, showticklabels=False)
-        ),
-        width=1200,
-        height=800,
-        title="Mesh Cross-Section"
-    )
-    
-    return fig
 
 
 
@@ -1230,7 +1082,7 @@ def main():
     st.sidebar.header("Visualization Controls")
     view_mode = st.sidebar.selectbox(
         "View Mode",
-        ["Solid", "Point Cloud", "Statistics", "Cross-Section", "Simple"],
+        ["Solid", "Point Cloud", "Statistics", "Simple"],
         help="Choose how to display the mesh"
     )
     
@@ -1396,60 +1248,6 @@ def main():
                 
                 processed_meshes.append((mesh, name, color))
         
-        # Analysis Tools (after meshes are loaded)
-        st.sidebar.header("Analysis Tools")
-        
-        # Cross-section controls
-        if st.sidebar.checkbox("Enable Cross-Section", value=False):
-            st.sidebar.subheader("Cross-Section Controls")
-            
-            # Plane orientation
-            plane_axis = st.sidebar.selectbox(
-                "Plane Axis",
-                ["X", "Y", "Z", "Custom"],
-                help="Choose the axis perpendicular to the cutting plane"
-            )
-            
-            if plane_axis == "Custom":
-                st.sidebar.write("Custom Plane Normal:")
-                nx = st.sidebar.number_input("Normal X", value=1.0, step=0.1)
-                ny = st.sidebar.number_input("Normal Y", value=0.0, step=0.1)
-                nz = st.sidebar.number_input("Normal Z", value=0.0, step=0.1)
-                plane_normal = np.array([nx, ny, nz])
-                st.session_state.plane_normal = plane_normal
-            else:
-                axis_map = {"X": [1, 0, 0], "Y": [0, 1, 0], "Z": [0, 0, 1]}
-                plane_normal = np.array(axis_map[plane_axis])
-                st.session_state.plane_normal = plane_normal
-            
-            st.session_state.plane_axis = plane_axis
-            
-            # Plane position
-            plane_position = st.sidebar.slider(
-                "Plane Position",
-                min_value=0.0,
-                max_value=1.0,
-                value=0.5,
-                step=0.01,
-                help="Position of the cutting plane (0-1)"
-            )
-            st.session_state.plane_position = plane_position
-        
-        # Surface analysis
-        if st.sidebar.checkbox("Enable Surface Analysis", value=False):
-            st.sidebar.subheader("Surface Analysis")
-            
-            roughness_radius = st.sidebar.slider(
-                "Roughness Analysis Radius",
-                min_value=0.01,
-                max_value=1.0,
-                value=0.1,
-                step=0.01,
-                help="Radius for local surface roughness analysis"
-            )
-            
-            if st.sidebar.button("Analyze Surface"):
-                st.session_state.surface_analysis = True
     
     # File upload section at the bottom
     st.sidebar.header("File Upload")
@@ -1567,60 +1365,6 @@ def main():
                         
                         st.plotly_chart(fig, use_container_width=True)
                 
-                elif view_mode == "Cross-Section":
-                    # Show cross-section
-                    if processed_meshes:
-                        mesh, name, color = processed_meshes[0]
-                        
-                        # Get cross-section parameters from session state or use defaults
-                        plane_axis = st.session_state.get('plane_axis', 'X')
-                        plane_position = st.session_state.get('plane_position', 0.5)
-                        
-                        # Calculate plane origin based on mesh bounding box
-                        bbox = mesh.get_axis_aligned_bounding_box()
-                        bbox_min = bbox.min_bound
-                        bbox_max = bbox.max_bound
-                        bbox_size = bbox_max - bbox_min
-                        
-                        # Set plane normal
-                        if plane_axis == "Custom":
-                            plane_normal = st.session_state.get('plane_normal', np.array([1, 0, 0]))
-                        else:
-                            axis_map = {"X": [1, 0, 0], "Y": [0, 1, 0], "Z": [0, 0, 1]}
-                            plane_normal = np.array(axis_map[plane_axis])
-                        
-                        # Calculate plane origin
-                        plane_origin = bbox_min + plane_position * bbox_size
-                        
-                        # Create cross-section
-                        cross_section_points, cross_section_edges = create_cross_section(mesh, plane_origin, plane_normal)
-                        
-                        # Visualize cross-section
-                        fig = create_cross_section_visualization(mesh, cross_section_points, cross_section_edges)
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Show cross-section info
-                        st.subheader("Cross-Section Information")
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.write(f"**Plane Axis:** {plane_axis}")
-                            st.write(f"**Plane Position:** {plane_position:.2f}")
-                            st.write(f"**Plane Origin:** ({plane_origin[0]:.3f}, {plane_origin[1]:.3f}, {plane_origin[2]:.3f})")
-                            st.write(f"**Plane Normal:** ({plane_normal[0]:.3f}, {plane_normal[1]:.3f}, {plane_normal[2]:.3f})")
-                        
-                        with col2:
-                            st.write(f"**Cross-section Points:** {len(cross_section_points)}")
-                            st.write(f"**Cross-section Edges:** {len(cross_section_edges)}")
-                            
-                            if len(cross_section_points) > 0:
-                                # Calculate cross-section area (simplified)
-                                if len(cross_section_edges) > 0:
-                                    total_length = 0
-                                    for edge in cross_section_edges:
-                                        p1, p2 = cross_section_points[edge]
-                                        total_length += np.linalg.norm(p2 - p1)
-                                    st.write(f"**Total Perimeter:** {total_length:.3f}")
             
             except Exception as e:
                 st.error(f"Error rendering 3D visualization: {str(e)}")
