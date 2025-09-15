@@ -11,15 +11,17 @@ This comprehensive guide explains how to containerize and run the HPE NVIDIA Vis
 
 ## 🎯 Deployment Scenarios
 
-### Scenario 1: Local Services + Remote Vista3D (Recommended)
-- **Streamlit App**: Runs locally in Docker
-- **Image Server**: Runs locally in Docker  
+### Scenario 1: Local GUI + Remote Vista3D (Recommended)
+- **Streamlit App**: Runs locally in Docker (port 8501)
+- **Image Server**: Runs locally in Docker (port 8888)
 - **Vista3D Server**: Runs on remote server (most common)
+- **Use Case**: Production deployments, shared GPU resources
 
 ### Scenario 2: All Services Local (Development)
-- **Streamlit App**: Runs locally in Docker
-- **Image Server**: Runs locally in Docker
-- **Vista3D Server**: Runs locally in Docker (requires GPU)
+- **Streamlit App**: Runs locally in Docker (port 8501)
+- **Image Server**: Runs locally in Docker (port 8888)
+- **Vista3D Server**: Runs locally in Docker (port 8000, requires GPU)
+- **Use Case**: Development, testing, single-machine deployments
 
 ## 🚀 Quick Start
 
@@ -27,13 +29,15 @@ This comprehensive guide explains how to containerize and run the HPE NVIDIA Vis
 
 The project includes Python-based startup scripts in the `utils/` folder:
 
-- `utils/start_vista3d.py` - Start Vista3D server container
+- `utils/start_vista3d.py` - Start Vista3D server container (requires GPU)
 - `utils/start_gui.py` - Start GUI containers (Streamlit app + image server)
 
-### Option 1: Remote Vista3D (Most Common)
+### Mode 1: Local GUI + Remote Vista3D (Recommended)
+
+**Use Case**: Production deployments, shared GPU resources, cloud-based Vista3D
 
 ```bash
-# 1. Configure environment
+# 1. Configure environment for remote Vista3D
 cp env.example .env
 nano .env  # Edit with your remote Vista3D server details
 
@@ -41,18 +45,56 @@ nano .env  # Edit with your remote Vista3D server details
 python3 utils/start_gui.py
 ```
 
-### Option 2: All Services Local (Development)
+**Environment Configuration:**
+```bash
+# .env file for remote Vista3D
+VISTA3D_SERVER=https://your-vista3d-server.com:8000
+VISTA3D_API_KEY=your_nvidia_api_key_here
+IMAGE_SERVER=http://image-server:8888
+EXTERNAL_IMAGE_SERVER=http://localhost:8888
+```
+
+### Mode 2: All Services Local (Development)
+
+**Use Case**: Development, testing, single-machine deployments
 
 ```bash
-# 1. Configure environment
+# 1. Configure environment for local Vista3D
 cp env.example .env
 nano .env  # Edit for local Vista3D
 
-# 2. Start Vista3D server
+# 2. Start Vista3D server (requires GPU)
 python3 utils/start_vista3d.py
 
-# 3. Start GUI containers
+# 3. Start GUI containers (in separate terminal)
 python3 utils/start_gui.py
+```
+
+**Environment Configuration:**
+```bash
+# .env file for local Vista3D
+VISTA3D_SERVER=http://vista3d-server:8000
+VISTA3D_API_KEY=your_nvidia_api_key_here
+IMAGE_SERVER=http://image-server:8888
+EXTERNAL_IMAGE_SERVER=http://localhost:8888
+```
+
+### Mode 3: Production with Auto-Startup
+
+**Use Case**: Production servers with automatic startup on boot
+
+```bash
+# Create systemd services for automatic startup
+sudo python3 utils/start_vista3d.py --create-service
+sudo python3 utils/start_gui.py --create-service
+
+# Enable services
+sudo systemctl enable vista3d
+sudo systemctl enable vista3d-gui
+
+# Start services
+sudo systemctl start vista3d
+sudo systemctl start vista3d-gui
 ```
 
 ### Option 3: Manual Docker Commands

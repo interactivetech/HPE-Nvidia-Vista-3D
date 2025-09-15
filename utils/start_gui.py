@@ -84,7 +84,6 @@ class Vista3DGUIManager:
         """Setup paths from environment variables or use defaults."""
         self.local_outputs_path = self.project_root / "output"
         self.local_dicom_path = self.project_root / "dicom"
-        self.local_logs_path = self.project_root / "logs"
         self.local_env_path = self.project_root / ".env"
 
     def _register_signal_handlers(self):
@@ -183,9 +182,8 @@ class Vista3DGUIManager:
         """Create necessary directories if they don't exist"""
         self.local_outputs_path.mkdir(parents=True, exist_ok=True)
         self.local_dicom_path.mkdir(parents=True, exist_ok=True)
-        self.local_logs_path.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"✅ Directories created: {self.local_outputs_path}, {self.local_dicom_path}, {self.local_logs_path}")
+        logger.info(f"✅ Directories created: {self.local_outputs_path}, {self.local_dicom_path}")
     
     def build_docker_image(self) -> bool:
         """Build the Docker image for the GUI containers"""

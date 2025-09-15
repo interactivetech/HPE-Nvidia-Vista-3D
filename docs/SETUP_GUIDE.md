@@ -88,28 +88,35 @@ source .venv/bin/activate
 python3 utils/dicom2nifti.py
 ```
 
-### 5. Start Vista3D Container (if running locally)
+### 5. Choose Deployment Mode
+
+#### Option A: Local GUI + Remote Vista3D (Recommended)
 ```bash
-# Start Vista3D AI server
+# Configure .env for remote Vista3D server
+VISTA3D_SERVER=https://your-vista3d-server.com:8000
+VISTA3D_API_KEY=your_nvidia_api_key
+
+# Start GUI containers (Streamlit + Image Server)
+python3 utils/start_gui.py
+```
+
+#### Option B: All Services Local (Development)
+```bash
+# Configure .env for local Vista3D
+VISTA3D_SERVER=http://vista3d-server:8000
+VISTA3D_API_KEY=your_nvidia_api_key
+
+# Start Vista3D server (requires GPU)
 python3 utils/start_vista3d.py
+
+# Start GUI containers (in separate terminal)
+python3 utils/start_gui.py
 ```
 
-### 6. Start Image Server
-```bash
-# Start the image server (in a separate terminal)
-python3 utils/image_server.py
-```
-
-### 7. Run Segmentation
+### 6. Run Segmentation
 ```bash
 # Process NIFTI files with Vista3D
 python3 utils/segment.py
-```
-
-### 8. Start the Web Application
-```bash
-# Start Streamlit web interface
-streamlit run app.py
 ```
 
 **🎉 You're ready!** Open your browser to `http://localhost:8501`
@@ -225,27 +232,52 @@ Nvidia-Vista3d-segmenation/
 ## 🚀 Usage Examples
 
 ### Basic Workflow
+
+#### For Remote Vista3D (Recommended)
 ```bash
 # 1. Activate virtual environment
 source .venv/bin/activate
 
-# 2. Place your medical images
+# 2. Configure for remote Vista3D
+echo "VISTA3D_SERVER=https://your-vista3d-server.com:8000" >> .env
+echo "VISTA3D_API_KEY=your_nvidia_api_key" >> .env
+
+# 3. Place your medical images
 cp your_scan.nii.gz output/nifti/
 
-# 3. Convert DICOM to NIFTI (if needed)
+# 4. Convert DICOM to NIFTI (if needed)
 python3 utils/dicom2nifti.py
 
-# 4. Start Vista3D container (if running locally)
-python3 utils/start_vista3d.py
-
-# 5. Start image server (in separate terminal)
-python3 utils/image_server.py
+# 5. Start GUI containers (Streamlit + Image Server)
+python3 utils/start_gui.py
 
 # 6. Run segmentation
 python3 utils/segment.py
+```
 
-# 7. Start web interface
-streamlit run app.py
+#### For Local Vista3D (Development)
+```bash
+# 1. Activate virtual environment
+source .venv/bin/activate
+
+# 2. Configure for local Vista3D
+echo "VISTA3D_SERVER=http://vista3d-server:8000" >> .env
+echo "VISTA3D_API_KEY=your_nvidia_api_key" >> .env
+
+# 3. Place your medical images
+cp your_scan.nii.gz output/nifti/
+
+# 4. Convert DICOM to NIFTI (if needed)
+python3 utils/dicom2nifti.py
+
+# 5. Start Vista3D server (requires GPU)
+python3 utils/start_vista3d.py
+
+# 6. Start GUI containers (in separate terminal)
+python3 utils/start_gui.py
+
+# 7. Run segmentation
+python3 utils/segment.py
 ```
 
 ### Batch Processing

@@ -49,21 +49,41 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 
 ### Docker Deployment
 
-The project includes Python-based startup scripts in the `utils/` folder:
+The project includes Python-based startup scripts in the `utils/` folder for different deployment scenarios:
 
+#### 🎯 Deployment Modes
+
+**Mode 1: Local GUI + Remote Vista3D (Recommended)**
 ```bash
-# For local services + remote Vista3D (most common)
+# Configure .env for remote Vista3D server
+VISTA3D_SERVER=https://your-vista3d-server.com:8000
+VISTA3D_API_KEY=your_nvidia_api_key
+
+# Start GUI containers (Streamlit + Image Server)
 python3 utils/start_gui.py
-
-# For all services local (development)
-python3 utils/start_vista3d.py  # Start Vista3D server
-python3 utils/start_gui.py      # Start GUI containers
-
-# Create systemd service for auto-startup
-sudo python3 utils/start_gui.py --create-service
 ```
 
-See [docs/CONTAINERIZATION.md](docs/CONTAINERIZATION.md) for detailed deployment instructions.
+**Mode 2: All Services Local (Development)**
+```bash
+# Configure .env for local Vista3D
+VISTA3D_SERVER=http://vista3d-server:8000
+VISTA3D_API_KEY=your_nvidia_api_key
+
+# Start Vista3D server (requires GPU)
+python3 utils/start_vista3d.py
+
+# Start GUI containers (in separate terminal)
+python3 utils/start_gui.py
+```
+
+**Mode 3: Production with Auto-Startup**
+```bash
+# Create systemd service for automatic startup
+sudo python3 utils/start_gui.py --create-service
+sudo python3 utils/start_vista3d.py --create-service
+```
+
+See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed deployment instructions and [docs/CONTAINERIZATION.md](docs/CONTAINERIZATION.md) for Docker-specific details.
 
 ### Installation using one server
 
