@@ -183,6 +183,31 @@ The following directories are mounted as volumes:
 - **Purpose**: Separate service for image processing
 - **Health Check**: Custom health endpoint
 
+## 🔧 Running Utility Scripts
+
+**Important**: When using Docker containers, utility scripts must be run from the **host system**, not from within the containers.
+
+### Prerequisites
+```bash
+# Activate virtual environment on host
+source .venv/bin/activate
+
+# Ensure you have the required dependencies
+uv sync
+```
+
+### Utility Scripts
+```bash
+# DICOM to NIFTI conversion (run from host)
+python3 utils/dicom2nifti.py
+
+# Segmentation processing (run from host)
+python3 utils/segment.py
+
+# NIFTI to PLY conversion (run from host)
+python3 utils/nifti2ply.py --batch
+```
+
 ## 🔧 Manual Commands
 
 ### Start Services

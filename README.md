@@ -61,6 +61,11 @@ VISTA3D_API_KEY=your_nvidia_api_key
 
 # Start GUI containers (Streamlit + Image Server)
 python3 utils/start_gui.py
+
+# Run utility scripts from host system
+python3 utils/dicom2nifti.py    # Convert DICOM to NIFTI
+python3 utils/segment.py        # Run segmentation
+python3 utils/nifti2ply.py --batch  # Convert to PLY files
 ```
 
 **Mode 2: All Services Local (Development)**
@@ -74,6 +79,11 @@ python3 utils/start_vista3d.py
 
 # Start GUI containers (in separate terminal)
 python3 utils/start_gui.py
+
+# Run utility scripts from host system
+python3 utils/dicom2nifti.py    # Convert DICOM to NIFTI
+python3 utils/segment.py        # Run segmentation
+python3 utils/nifti2ply.py --batch  # Convert to PLY files
 ```
 
 **Mode 3: Production with Auto-Startup**

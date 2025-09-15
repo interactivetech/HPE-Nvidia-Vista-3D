@@ -180,6 +180,61 @@ sudo python3 utils/start_gui.py --create-service
 sudo systemctl start vista3d vista3d-gui
 ```
 
+## 🔧 Running Utility Scripts
+
+**Important**: When using Docker containers, utility scripts must be run from the **host system**, not from within the containers.
+
+### Prerequisites
+```bash
+# Activate virtual environment on host
+source .venv/bin/activate
+
+# Ensure you have the required dependencies
+uv sync
+```
+
+### DICOM to NIFTI Conversion
+```bash
+# Run from host system (not inside Docker container)
+python3 utils/dicom2nifti.py
+```
+
+### NIFTI to PLY Conversion
+```bash
+# Single file conversion
+python3 utils/nifti2ply.py input.nii.gz output.ply
+
+# Batch processing of all voxels folders
+python3 utils/nifti2ply.py --batch
+
+# Batch processing for specific patient
+python3 utils/nifti2ply.py --batch --patient PA00000002
+```
+
+### Segmentation Processing
+```bash
+# Run segmentation (connects to Vista3D server)
+python3 utils/segment.py
+```
+
+### Complete Workflow Example
+```bash
+# 1. Start containers
+python3 utils/start_gui.py
+
+# 2. Convert DICOM to NIFTI (from host)
+python3 utils/dicom2nifti.py
+
+# 3. Run segmentation (from host)
+python3 utils/segment.py
+
+# 4. Convert to PLY files (from host)
+python3 utils/nifti2ply.py --batch
+
+# 5. Access web interface
+# Open http://localhost:8501 in browser
+```
+
 ## 🔍 Troubleshooting
 
 ### Common Issues
