@@ -419,18 +419,16 @@ def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None
         if not output_base_path.exists():
             raise FileNotFoundError(f"Output directory not found: {output_base_path}")
         
-        # Check if voxels folders exist
-        if not check_voxels_folders_exist(output_base_path):
-            raise FileNotFoundError(f"No voxels folders found in: {output_base_path}")
-        
-        # Get patient directories
+        # Get patient directories (this will only return those with voxels folders)
         patient_dirs = get_patient_directories(output_base_path, specific_patient)
         
         if not patient_dirs:
             if specific_patient:
-                raise FileNotFoundError(f"Patient {specific_patient} not found or has no voxels folder")
+                print(f"⚠️  Patient {specific_patient} not found or has no voxels folder - skipping")
+                return
             else:
-                raise FileNotFoundError("No patient directories with voxels folders found")
+                print(f"⚠️  No patient directories with voxels folders found - skipping conversion")
+                return
         
         print(f"📊 Found {len(patient_dirs)} patient directories to process")
         print(f"🔧 Converting NIfTI files to PLY format with high-quality settings")
