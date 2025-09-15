@@ -99,7 +99,7 @@ PLY_MODES = ["Single PLY", "Multiple PLY Files"]
 
 
 
-def render_ply_selection(selected_patient: str, selected_file: str, data_manager: DataManager, IMAGE_SERVER_URL: str):
+def render_ply_selection(selected_patient: str, selected_file: str, data_manager: DataManager, EXTERNAL_IMAGE_SERVER_URL: str):
     """Render the PLY selection interface similar to voxel selection."""
     with st.sidebar.expander("Select PLY Files", expanded=True):
         # PLY selection mode
@@ -133,13 +133,13 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                         selected_index = display_names.index(selected_display_name)
                         selected_ply_file = ply_files[selected_index]
                         output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                        file_to_load = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
+                        file_to_load = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
                         selected_ply_files = [selected_ply_file]
                         
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
                     output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                    ply_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    ply_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
                     st.caption(f"PLY directory: {ply_url}")
         
         elif ply_mode == "Multiple PLY Files":
@@ -173,7 +173,7 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
                     output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                    ply_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    ply_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
                     st.caption(f"PLY directory: {ply_url}")
             else:
                 st.info("Please select a patient and CT scan first.")
@@ -195,7 +195,9 @@ def main():
     # Initialize managers
     load_dotenv()
     IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
+    EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
     data_manager = DataManager(IMAGE_SERVER_URL)
+    external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL)
     mesh_processor = MeshProcessor()
     mesh_visualizer = MeshVisualizer()
     
@@ -252,7 +254,7 @@ def main():
         return
 
     # PLY file selection (similar to voxel selection)
-    ply_mode, selected_ply_files, file_to_load = render_ply_selection(selected_patient, selected_file, data_manager, IMAGE_SERVER_URL)
+    ply_mode, selected_ply_files, file_to_load = render_ply_selection(selected_patient, selected_file, external_data_manager, EXTERNAL_IMAGE_SERVER_URL)
     
     
     # Visualization controls
@@ -417,7 +419,7 @@ def main():
         for i, ply_file in enumerate(selected_ply_files):
             try:
                 output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                file_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
+                file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
                 mesh, _ = mesh_processor.load_ply_file(file_url)
                 
                 if mesh is not None and not mesh.is_empty():

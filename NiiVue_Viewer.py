@@ -21,11 +21,13 @@ from utils.constants import (
 # --- Initial Setup ---
 load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
+EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
 
 # Initialize our managers
 config_manager = ConfigManager()
 data_manager = DataManager(IMAGE_SERVER_URL)
-voxel_manager = VoxelManager(config_manager, data_manager)
+external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL)
+voxel_manager = VoxelManager(config_manager, external_data_manager)
 viewer_config = ViewerConfig()
 template_renderer = TemplateRenderer()
 
@@ -142,7 +144,7 @@ def render_viewer(selected_patient: str, selected_file: str):
 
     # Prepare volume URLs and overlays
     output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-    base_file_url = f"{IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/nifti/{selected_file}"
+    base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/nifti/{selected_file}"
 
     # Create overlays based on voxel mode
     overlays = voxel_manager.create_overlays(
@@ -184,7 +186,7 @@ def render_viewer(selected_patient: str, selected_file: str):
         volume_list_js=volume_list_js,
         overlay_colors_js=overlay_colors_js,
         custom_colormap_js=custom_colormap_js,
-        image_server_url=IMAGE_SERVER_URL,
+        image_server_url=EXTERNAL_IMAGE_SERVER_URL,
         main_is_nifti=settings.get('show_nifti', True),
         main_vol=settings.get('show_nifti', True),
         color_map_js=json.dumps(settings.get('color_map', 'gray')),

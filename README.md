@@ -47,6 +47,24 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 - Docker and NVIDIA Container Toolkit
 - NVIDIA NGC account
 
+### Docker Deployment
+
+The project includes Python-based startup scripts in the `utils/` folder:
+
+```bash
+# For local services + remote Vista3D (most common)
+python3 utils/start_gui.py
+
+# For all services local (development)
+python3 utils/start_vista3d.py  # Start Vista3D server
+python3 utils/start_gui.py      # Start GUI containers
+
+# Create systemd service for auto-startup
+sudo python3 utils/start_gui.py --create-service
+```
+
+See [docs/CONTAINERIZATION.md](docs/CONTAINERIZATION.md) for detailed deployment instructions.
+
 ### Installation using one server
 
 Configure HPE GreenLake HPC and Private Cloud AI access

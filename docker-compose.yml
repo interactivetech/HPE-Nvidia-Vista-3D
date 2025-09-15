@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Main Streamlit Application
+  vista3d-app:
+    build: .
+    container_name: hpe-nvidia-vista3d-app
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - IMAGE_SERVER=http://image-server:8888
+      - EXTERNAL_IMAGE_SERVER=http://localhost:8888
+      - VISTA3D_SERVER=${VISTA3D_SERVER:-http://vista3d-server:8000}
+      - VISTA3D_API_KEY=${VISTA3D_API_KEY}
+      - HPE_CLUSTER_ENDPOINT=${HPE_CLUSTER_ENDPOINT}
+      - HPE_API_KEY=${HPE_API_KEY}
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./dicom:/app/dicom
+      - ./.env:/app/.env
+    networks:
+      - local-network
+    restart: unless-stopped
+    depends_on:
+      - image-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Local Image Server
+  image-server:
+    build: .
+    container_name: vista3d-image-server
+    ports:
+      - "8888:8888"
+    command: ["uv", "run", "python", "utils/image_server.py"]
+    environment:
+      - VISTA3D_SERVER=${VISTA3D_SERVER:-http://vista3d-server:8000}
+      - VISTA3D_API_KEY=${VISTA3D_API_KEY}
+      - OUTPUT_DIR=/app/output
+      - DICOM_DIR=/app/dicom
+    volumes:
+      - ./output:/app/output
+      - ./dicom:/app/dicom
+      - ./logs:/app/logs
+      - ./.env:/app/.env
+    networks:
+      - local-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Optional: Local Vista3D Server (for testing/development)
+  vista3d-server:
+    image: nvidia/vista3d:latest
+    container_name: vista3d-server-local
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_API_KEY=${VISTA3D_API_KEY}
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./output:/app/output
+    networks:
+      - local-network
+    restart: unless-stopped
+    profiles:
+      - local-vista3d
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+networks:
+  local-network:
+    driver: bridge
+  # External network for remote Vista3D server connectivity
+  external-network:
+    external: true
+    name: vista3d-external
+
+volumes:
+  output-data:
+  dicom-data:
+  logs-data:

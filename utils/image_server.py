@@ -110,6 +110,11 @@ app = FastAPI(title="Medical Imaging Server", description="HTTP server for medic
 # Mount the assets directory to serve static files like niivue.umd.js
 app.mount("/assets", StaticFiles(directory=project_root / "assets"), name="assets")
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker"""
+    return {"status": "healthy", "service": "image-server"}
+
 @app.get("/filtered-segments/{patient_id}/{filename}")
 async def get_filtered_segments(
     patient_id: str, 
