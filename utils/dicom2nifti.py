@@ -357,6 +357,15 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
                             
                             print(f"   Deleted {deleted_count} small NIFTI files.")
                             nifti_files = large_nifti_files
+                            
+                            # Check if any files remain after filtering
+                            if not nifti_files:
+                                print(f"⚠️  No files meet minimum size requirement ({min_size_mb} MB) for {dicom_directory}")
+                                print(f"🗑️  Removing empty patient directory: {output_directory}")
+                                shutil.rmtree(output_directory)
+                                print(f"⏭️  Skipping {dicom_directory} - no files meet size criteria")
+                                patient_pbar.update(1)
+                                continue
 
                         # Process each created NIFTI file for NiiVue enhancement
                         json_files = conversion_result['json_files']

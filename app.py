@@ -137,14 +137,16 @@ def run_server_analysis():
                     current_patient['ply_files'] = int(ply_number)
                 except (ValueError, IndexError):
                     current_patient['ply_files'] = 0
-            elif "✅" in line and current_patient and "(" in line:
-                # Parse scan details like "✅ 2.5_mm_STD_-_30%_ASIR_2 (segmentation file, 84 voxels)"
+            elif ("✅" in line or "❌" in line) and current_patient and "(" in line:
+                # Parse scan details like "      ✅ 2.5_mm_STD_-_30%_ASIR_2 (segmentation file, 84 voxels)"
+                # or "      ❌ 2.5_mm_STD_-_30%_ASIR_2 (no voxel data)"
                 scan_line = line.strip()
-                if "✅" in scan_line:
+                if "✅" in scan_line or "❌" in scan_line:
                     # Extract scan name and voxel count
                     parts = scan_line.split("(")
                     if len(parts) >= 2:
-                        scan_name = parts[0].replace("✅", "").strip()
+                        # Remove status indicator and clean up the scan name
+                        scan_name = parts[0].replace("✅", "").replace("❌", "").strip()
                         voxel_info = parts[1].replace(")", "").strip()
                         voxel_count = 0
                         if "voxels" in voxel_info:
@@ -152,10 +154,14 @@ def run_server_analysis():
                                 voxel_count = int(voxel_info.split("voxels")[0].split()[-1])
                             except:
                                 pass
-                        current_patient['scans'].append({
-                            'name': scan_name,
-                            'voxel_count': voxel_count
-                        })
+                        
+                        # Only add if we haven't seen this scan name before
+                        existing_scan_names = [scan.get('name') for scan in current_patient['scans']]
+                        if scan_name not in existing_scan_names:
+                            current_patient['scans'].append({
+                                'name': scan_name,
+                                'voxel_count': voxel_count
+                            })
         
         if current_patient:
             patients.append(current_patient)

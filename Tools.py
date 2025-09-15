@@ -234,6 +234,127 @@ def main():
     if st.button("🚀 Launch DICOM Inspector", key="launch_dicom_inspector", type="primary"):
         st.session_state.current_page = "dicom"
         st.rerun()
+    
+    st.markdown("---")
+    
+    # DICOM to NIfTI Conversion Section
+    st.subheader("🔄 DICOM to NIfTI Conversion")
+    st.markdown("""
+    Convert DICOM medical imaging files to NIfTI format using dcm2niix. This tool processes 
+    DICOM files and creates optimized NIfTI files with metadata for medical image analysis.
+    """)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Conversion options
+        force_overwrite = st.checkbox("Force Overwrite", value=False, help="Overwrite existing NIfTI files")
+        min_size_mb = st.number_input("Minimum File Size (MB)", min_value=0.0, value=0.5, step=0.1, 
+                                    help="Delete NIfTI files smaller than this size")
+    
+    with col2:
+        st.markdown("**Conversion Options**")
+        st.markdown("• Uses dcm2niix for robust conversion")
+        st.markdown("• Generates BIDS-compliant metadata")
+        st.markdown("• Creates quality reports")
+        st.markdown("• Optimized for NiiVue viewer")
+    
+    if st.button("🔄 Start DICOM to NIfTI Conversion", key="start_dicom2nifti", type="primary"):
+        with st.spinner("Starting DICOM to NIfTI conversion..."):
+            # Prepare command arguments
+            cmd_args = ["python", "utils/dicom2nifti.py"]
+            
+            if force_overwrite:
+                cmd_args.append("--force")
+            
+            if min_size_mb > 0:
+                cmd_args.extend(["--min-size-mb", str(int(min_size_mb))])
+            
+            # Create progress containers
+            progress_container = st.container()
+            output_container = st.container()
+            
+            with progress_container:
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+            
+            with output_container:
+                output_placeholder = st.empty()
+            
+            try:
+                # Run the conversion with real-time output
+                status_text.text("🔄 Initializing conversion...")
+                progress_bar.progress(10)
+                
+                # Start the subprocess
+                process = subprocess.Popen(
+                    cmd_args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True,
+                    cwd=Path(__file__).parent
+                )
+                
+                # Read output line by line
+                output_lines = []
+                current_progress = 10
+                
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        output_lines.append(output.strip())
+                        # Update output display (keep last 20 lines)
+                        recent_output = output_lines[-20:]
+                        output_placeholder.text_area(
+                            "Conversion Output:", 
+                            value="\n".join(recent_output), 
+                            height=300,
+                            disabled=True
+                        )
+                        
+                        # Update progress based on output keywords
+                        if "Processing patients" in output:
+                            current_progress = min(50, current_progress + 5)
+                        elif "Successfully processed" in output:
+                            current_progress = min(90, current_progress + 10)
+                        elif "conversion completed" in output:
+                            current_progress = 100
+                        
+                        progress_bar.progress(current_progress)
+                        status_text.text(f"🔄 Converting DICOM files... ({current_progress}%)")
+                
+                # Wait for process to complete
+                return_code = process.wait()
+                
+                if return_code == 0:
+                    progress_bar.progress(100)
+                    status_text.text("✅ Conversion completed successfully!")
+                    st.success("🎉 DICOM to NIfTI conversion completed successfully!")
+                    
+                    # Show final output
+                    final_output = "\n".join(output_lines)
+                    st.text_area("Final Output:", final_output, height=400, disabled=True)
+                    
+                else:
+                    progress_bar.progress(0)
+                    status_text.text("❌ Conversion failed!")
+                    st.error("❌ DICOM to NIfTI conversion failed!")
+                    
+                    # Show error output
+                    error_output = "\n".join(output_lines)
+                    st.text_area("Error Output:", error_output, height=400, disabled=True)
+                    
+            except Exception as e:
+                progress_bar.progress(0)
+                status_text.text("❌ Conversion error!")
+                st.error(f"❌ Error running conversion: {str(e)}")
+                
+                # Show error details
+                st.text_area("Error Details:", str(e), height=200, disabled=True)
 
 if __name__ == "__main__":
     main()
