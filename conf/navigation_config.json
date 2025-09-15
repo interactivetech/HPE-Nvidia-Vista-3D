@@ -42,6 +42,16 @@
         "enabled": false,
         "order": 4,
         "description": "DICOM file inspection and analysis"
+      },
+      {
+        "key": "tools",
+        "label": "Tools",
+        "page_key": "tools",
+        "icon": "🛠️",
+        "is_image": false,
+        "enabled": true,
+        "order": 5,
+        "description": "Tools and utilities for medical image processing"
       }
     ],
     "settings": {

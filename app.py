@@ -591,5 +591,10 @@ elif current_page == 'ply_viewer':
     # Import and run Open3D Viewer content
     sys.path.append(str(Path(__file__).parent))
     exec(open('Open3d_Viewer.py').read())
+
+elif current_page == 'tools':
+    # Import and run Tools content
+    sys.path.append(str(Path(__file__).parent))
+    exec(open('Tools.py').read())
     
 
