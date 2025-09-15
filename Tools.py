@@ -105,7 +105,7 @@ def render_segmentation_tools():
         )
     
     with col2:
-        st.markdown("**Configuration**")
+        pass
     
     if st.button("🎯 Start Vista3D Segmentation", key="start_segmentation", type="primary"):
         with st.spinner("Starting Vista3D segmentation..."):

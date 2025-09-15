@@ -2,14 +2,14 @@
   "name": "Basic Medical Colormaps",
   "description": "Essential colormaps for medical imaging",
   "version": "1.0",
-  "default": "gray",
+  "default": "bone",
   "colormaps": {
-    "gray": {
+    "bone": {
       "R": [0, 32, 64, 96, 128, 160, 192, 224, 255],
-      "G": [0, 32, 64, 96, 128, 160, 192, 224, 255],
-      "B": [0, 32, 64, 96, 128, 160, 192, 224, 255],
+      "G": [0, 28, 56, 84, 112, 140, 168, 196, 224],
+      "B": [0, 24, 48, 72, 96, 120, 144, 168, 192],
       "A": [255, 255, 255, 255, 255, 255, 255, 255, 255],
-      "labels": ["Black", "Dark Gray", "Gray", "Light Gray", "Medium", "Light", "Lighter", "Very Light", "White"]
+      "labels": ["Black", "Dark Bone", "Bone", "Light Bone", "Medium", "Light", "Lighter", "Very Light", "White"]
     }
   }
 }

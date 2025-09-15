@@ -13,7 +13,7 @@ from utils.viewer_config import ViewerConfig
 from utils.template_renderer import TemplateRenderer
 from utils.constants import (
     NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
-    VOXEL_MODES, MESSAGES, VIEWER_HEIGHT
+    VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data
 )
  
  
@@ -64,8 +64,36 @@ def render_sidebar():
         viewer_config.selected_patient = selected_patient
         viewer_config.selected_file = selected_file
 
-        # Render viewer settings
-        viewer_config.render_sidebar_settings()
+        # Extract data characteristics for modality-specific settings
+        min_val, max_val, mean_val = None, None, None
+        if selected_patient and selected_file:
+            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+            quality_file_path = os.path.join(output_folder, selected_patient, "nifti", f"{selected_file}.quality.json")
+            if os.path.exists(quality_file_path):
+                try:
+                    with open(quality_file_path, 'r') as f:
+                        quality_data = json.load(f)
+                    
+                    data_quality = quality_data.get('data_quality', {})
+                    min_val = data_quality.get('min_value')
+                    max_val = data_quality.get('max_value')
+                    mean_val = data_quality.get('mean_value')
+                    
+                    # Apply optimal window settings immediately when new dataset is selected
+                    viewer_config.apply_optimal_window_settings(min_val, max_val, mean_val)
+                    
+                    # Apply appropriate colormap for the detected modality
+                    modality = detect_modality_from_data(min_val, max_val, mean_val)
+                    if modality == 'MRI':
+                        # Use bone colormap for MRI (works great without cube artifacts)
+                        viewer_config._settings['color_map'] = 'bone'
+                    
+                except Exception:
+                    # Fallback to None if parsing fails
+                    pass
+
+        # Render viewer settings with data characteristics
+        viewer_config.render_sidebar_settings(min_val, max_val, mean_val)
 
         # Voxel selection (after show_overlay is set)
         if viewer_config.settings.get('show_overlay', False):
@@ -173,6 +201,7 @@ def render_viewer(selected_patient: str, selected_file: str):
     volume_list_js = json.dumps(volume_list_entries)
     overlay_colors_js = json.dumps(overlays)
     custom_colormap_js = voxel_manager.create_custom_colormap_js()
+
 
     # Get viewer settings
     settings = viewer_config.settings

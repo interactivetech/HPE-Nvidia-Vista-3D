@@ -7,7 +7,8 @@ import streamlit as st
 from typing import Dict, Any, Optional, Tuple
 from .constants import (
     DEFAULT_VIEWER_SETTINGS, SLICE_TYPE_MAP, WINDOW_PRESETS,
-    AVAILABLE_COLOR_MAPS, VOXEL_MODES, MESSAGES
+    WINDOW_PRESETS_CT, WINDOW_PRESETS_MRI, get_optimal_window_settings,
+    detect_modality_from_data, AVAILABLE_COLOR_MAPS, VOXEL_MODES, MESSAGES
 )
 
 
@@ -92,6 +93,20 @@ class ViewerConfig:
             self._settings.get('window_width', 1000)
         )
 
+    def apply_optimal_window_settings(self, min_value: float, max_value: float, mean_value: float):
+        """Apply optimal window settings based on data characteristics."""
+        optimal_center, optimal_width = get_optimal_window_settings(min_value, max_value, mean_value)
+        self._settings['window_center'] = optimal_center
+        self._settings['window_width'] = optimal_width
+
+    def get_modality_specific_presets(self, min_value: float = None, max_value: float = None, mean_value: float = None):
+        """Get window presets appropriate for the detected modality."""
+        if min_value is not None and max_value is not None and mean_value is not None:
+            modality = detect_modality_from_data(min_value, max_value, mean_value)
+            if modality == 'MRI':
+                return WINDOW_PRESETS_MRI
+        return WINDOW_PRESETS_CT
+
     def reset_to_defaults(self):
         """Reset all settings to defaults."""
         self._settings = DEFAULT_VIEWER_SETTINGS.copy()
@@ -108,7 +123,7 @@ class ViewerConfig:
         self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         self._selected_individual_voxels = getattr(st.session_state, 'selected_individual_voxels', [])
 
-    def render_sidebar_settings(self):
+    def render_sidebar_settings(self, min_value: float = None, max_value: float = None, mean_value: float = None):
         """Render the viewer settings in the sidebar."""
         # Slice type selection
         st.markdown("Select Slice")
@@ -140,10 +155,10 @@ class ViewerConfig:
                 try:
                     color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
                 except ValueError:
-                    # If current color map is not in the list, use 'gray' as fallback
-                    if 'gray' in AVAILABLE_COLOR_MAPS:
-                        color_map_index = AVAILABLE_COLOR_MAPS.index('gray')
-                        self._settings['color_map'] = 'gray'
+                    # If current color map is not in the list, use 'bone' as fallback
+                    if 'bone' in AVAILABLE_COLOR_MAPS:
+                        color_map_index = AVAILABLE_COLOR_MAPS.index('bone')
+                        self._settings['color_map'] = 'bone'
                     else:
                         color_map_index = 0
                         self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
@@ -167,8 +182,19 @@ class ViewerConfig:
                     key="nifti_gamma"
                 )
 
-                # CT Window/Level settings
-                st.markdown("**CT Window/Level Settings**")
+                # Window/Level settings (CT/MRI adaptive)
+                st.markdown("**Window/Level Settings**")
+                
+                # Show modality detection info if available
+                if min_value is not None and max_value is not None and mean_value is not None:
+                    modality = detect_modality_from_data(min_value, max_value, mean_value)
+                    current_center, current_width = self.get_window_settings()
+                    optimal_center, optimal_width = get_optimal_window_settings(min_value, max_value, mean_value)
+                    
+                    if current_center == optimal_center and current_width == optimal_width:
+                        st.success(f"✅ Auto-applied {modality} optimal settings: Center={current_center}, Width={current_width}")
+                    else:
+                        st.info(f"📊 {modality} data detected (range: {min_value:.0f}-{max_value:.0f}, mean: {mean_value:.0f})")
                 self._settings['window_center'] = st.slider(
                     "Window Center (Level)",
                     -2500, 2500,
@@ -182,8 +208,9 @@ class ViewerConfig:
                     key="window_width"
                 )
 
-                # Preset windowing options
-                preset_options = list(WINDOW_PRESETS.keys())
+                # Preset windowing options (modality-specific)
+                modality_presets = self.get_modality_specific_presets(min_value, max_value, mean_value)
+                preset_options = list(modality_presets.keys())
                 window_preset = st.selectbox(
                     "Window Preset",
                     preset_options,
