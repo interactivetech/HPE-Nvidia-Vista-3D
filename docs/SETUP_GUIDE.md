@@ -9,7 +9,7 @@ Get up and running with the HPE GreenLake Medical AI Platform with NVIDIA Vista3
 - **NVIDIA GPU** with CUDA support (8GB+ VRAM recommended)
 - **16GB+ RAM** for large medical imaging datasets
 - **10GB+ free disk space**
-- **Sudo access** for system package installation
+- **Docker and NVIDIA Container Toolkit** (for Docker deployment)
 - **Internet connection** for downloading packages and Docker images
 
 ### NVIDIA Requirements
@@ -29,7 +29,9 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 - **Anatomical Scope**: Supports segmentation of organs, vessels, bones, and soft tissue structures
 - **Important Note**: Does not segment the entire brain (optimized for body structures and lesions)
 
-## ⚡ Quick Start (15 minutes)
+## 🐳 Docker Deployment (Recommended)
+
+The **preferred method** for running the Vista3D platform is using Docker containers, which provides better isolation, easier deployment, and consistent environments.
 
 ### 1. Clone the Repository
 ```bash
@@ -38,10 +40,52 @@ git clone <repository-url>
 cd Nvidia-Vista3d-segmenation
 ```
 
-### 2. Run Automated Setup
+### 2. Start GUI Containers
 ```bash
-# Run the interactive setup script
-python3 setup.py
+# Start GUI containers (Streamlit + Image Server)
+python3 utils/start_gui.py
+```
+
+### 3. Add Your Medical Images
+```bash
+# Option A: Place DICOM files in patient-specific folders
+mkdir -p dicom/PA00000001
+# Copy your DICOM files to dicom/PA00000001/
+
+# Option B: Place NIFTI files directly
+mkdir -p output/nifti
+# Copy your .nii.gz files to output/nifti/
+```
+
+### 4. Convert DICOM to NIFTI (if using DICOM files)
+```bash
+# Convert DICOM files to NIFTI format
+python3 utils/dicom2nifti.py
+```
+
+### 5. Run Segmentation
+```bash
+# Process NIFTI files with Vista3D
+python3 utils/segment.py
+```
+
+**🎉 You're ready!** Open your browser to `http://localhost:8501`
+
+## 🐍 Non-Docker Installation (Alternative)
+
+For development or environments where Docker is not available, you can install the platform directly on the host system.
+
+### 1. Clone the Repository
+```bash
+# Clone the repository
+git clone <repository-url>
+cd Nvidia-Vista3d-segmenation
+```
+
+### 2. Run Automated Installation
+```bash
+# Run the interactive installation script
+python3 utils/install.py
 ```
 
 **The setup script will:**

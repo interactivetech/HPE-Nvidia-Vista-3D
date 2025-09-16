@@ -22,7 +22,6 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 - **Anatomical Scope**: Supports segmentation of organs, vessels, bones, and soft tissue structures
 - **Limitation**: Does not segment the entire brain (optimized for body structures and lesions)
 
-
 ### Technology Stack
 - **Infrastructure**: HPE GreenLake HPC, Private Cloud AI, HPE ProLiant servers
 - **AI/ML**: NVIDIA Vista3D NIM, CUDA acceleration
@@ -47,11 +46,11 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 - Docker and NVIDIA Container Toolkit
 - NVIDIA NGC account
 
-### Docker Deployment
+## 🐳 Docker Deployment (Recommended)
 
-The project includes Python-based startup scripts in the `utils/` folder for different deployment scenarios:
+The **preferred method** for running the Vista3D platform is using Docker containers, which provides better isolation, easier deployment, and consistent environments.
 
-#### 🎯 Deployment Modes
+### 🎯 Deployment Modes
 
 **Mode 1: Local GUI + Remote Vista3D (Recommended)**
 ```bash
@@ -95,31 +94,36 @@ sudo python3 utils/start_vista3d.py --create-service
 
 See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed deployment instructions and [docs/CONTAINERIZATION.md](docs/CONTAINERIZATION.md) for Docker-specific details.
 
-### Installation using one server
+## 🐍 Non-Docker Installation (Alternative)
 
-Configure HPE GreenLake HPC and Private Cloud AI access
-Set up NVIDIA NGC API credentials for Vista3D
+For development or environments where Docker is not available, you can install the platform directly on the host system.
 
+### Prerequisites
+- Python 3.11+
+- NVIDIA GPU with CUDA support
+- NVIDIA NGC account
+- Ubuntu Linux (18.04+) recommended
+
+### Installation Steps
 
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd Nvidia-Vista3d-segmenation
-```
-Configure `.env` file with project settings
 
-```bash
-# Run automated setup
-python3 setup.py --setup-vista3d 
+# Run automated installation and setup
+python3 utils/install.py
+
 # Activate virtual environment
-source .venv/bin/activate 
+source .venv/bin/activate
 ```
 
-Place DICOM files in the `dicom/` directory        
+### Usage
 
 ```bash
+# Place DICOM files in the dicom/ directory
 # Convert DICOM files to NIFTI format
-python3 utils/dicom2nifty.py
+python3 utils/dicom2nifti.py
 
 # Run segmentation
 python3 utils/segment.py
@@ -127,6 +131,8 @@ python3 utils/segment.py
 # Start the application
 streamlit run app.py
 ```
+
+**Note**: The Docker method is recommended for production use as it provides better isolation and easier management.
 
 ---
 

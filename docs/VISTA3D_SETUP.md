@@ -1,10 +1,12 @@
 # NVIDIA Vista3D NIM Setup Guide
 
-This guide explains how to use the automated setup script to install and configure NVIDIA Vista3D NIM on Ubuntu Linux.
+This guide explains how to set up and configure NVIDIA Vista3D NIM for the HPE Medical Imaging AI Platform.
 
 ## Overview
 
-The `setup.py` script now includes a complete Vista3D setup mode (`--setup-vista3d`) that will:
+The Vista3D setup can be done through two methods:
+1. **Docker Deployment (Recommended)**: Using `utils/start_vista3d.py` for containerized setup
+2. **Non-Docker Installation**: Using `utils/install.py` for direct host installation
 
 ### **VISTA3D Model Capabilities & Limitations**
 
@@ -16,45 +18,56 @@ The `setup.py` script now includes a complete Vista3D setup mode (`--setup-vista
 - Body lesion detection and segmentation
 - Soft tissue and bone structure analysis (excluding detailed brain anatomy)
 
-### **Setup Process**
+## 🐳 Docker Setup (Recommended)
 
-The automated setup will:
+The **preferred method** for Vista3D setup uses Docker containers for better isolation and easier management.
 
-1. ✅ Check system requirements (Ubuntu, sudo access)
+### Prerequisites
+- **Ubuntu Linux** (18.04+ recommended)
+- **NVIDIA GPU** with CUDA support
+- **Docker and NVIDIA Container Toolkit**
+- **NVIDIA NGC account** (free registration at https://ngc.nvidia.com/)
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd <repository-directory>
+
+# Start Vista3D Docker container
+python3 utils/start_vista3d.py
+```
+
+The Docker setup will:
+1. ✅ Check system requirements (Ubuntu, Docker, GPU)
 2. ✅ Verify NVIDIA GPU and drivers
-3. ✅ Install Docker (if not present)
-4. ✅ Install NVIDIA Container Toolkit
-5. ✅ Test NVIDIA Docker integration
-6. ✅ Prompt for NVIDIA NGC credentials
-7. ✅ Create `.env` configuration file
-8. ✅ Login to NVIDIA NGC registry
-9. ✅ Download Vista3D Docker image
-10. ✅ Start Vista3D container
-11. ✅ Verify container health
+3. ✅ Test NVIDIA Docker integration
+4. ✅ Prompt for NVIDIA NGC credentials
+5. ✅ Login to NVIDIA NGC registry
+6. ✅ Download Vista3D Docker image
+7. ✅ Start Vista3D container
+8. ✅ Verify container health
 
-## Prerequisites
+## 🐍 Non-Docker Installation (Alternative)
 
-### System Requirements
+For development or environments where Docker is not available.
+
+### Prerequisites
 - **Ubuntu Linux** (18.04+ recommended)
 - **NVIDIA GPU** with CUDA support
 - **Sudo access** for system package installation
-- **Internet connection** for downloading packages and Docker images
-
-### NVIDIA Requirements
-- **NVIDIA GPU drivers** (automatically installed if missing)
 - **NVIDIA NGC account** (free registration at https://ngc.nvidia.com/)
 
-## Quick Start
+### Quick Start
 
-### 1. Clone the Repository
 ```bash
+# Clone the repository
 git clone <repository-url>
 cd <repository-directory>
-```
 
-### 2. Run Vista3D Setup
-```bash
-python3 setup.py --setup-vista3d
+# Run automated installation
+python3 utils/install.py --setup-vista3d
 ```
 
 ### 3. Follow the Interactive Prompts
