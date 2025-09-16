@@ -4,6 +4,7 @@
   "version": "1.0",
   "colormap_order": [
     "gray",
+    "gray_high_contrast",
     "bone",
     "hot",
     "cool",
@@ -33,6 +34,7 @@
   "categories": {
     "basic": [
       "gray",
+      "gray_high_contrast",
       "bone",
       "hot",
       "cool",

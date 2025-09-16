@@ -241,7 +241,7 @@ def render_viewer(selected_patient: str, selected_file: str):
 def main():
     """Main application entry point."""
     # Set page title
-    st.title("🩻 NiiVue Viewer")
+    st.header("🩻 NiiVue Viewer")
     
     # Render sidebar and get selections
     selected_patient, selected_file = render_sidebar()
