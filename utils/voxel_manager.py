@@ -4,6 +4,9 @@ Handles voxel selection, overlay management, and related logic.
 """
 
 from typing import List, Dict, Optional, Any, Set, Tuple
+import os
+import requests
+from bs4 import BeautifulSoup
 from .config_manager import ConfigManager
 from .data_manager import DataManager
 from .constants import OUTPUT_DIR, SEGMENTS_DIR, VOXELS_DIR
@@ -18,6 +21,64 @@ class VoxelManager:
     def __init__(self, config_manager: ConfigManager, data_manager: DataManager):
         self.config = config_manager
         self.data = data_manager
+
+    def has_voxels_for_patient(self, patient_id: str) -> bool:
+        """
+        Check if there are any voxels available for the given patient.
+        Returns True if voxels exist, False otherwise.
+        """
+        if not patient_id:
+            return False
+        
+        # First try to check via image server
+        try:
+            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+            voxels_folder_url = f"{self.data.image_server_url}/{output_folder}/{patient_id}/voxels/"
+            
+            resp = requests.get(voxels_folder_url, timeout=5)
+            if resp.status_code == 200:
+                # Parse directory listing to see if there are any subdirectories (CT scan folders)
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                voxel_subdirs = []
+                for link in soup.find_all('a'):
+                    href = link.get('href')
+                    if href and not href.startswith('..') and href.endswith('/'):
+                        voxel_subdirs.append(href)
+                
+                # Check if any of the subdirectories contain .nii.gz files
+                for subdir in voxel_subdirs:
+                    subdir_url = f"{voxels_folder_url}{subdir}"
+                    subdir_resp = requests.get(subdir_url, timeout=5)
+                    if subdir_resp.status_code == 200:
+                        subdir_soup = BeautifulSoup(subdir_resp.text, 'html.parser')
+                        for link in subdir_soup.find_all('a'):
+                            href = link.get('href')
+                            if href and href.endswith('.nii.gz') and not href.startswith('..'):
+                                return True
+        except Exception:
+            pass  # Fall through to local filesystem check
+        
+        # Fallback: Check local filesystem
+        try:
+            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+            voxels_folder_path = os.path.join(output_folder, patient_id, 'voxels')
+            
+            if not os.path.exists(voxels_folder_path):
+                return False
+            
+            # Check if there are any subdirectories with .nii.gz files
+            for item in os.listdir(voxels_folder_path):
+                item_path = os.path.join(voxels_folder_path, item)
+                if os.path.isdir(item_path):
+                    # Check if this subdirectory contains .nii.gz files
+                    for file in os.listdir(item_path):
+                        if file.endswith('.nii.gz'):
+                            return True
+            
+            return False
+            
+        except Exception:
+            return False
 
     def get_available_voxels(
         self,

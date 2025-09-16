@@ -92,17 +92,22 @@ def render_sidebar():
                     # Fallback to None if parsing fails
                     pass
 
+        # Check if voxels are available for this patient
+        has_voxels = bool(selected_patient and voxel_manager.has_voxels_for_patient(selected_patient))
+        
         # Render viewer settings with data characteristics
-        viewer_config.render_sidebar_settings(min_val, max_val, mean_val)
+        viewer_config.render_sidebar_settings(min_val, max_val, mean_val, has_voxels)
 
-        # Voxel selection (after show_overlay is set)
-        if viewer_config.settings.get('show_overlay', False):
-            render_voxel_selection(selected_patient, selected_file)
-            # Voxel image settings (after voxel selection)
-            viewer_config.render_voxel_image_settings()
+        # Only show voxel settings if there are voxels available for this patient
+        if has_voxels:
+            # Voxel selection (after show_overlay is set)
+            if viewer_config.settings.get('show_overlay', False):
+                render_voxel_selection(selected_patient, selected_file)
+                # Voxel image settings (after voxel selection)
+                viewer_config.render_voxel_image_settings()
 
-        # Voxel legend
-        viewer_config.render_voxel_legend()
+            # Voxel legend
+            viewer_config.render_voxel_legend()
 
     return selected_patient, selected_file
 

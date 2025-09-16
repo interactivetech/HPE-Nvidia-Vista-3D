@@ -123,7 +123,7 @@ class ViewerConfig:
         self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         self._selected_individual_voxels = getattr(st.session_state, 'selected_individual_voxels', [])
 
-    def render_sidebar_settings(self, min_value: float = None, max_value: float = None, mean_value: float = None):
+    def render_sidebar_settings(self, min_value: float = None, max_value: float = None, mean_value: float = None, has_voxels: bool = False):
         """Render the viewer settings in the sidebar."""
         # Slice type selection
         st.markdown("Select Slice")
@@ -220,8 +220,12 @@ class ViewerConfig:
                 if window_preset != "Custom":
                     self.apply_window_preset(window_preset)
 
-        # Voxel display settings
-        self._settings['show_overlay'] = st.checkbox("Show Voxels", value=self._settings['show_overlay'])
+        # Voxel display settings - only show if voxels are available
+        if has_voxels:
+            self._settings['show_overlay'] = st.checkbox("Show Voxels", value=self._settings['show_overlay'])
+        else:
+            # If no voxels available, ensure show_overlay is False
+            self._settings['show_overlay'] = False
 
     def render_voxel_image_settings(self):
         """Render the voxel image settings in an expander."""
