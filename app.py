@@ -465,7 +465,7 @@ if current_page == 'home':
     _render_hpe_badge()
     # Render NiiVue badge in sidebar
     #_render_niivue_badge()
-    st.title("Vessel Segmentation Viewer")
+    st.markdown('<h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Vessel Segmentation Viewer</h2>', unsafe_allow_html=True)
     
     # Image Data Analysis Section on main page
     if check_image_server_status():

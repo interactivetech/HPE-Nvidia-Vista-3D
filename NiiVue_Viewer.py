@@ -38,27 +38,47 @@ def render_sidebar():
     with st.sidebar:
         # Patient folders are now directly in the output directory
         patient_folders = data_manager.get_server_data('', 'folders', ('',))
+        
+        # Add uploaded files as special "patients"
+        uploaded_patients = []
+        if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
+            for key, file_info in st.session_state.uploaded_files.items():
+                uploaded_patients.append(f"📁 {file_info['name']}")
+        
+        # Combine regular patients and uploaded files
+        all_patients = patient_folders + uploaded_patients
         # Add None option at the beginning
-        patient_options = [None] + patient_folders
+        patient_options = [None] + all_patients
         selected_patient = st.selectbox("Select Patient", patient_options, index=0)
 
         selected_file = None
+        is_uploaded_file = False
+        
         if selected_patient:
-            filenames = data_manager.get_server_data(f"{selected_patient}/nifti", 'files', IMAGE_EXTENSIONS)
+            # Check if this is an uploaded file
+            if selected_patient.startswith("📁 "):
+                # This is an uploaded file
+                uploaded_filename = selected_patient[2:]  # Remove the 📁 prefix
+                selected_file = uploaded_filename
+                is_uploaded_file = True
+                st.info(f"Viewing uploaded file: {uploaded_filename}")
+            else:
+                # Regular patient folder
+                filenames = data_manager.get_server_data(f"{selected_patient}/nifti", 'files', IMAGE_EXTENSIONS)
 
-            # Create display names without .nii.gz extensions
-            if filenames:
-                display_names = [
-                    filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                    for filename in filenames
-                ]
-                # Add None option at the beginning
-                scan_options = [None] + display_names
-                selected_display_name = st.selectbox("Select Scan", scan_options, index=0)
-                # Map back to the actual filename
-                if selected_display_name:
-                    selected_index = display_names.index(selected_display_name)
-                    selected_file = filenames[selected_index]
+                # Create display names without .nii.gz extensions
+                if filenames:
+                    display_names = [
+                        filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+                        for filename in filenames
+                    ]
+                    # Add None option at the beginning
+                    scan_options = [None] + display_names
+                    selected_display_name = st.selectbox("Select Scan", scan_options, index=0)
+                    # Map back to the actual filename
+                    if selected_display_name:
+                        selected_index = display_names.index(selected_display_name)
+                        selected_file = filenames[selected_index]
 
         # Update viewer config with selections
         viewer_config.selected_patient = selected_patient
@@ -108,6 +128,9 @@ def render_sidebar():
 
             # Voxel legend
             viewer_config.render_voxel_legend()
+
+        # File upload section at the bottom of sidebar
+        render_file_upload()
 
     return selected_patient, selected_file
 
@@ -168,6 +191,75 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
         st.info(status_message)
 
 
+def render_file_upload():
+    """Render the file upload interface at the bottom of the sidebar."""
+    st.divider()
+    st.subheader("📁 Upload NIfTI File")
+    
+    # File upload widget
+    uploaded_file = st.file_uploader(
+        "Choose a .nii.gz file",
+        type=['nii.gz', 'nii'],
+        help="Upload a NIfTI file to view it in the 3D viewer"
+    )
+    
+    if uploaded_file is not None:
+        # Initialize session state for uploaded files if not exists
+        if 'uploaded_files' not in st.session_state:
+            st.session_state.uploaded_files = {}
+        
+        # Create a unique key for this upload
+        file_key = f"uploaded_{uploaded_file.name}_{uploaded_file.size}"
+        
+        # Check if this is a new upload
+        if file_key not in st.session_state.uploaded_files:
+            # Save uploaded file to a location accessible by the image server
+            import tempfile
+            import shutil
+            
+            # Create uploads directory in the output folder (accessible by image server)
+            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+            uploads_dir = os.path.join(output_folder, 'uploads')
+            os.makedirs(uploads_dir, exist_ok=True)
+            
+            # Save file to uploads directory within output folder
+            upload_file_path = os.path.join(uploads_dir, uploaded_file.name)
+            with open(upload_file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # Store file info in session state
+            st.session_state.uploaded_files[file_key] = {
+                'name': uploaded_file.name,
+                'path': upload_file_path,
+                'size': uploaded_file.size
+            }
+            
+            st.success(f"✅ Uploaded: {uploaded_file.name}")
+            st.info("The uploaded file is now available in the patient selection dropdown above.")
+        
+        # Display uploaded files
+        if st.session_state.uploaded_files:
+            st.write("**Uploaded Files:**")
+            for key, file_info in st.session_state.uploaded_files.items():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"• {file_info['name']}")
+                with col2:
+                    if st.button("🗑️", key=f"delete_{key}", help="Remove this file"):
+                        # Clean up file
+                        try:
+                            os.remove(file_info['path'])
+                        except FileNotFoundError:
+                            pass
+                        # Remove from session state
+                        del st.session_state.uploaded_files[key]
+                        st.rerun()
+    
+    # Cleanup old uploaded files on app start (optional - keep files for persistence)
+    # Note: We keep uploaded files in the uploads directory for persistence
+    # Users can manually delete them using the delete button
+
+
 # --- Main Application ---
 def render_viewer(selected_patient: str, selected_file: str):
     """Render the main NiiVue viewer."""
@@ -177,15 +269,39 @@ def render_viewer(selected_patient: str, selected_file: str):
 
     # Prepare volume URLs and overlays
     output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-    base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/nifti/{selected_file}"
+    
+    # Check if this is an uploaded file
+    if selected_patient and selected_patient.startswith("📁 "):
+        # For uploaded files, use the temporary file path
+        uploaded_filename = selected_patient[2:]  # Remove the 📁 prefix
+        # Find the file in session state
+        uploaded_file_path = None
+        if 'uploaded_files' in st.session_state:
+            for key, file_info in st.session_state.uploaded_files.items():
+                if file_info['name'] == uploaded_filename:
+                    uploaded_file_path = file_info['path']
+                    break
+        
+        if uploaded_file_path and os.path.exists(uploaded_file_path):
+            # For uploaded files, serve them through the image server
+            # The file is in the output/uploads directory, so we can access it via HTTP
+            base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/uploads/{uploaded_filename}"
+        else:
+            st.error("Uploaded file not found. Please re-upload the file.")
+            return
+    else:
+        # Regular patient file
+        base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/nifti/{selected_file}"
 
-    # Create overlays based on voxel mode
-    overlays = voxel_manager.create_overlays(
-        selected_patient,
-        selected_file,
-        viewer_config.voxel_mode,
-        viewer_config.selected_individual_voxels
-    )
+    # Create overlays based on voxel mode (only for regular patient files, not uploaded files)
+    overlays = []
+    if not (selected_patient and selected_patient.startswith("📁 ")):
+        overlays = voxel_manager.create_overlays(
+            selected_patient,
+            selected_file,
+            viewer_config.voxel_mode,
+            viewer_config.selected_individual_voxels
+        )
 
     # Build volume list for NiiVue
     volume_list_entries = []
