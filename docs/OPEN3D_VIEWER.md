@@ -203,7 +203,7 @@ The viewer seamlessly integrates with the Vista 3D output structure:
 output/
 ├── {PATIENT_ID}/
 │   ├── nifti/          # Source CT data
-│   ├── segments/       # Segmentation results
+│   ├── scans/       # Scan results
 │   ├── ply/           # Generated PLY meshes
 │   │   └── {CT_SCAN}/ # Organized by CT scan
 │   └── voxels/        # Voxel data

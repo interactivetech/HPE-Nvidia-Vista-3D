@@ -100,7 +100,7 @@ Handles rendering of HTML templates with dynamic data injection.
    ├── PATIENT_ID/
    │   ├── nifti/
    │   │   └── scan_files.nii.gz
-   │   ├── segments/
+   │   ├── scans/
    │   │   └── segmentation_files.nii.gz
    │   └── voxels/
    │       └── SCAN_NAME/
@@ -267,7 +267,7 @@ DEFAULT_VIEWER_SETTINGS = {
 - Check image server logs for file serving errors
 
 #### **Overlays Not Displaying**
-- Ensure segments directory exists with corresponding .nii.gz files
+- Ensure scans directory exists with corresponding .nii.gz files
 - Verify voxels directory structure matches the scan name
 - Check Vista3D configuration files for label definitions
 

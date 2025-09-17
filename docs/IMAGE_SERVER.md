@@ -82,7 +82,7 @@ Nvidia-Vista3d-segmenation/
 ├── output/
 │   ├── PA00000002/
 │   │   ├── nifti/              # Original NIFTI images
-│   │   ├── segments/           # Segmentation files
+│   │   ├── scans/           # Scan files
 │   │   └── voxels/             # Voxel data files
 │   └── [other patient directories]
 ├── assets/
@@ -166,16 +166,16 @@ IMAGE_SERVER="http://203.0.113.1:8888"
 ## 🏥 Medical Imaging API Endpoints
 
 ### **Segmentation Filtering**
-- **`GET /filtered-segments/{patient_id}/{filename}?label_ids=1,2,3`**
+- **`GET /filtered-scans/{patient_id}/{filename}?label_ids=1,2,3`**
   - Filter segmentation files to include only specified label IDs
   - Returns filtered NIFTI file with only selected anatomical structures
-  - Example: `/filtered-segments/PA00000002/segmentation.nii.gz?label_ids=1,5,10`
+  - Example: `/filtered-scans/PA00000002/segmentation.nii.gz?label_ids=1,5,10`
 
 ### **Voxel Data Filtering**
-- **`GET /filtered-segments/{patient_id}/voxels/{filename}?label_ids=1,2,3`**
+- **`GET /filtered-scans/{patient_id}/voxels/{filename}?label_ids=1,2,3`**
   - Filter voxel data files by anatomical label IDs
   - Returns filtered voxel data for specific structures
-  - Example: `/filtered-segments/PA00000002/voxels/data.nii.gz?label_ids=1,5,10`
+  - Example: `/filtered-scans/PA00000002/voxels/data.nii.gz?label_ids=1,5,10`
 
 ### **Label Metadata**
 - **`GET /output/{patient_id}/voxels/{filename}/labels`**
@@ -248,13 +248,13 @@ curl "http://localhost:8888/output/PA00000002/voxels/data.nii.gz/labels"
 
 #### Filter Segmentation by Label IDs
 ```bash
-curl "http://localhost:8888/filtered-segments/PA00000002/segmentation.nii.gz?label_ids=1,5,10" -o filtered.nii.gz
+curl "http://localhost:8888/filtered-scans/PA00000002/segmentation.nii.gz?label_ids=1,5,10" -o filtered.nii.gz
 # Downloads segmentation with only labels 1, 5, and 10
 ```
 
 #### Filter Voxel Data
 ```bash
-curl "http://localhost:8888/filtered-segments/PA00000002/voxels/data.nii.gz?label_ids=1,5" -o filtered_voxels.nii.gz
+curl "http://localhost:8888/filtered-scans/PA00000002/voxels/data.nii.gz?label_ids=1,5" -o filtered_voxels.nii.gz
 # Downloads voxel data with only labels 1 and 5
 ```
 
@@ -296,7 +296,7 @@ The Medical Imaging Server is now ready for production use:
 ## 🚨 Important Notes
 
 - **Port 8888** is configured as default (matches .env configuration)
-- **Patient data structure** follows `output/{patient_id}/{nifti,segments,voxels}/` organization
+- **Patient data structure** follows `output/{patient_id}/{nifti,scans,voxels}/` organization
 - **Label filtering** requires valid label IDs from Vista3D configuration
 
 ---
@@ -391,7 +391,7 @@ chmod +x utils/image_server.py
 
 If segmentation filtering isn't working:
 - Check that patient directory exists in `output/{patient_id}/`
-- Verify segmentation files are in `output/{patient_id}/segments/`
+- Verify scan files are in `output/{patient_id}/scans/`
 - Ensure label IDs are valid (check with `/labels` endpoint)
 
 ## Dependencies
@@ -424,7 +424,7 @@ python utils/image_server.py
 
 # Vista3D can then access:
 # - Original NIFTI files: http://localhost:8888/output/{patient_id}/nifti/
-# - Filtered segments: http://localhost:8888/filtered-segments/{patient_id}/{file}?label_ids=1,2,3
+# - Filtered scans: http://localhost:8888/filtered-scans/{patient_id}/{file}?label_ids=1,2,3
 # - Label metadata: http://localhost:8888/output/{patient_id}/voxels/{file}/labels
 ```
 

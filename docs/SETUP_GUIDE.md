@@ -239,7 +239,7 @@ Nvidia-Vista3d-segmenation/
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
 ├── output/               # Generated files
 │   ├── nifti/           # Converted NIFTI files
-│   ├── segments/        # Segmentation results
+│   ├── scans/        # Scan results
 │   └── voxels/          # Voxel data
 ├── utils/               # Utility scripts
 │   ├── dicom2nifti.py   # DICOM to NIFTI conversion

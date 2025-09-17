@@ -16,7 +16,7 @@ IMAGE_EXTENSIONS = NIFTI_EXTENSIONS + DICOM_EXTENSIONS
 
 # Directory structure - get from environment variables
 OUTPUT_DIR = os.getenv('OUTPUT_FOLDER', 'output')
-SEGMENTS_DIR = "segments"
+SCANS_DIR = "scans"
 VOXELS_DIR = "voxels"
 NIFTI_DIR = "nifti"
 

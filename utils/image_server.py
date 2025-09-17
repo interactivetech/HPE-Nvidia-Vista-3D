@@ -115,8 +115,8 @@ async def health_check():
     """Health check endpoint for Docker"""
     return {"status": "healthy", "service": "image-server"}
 
-@app.get("/filtered-segments/{patient_id}/{filename}")
-async def get_filtered_segments(
+@app.get("/filtered-scans/{patient_id}/{filename}")
+async def get_filtered_scans(
     patient_id: str, 
     filename: str, 
     label_ids: str = Query(..., description="Comma-separated list of label IDs to include")
@@ -127,13 +127,13 @@ async def get_filtered_segments(
         label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
         
         # Construct path to original segmentation file
-        segment_path = project_root / output_folder / "segments" / patient_id / filename
+        scan_path = project_root / output_folder / "scans" / patient_id / filename
         
-        if not segment_path.exists():
-            raise HTTPException(status_code=404, detail=f"Segmentation file not found: {filename}")
+        if not scan_path.exists():
+            raise HTTPException(status_code=404, detail=f"Scan file not found: {filename}")
         
         # Load the NIfTI file
-        nifti_img = nib.load(str(segment_path))
+        nifti_img = nib.load(str(scan_path))
         data = nifti_img.get_fdata()
         
         # Create filtered data - only keep voxels with selected label IDs
@@ -168,7 +168,7 @@ async def get_filtered_segments(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error filtering segmentation: {str(e)}")
 
-@app.get("/filtered-segments/{patient_id}/voxels/{filename}")
+@app.get("/filtered-scans/{patient_id}/voxels/{filename}")
 async def get_filtered_voxels(
     patient_id: str, 
     filename: str, 

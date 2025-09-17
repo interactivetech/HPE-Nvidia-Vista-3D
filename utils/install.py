@@ -73,7 +73,7 @@ class InstallManager:
         print("This platform processes medical imaging data through the following workflow:")
         print("  1. 📁 DICOM files → Raw medical imaging data from scanners")
         print("  2. 🔄 Conversion → DICOM to NIfTI format for processing")
-        print("  3. 🧠 Segmentation → Vista3D AI analyzes and segments structures")
+        print("  3. 🧠 Scanning → Vista3D AI analyzes and scans structures")
         print("  4. 🌐 Visualization → Web interface for viewing results")
         print("  5. 📊 Analysis → Interactive exploration of segmented data")
         

@@ -185,9 +185,9 @@ def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:
         voxel_files = patient.get('voxel_files', 0)
         ply_files = patient.get('ply_files', 0)
         
-        # Calculate segments - this is the number of individual voxel files per patient
-        # In the current data structure, segments are represented by voxel files
-        segments = voxel_files
+        # Calculate scans - this is the number of individual voxel files per patient
+        # In the current data structure, scans are represented by voxel files
+        scans = voxel_files
         
         # Extract size information from data_size string (e.g., "123.4 MB")
         data_size_str = patient.get('data_size', 'Unknown')
@@ -212,7 +212,7 @@ def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:
         chart_data.append({
             'Patient': patient_id,
             'CT Scans': ct_scans,
-            'Segments': segments,
+            'Scans': scans,
             'Voxels': voxel_files,  # Using voxel_files as the voxel count
             'PLY Files': ply_files,
             'Size (MB)': size_mb,
@@ -238,7 +238,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
         chart_df = pd.melt(
             df, 
             id_vars=['Patient'], 
-            value_vars=['CT Scans', 'Segments', 'Voxels', 'PLY Files'],
+            value_vars=['CT Scans', 'Scans', 'Voxels', 'PLY Files'],
             var_name='Data Type', 
             value_name='Count'
         )
@@ -254,11 +254,11 @@ def render_patient_data_chart(patients_data: List[Dict]):
             x='Patient', 
             y='Count', 
             color='Data Type',
-            title='Patient File Counts - CT Scans, Segments, Voxels, and PLY Files',
+            title='Patient File Counts - CT Scans, Scans, Voxels, and PLY Files',
             labels={'Count': 'Number of Files', 'Patient': 'Patient ID'},
             color_discrete_map={
                 'CT Scans': '#1f77b4',
-                'Segments': '#ff7f0e', 
+                'Scans': '#ff7f0e', 
                 'Voxels': '#2ca02c',
                 'PLY Files': '#d62728'
             },
@@ -305,7 +305,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
         chart_df = pd.melt(
             df, 
             id_vars=['Patient'], 
-            value_vars=['CT Scans', 'Segments', 'Voxels', 'PLY Files'],
+            value_vars=['CT Scans', 'Scans', 'Voxels', 'PLY Files'],
             var_name='Data Type', 
             value_name='Count'
         )
@@ -316,7 +316,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
             lambda x: '<br>'.join(x) if x else 'No scan data'
         )
         
-        for data_type in ['CT Scans', 'Segments', 'Voxels', 'PLY Files']:
+        for data_type in ['CT Scans', 'Scans', 'Voxels', 'PLY Files']:
             data_subset = chart_df_with_scans[chart_df_with_scans['Data Type'] == data_type]
             fig.add_trace(
                 go.Bar(
@@ -325,7 +325,7 @@ def render_patient_data_chart(patients_data: List[Dict]):
                     name=data_type,
                     marker_color={
                         'CT Scans': '#1f77b4',
-                        'Segments': '#ff7f0e', 
+                        'Scans': '#ff7f0e', 
                         'Voxels': '#2ca02c',
                         'PLY Files': '#d62728'
                     }[data_type],

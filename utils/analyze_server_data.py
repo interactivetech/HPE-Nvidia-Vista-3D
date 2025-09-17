@@ -5,15 +5,15 @@ Supports both old and new folder structures. Analyzes all folders in the output 
 
 CURRENT STRUCTURE:
 - output/{folder_name}/nifti/         (CT scan files)
-- output/{folder_name}/segments/      (full segmentation files)
+- output/{folder_name}/scans/      (full scan files)
 - output/{folder_name}/voxels/{ct_scan_name}/  (individual voxel files)
 - output/{folder_name}/mesh/{ct_scan_name}/    (STL mesh files)
 
 OLD STRUCTURE (legacy):
 - output/nifti/{folder_name}/         (CT scan files)
-- output/segments/{folder_name}/      (segmentation files)
-- output/segments/{folder_name}/voxels/  (voxel files)
-- output/segments/{folder_name}/mesh/    (STL mesh files)
+- output/scans/{folder_name}/      (scan files)
+- output/scans/{folder_name}/voxels/  (voxel files)
+- output/scans/{folder_name}/mesh/    (STL mesh files)
 
 Usage:
     python utils/analyze_server_data.py
@@ -237,10 +237,10 @@ def get_ct_scan_files(patient_folder_contents: List[Dict[str, str]]) -> List[Dic
             })
     return ct_scans
 
-def get_voxel_files(segments_folder_contents: List[Dict[str, str]]) -> List[Dict[str, any]]:
-    """Extract voxel files from segments folder contents with size info."""
+def get_voxel_files(scans_folder_contents: List[Dict[str, str]]) -> List[Dict[str, any]]:
+    """Extract voxel files from scans folder contents with size info."""
     voxel_files = []
-    for item in segments_folder_contents:
+    for item in scans_folder_contents:
         if not item['is_directory'] and item['name'].endswith('.nii.gz'):
             voxel_files.append({
                 'name': item['name'],
@@ -282,14 +282,14 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     # Determine folder paths based on structure
     if use_old_structure:
         nifti_folder_path = f"nifti/{patient_id}"
-        segments_folder_path = f"segments/{patient_id}"
-        voxel_folder_path = f"segments/{patient_id}/voxels"
-        mesh_folder_path = f"segments/{patient_id}/mesh"
-        ply_folder_path = f"segments/{patient_id}/ply"
+        scans_folder_path = f"scans/{patient_id}"
+        voxel_folder_path = f"scans/{patient_id}/voxels"
+        mesh_folder_path = f"scans/{patient_id}/mesh"
+        ply_folder_path = f"scans/{patient_id}/ply"
         structure_type = "old"
     else:
         nifti_folder_path = f"{patient_id}/nifti"
-        segments_folder_path = f"{patient_id}/segments"
+        scans_folder_path = f"{patient_id}/scans"
         voxel_folder_path = f"{patient_id}/voxels"
         mesh_folder_path = f"{patient_id}/mesh"
         ply_folder_path = f"{patient_id}/ply"
@@ -326,8 +326,8 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     # Calculate total CT scan size
     total_ct_size_bytes = sum(scan.get('size_bytes', 0) for scan in ct_scans)
     
-    # Get segments folder contents for this patient
-    segments_contents = get_folder_contents(base_url, segments_folder_path)
+    # Get scans folder contents for this patient
+    scans_contents = get_folder_contents(base_url, scans_folder_path)
     
     voxel_data = {}
     total_voxel_files = 0
@@ -354,13 +354,13 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     # Get PLY folder contents (same structure as voxels and mesh)
     ply_folder_contents = get_folder_contents(base_url, ply_folder_path)
     
-    if segments_contents:
+    if scans_contents:
         # For each CT scan, check for corresponding voxel data
         for ct_scan_info in ct_scans:
             ct_scan_name = ct_scan_info['name']
             
             # Check for direct voxel file (segmentation result)
-            voxel_files = get_voxel_files(segments_contents)
+            voxel_files = get_voxel_files(scans_contents)
             voxel_file_names = [vf['name'] for vf in voxel_files]
             has_voxel_file = ct_scan_name in voxel_file_names
             
@@ -698,7 +698,7 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     report_lines.append("│   │   ├── 1.25_mm_4.nii.gz")
     report_lines.append("│   │   ├── 1.25_mm_4.json")
     report_lines.append("│   │   └── 2.5_mm_STD_-_30%_ASIR_2.nii.gz")
-    report_lines.append("│   ├── segments/")
+    report_lines.append("│   ├── scans/")
     report_lines.append("│   │   ├── 1.25_mm_4.nii.gz  (full segmentation)")
     report_lines.append("│   │   └── 2.5_mm_STD_-_30%_ASIR_2.nii.gz")
     report_lines.append("│   ├── voxels/")
@@ -728,7 +728,7 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     report_lines.append("OLD STRUCTURE (still supported):")
     report_lines.append("output/")
     report_lines.append("├── nifti/PA00000002/")
-    report_lines.append("├── segments/PA00000002/")
+    report_lines.append("├── scans/PA00000002/")
     report_lines.append("│   ├── voxels/")
     report_lines.append("│   ├── mesh/")
     report_lines.append("│   └── ply/")

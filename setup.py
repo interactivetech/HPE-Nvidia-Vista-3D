@@ -73,7 +73,7 @@ class SetupManager:
         print("This platform processes medical imaging data through the following workflow:")
         print("  1. 📁 DICOM files → Raw medical imaging data from scanners")
         print("  2. 🔄 Conversion → DICOM to NIfTI format for processing")
-        print("  3. 🧠 Segmentation → Vista3D AI analyzes and segments structures")
+        print("  3. 🧠 Scanning → Vista3D AI analyzes and scans structures")
         print("  4. 🌐 Visualization → Web interface for viewing results")
         print("  5. 📊 Analysis → Interactive exploration of segmented data")
         
@@ -1010,7 +1010,7 @@ class SetupManager:
                 project_root / config['DICOM_FOLDER'],
                 project_root / config['OUTPUT_FOLDER'],
                 project_root / config['OUTPUT_FOLDER'] / 'nifti',
-                project_root / config['OUTPUT_FOLDER'] / 'segments',
+                project_root / config['OUTPUT_FOLDER'] / 'scans',
                 project_root / config['OUTPUT_FOLDER'] / 'voxels'
             ]
             

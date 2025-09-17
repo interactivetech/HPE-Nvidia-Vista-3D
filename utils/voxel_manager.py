@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 from .config_manager import ConfigManager
 from .data_manager import DataManager
-from .constants import OUTPUT_DIR, SEGMENTS_DIR, VOXELS_DIR
+from .constants import OUTPUT_DIR, SCANS_DIR, VOXELS_DIR
 
 
 class VoxelManager:
@@ -138,7 +138,7 @@ class VoxelManager:
             overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{SEGMENTS_DIR}/{filename}",
+                'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{SCANS_DIR}/{filename}",
                 'is_all_segmentation': True
             }]
 
@@ -168,7 +168,7 @@ class VoxelManager:
             overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{SEGMENTS_DIR}/{filename}",
+                'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{SCANS_DIR}/{filename}",
                 'is_all_segmentation': True
             }]
 

@@ -259,7 +259,7 @@ class Vista3DManager:
         """Create the local output directory if it doesn't exist"""
         self.local_outputs_path.mkdir(parents=True, exist_ok=True)
         self.local_images_path.mkdir(parents=True, exist_ok=True)
-        (self.local_outputs_path / "segments").mkdir(parents=True, exist_ok=True)
+        (self.local_outputs_path / "scans").mkdir(parents=True, exist_ok=True)
         
         logger.info(f"✅ Output directory created: {self.local_outputs_path}")
     
