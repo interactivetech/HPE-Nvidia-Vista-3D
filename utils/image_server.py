@@ -23,8 +23,22 @@ project_root = Path(__file__).parent.parent
 # Load environment variables
 load_dotenv()
 
-# Get output folder from environment variable
-output_folder = os.getenv('OUTPUT_FOLDER', 'output')
+# Get folder paths from environment variables and resolve relative paths
+def resolve_folder_path(env_var_name: str, default_path: str) -> str:
+    """Resolve folder path from environment variable, handling relative paths."""
+    folder_path = os.getenv(env_var_name, default_path)
+    
+    # If it's a relative path, make it relative to project root
+    if not os.path.isabs(folder_path):
+        # Resolve relative to project root
+        resolved_path = (project_root / folder_path).resolve()
+        return str(resolved_path)
+    else:
+        # It's already an absolute path
+        return folder_path
+
+output_folder = resolve_folder_path('OUTPUT_FOLDER', 'output')
+dicom_folder = resolve_folder_path('DICOM_FOLDER', 'dicom')
 
 
 def get_server_config():
@@ -37,6 +51,60 @@ def get_server_config():
     port = parsed.port or 8888
     
     return host, port
+
+def load_image_server_config():
+    """Load image server configuration from JSON file."""
+    config_path = project_root / "conf" / "image_server_conf.json"
+    
+    # Default configuration with resolved absolute paths
+    default_config = {
+        "viewable_folders": [
+            {
+                "name": "dicom",
+                "path": dicom_folder,  # This is now an absolute path
+                "url_path": "dicom",   # URL path for web access
+                "description": "DICOM medical imaging files",
+                "icon": "📁"
+            },
+            {
+                "name": "output",
+                "path": output_folder,  # This is now an absolute path
+                "url_path": "output",   # URL path for web access
+                "description": "Processed medical imaging output files", 
+                "icon": "📁"
+            }
+        ],
+        "server_settings": {
+            "title": "Medical Imaging Server",
+            "description": "HTTP server for medical imaging files with directory browsing",
+            "show_file_sizes": True,
+            "show_hidden_files": False
+        }
+    }
+    
+    try:
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            
+            # Update folder paths from environment variables if they exist
+            for folder in config.get("viewable_folders", []):
+                if folder["name"] == "dicom":
+                    folder["path"] = dicom_folder
+                    folder["url_path"] = "dicom"  # Ensure URL path is set
+                elif folder["name"] == "output":
+                    folder["path"] = output_folder
+                    folder["url_path"] = "output"  # Ensure URL path is set
+            
+            return config
+        else:
+            return default_config
+    except Exception as e:
+        print(f"Warning: Could not load image server config: {e}")
+        return default_config
+
+# Load configuration
+server_config = load_image_server_config()
 
 def generate_directory_listing(directory_path: Path, request_path: str) -> str:
     """Generate HTML directory listing"""
@@ -105,7 +173,11 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
     return html
 
 # --- FastAPI Application ---
-app = FastAPI(title="Medical Imaging Server", description="HTTP server for medical imaging files with directory browsing")
+server_settings = server_config.get("server_settings", {})
+app = FastAPI(
+    title=server_settings.get("title", "Medical Imaging Server"), 
+    description=server_settings.get("description", "HTTP server for medical imaging files with directory browsing")
+)
 
 # Mount the assets directory to serve static files like niivue.umd.js
 app.mount("/assets", StaticFiles(directory=project_root / "assets"), name="assets")
@@ -295,26 +367,151 @@ async def get_available_voxel_labels(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading voxel labels: {str(e)}")
 
+def is_allowed_directory(path: Path) -> bool:
+    """Check if a directory is within the allowed viewable folders"""
+    try:
+        # Get allowed folder paths from config (these are now absolute paths)
+        allowed_folder_paths = [Path(folder["path"]) for folder in server_config.get("viewable_folders", [])]
+        
+        # Allow root access
+        if path == project_root:
+            return True
+        
+        # Check if the path is within any of the allowed folder paths
+        for allowed_path in allowed_folder_paths:
+            try:
+                # Check if the requested path is within the allowed path
+                path.relative_to(allowed_path)
+                return True
+            except ValueError:
+                # Path is not within this allowed path, continue checking
+                continue
+        
+        # Check if it's a subdirectory of project root and matches URL path
+        try:
+            rel_path = path.relative_to(project_root)
+            path_parts = rel_path.parts
+            
+            if path_parts:
+                # Get allowed URL paths from config
+                allowed_url_paths = [folder["url_path"] for folder in server_config.get("viewable_folders", [])]
+                
+                # Allow configured URL paths and their subdirectories
+                if path_parts[0] in allowed_url_paths:
+                    return True
+        except ValueError:
+            # Path is not relative to project root
+            pass
+            
+        return False
+    except Exception:
+        # Any other error means not allowed
+        return False
+
+def generate_restricted_root_listing() -> HTMLResponse:
+    """Generate HTML listing showing only configured viewable folders"""
+    items = []
+    
+    # Get server settings from config
+    server_settings = server_config.get("server_settings", {})
+    title = server_settings.get("title", "Medical Imaging Server")
+    description = server_settings.get("description", "HTTP server for medical imaging files with directory browsing")
+    
+    # Check each configured folder
+    for folder_config in server_config.get("viewable_folders", []):
+        folder_name = folder_config.get("name", "")
+        folder_path = folder_config.get("path", "")
+        folder_url_path = folder_config.get("url_path", folder_name)
+        folder_description = folder_config.get("description", "")
+        folder_icon = folder_config.get("icon", "📁")
+        
+        # Check if folder exists (folder_path is now absolute)
+        full_path = Path(folder_path)
+        if full_path.exists() and full_path.is_dir():
+            items.append(f'<li><a href="/{folder_url_path}/">{folder_icon} {folder_name}/</a> <span style="color: #666; font-size: 0.8em;">({folder_description})</span></li>')
+    
+    # If no folders exist, show a message
+    if not items:
+        items.append('<li><span style="color: #666;">No accessible folders found</span></li>')
+    
+    items_html = "\n".join(items)
+    
+    # Get folder names for description
+    folder_names = [folder["name"] for folder in server_config.get("viewable_folders", [])]
+    folder_list = ", ".join(folder_names) if folder_names else "none"
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>{title}</title>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
+            h1 {{ color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }}
+            ul {{ list-style: none; padding: 0; }}
+            li {{ margin: 5px 0; }}
+            a {{ text-decoration: none; color: #0066cc; }}
+            a:hover {{ text-decoration: underline; }}
+            .header {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+            .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🏥 {title}</h1>
+            <p>{description}</p>
+            <p>Accessible folders: {folder_list}</p>
+        </div>
+        <ul>
+            {items_html}
+        </ul>
+        <div class="footer">
+            <p>🏥 {title} | FastAPI + Uvicorn</p>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html, status_code=200)
+
 @app.get("/{full_path:path}")
 @app.head("/{full_path:path}")
 async def serve_files(request: Request, full_path: str):
     """Serve files and directory listings with proper range request support"""
     
-    # Handle root path
-    if full_path == "":
-        full_path = "."
+    # Handle root path - only show configured folders
+    if full_path == "" or full_path == ".":
+        return generate_restricted_root_listing()
     
-    # Construct absolute path
-    absolute_path = project_root / full_path
+    # Map URL path to actual folder path
+    def map_url_to_actual_path(url_path: str) -> Path:
+        """Map URL path to actual file system path"""
+        # Check if this is a configured folder URL path
+        for folder_config in server_config.get("viewable_folders", []):
+            folder_url_path = folder_config.get("url_path", folder_config.get("name", ""))
+            if url_path.startswith(folder_url_path + "/") or url_path == folder_url_path:
+                # Replace the URL path with the actual folder path
+                actual_folder_path = Path(folder_config.get("path", ""))
+                if url_path == folder_url_path:
+                    return actual_folder_path
+                else:
+                    # Get the subpath after the folder name
+                    subpath = url_path[len(folder_url_path):].lstrip("/")
+                    return actual_folder_path / subpath
+        
+        # If not a configured folder, treat as relative to project root
+        return project_root / url_path
     
-    # Security check - ensure path is within project root
+    # Map URL path to actual path
+    absolute_path = map_url_to_actual_path(full_path)
+    
+    # Security check - ensure path is within allowed directories
     try:
         absolute_path = absolute_path.resolve()
-        project_root_resolved = project_root.resolve()
         
-        # Check if the resolved path is within project root
-        if not str(absolute_path).startswith(str(project_root_resolved)):
-            raise HTTPException(status_code=403, detail="Access denied")
+        # Check if this is an allowed directory or subdirectory
+        if not is_allowed_directory(absolute_path):
+            raise HTTPException(status_code=403, detail="Access denied - only configured folders are accessible")
     except Exception:
         raise HTTPException(status_code=404, detail="Not found")
     

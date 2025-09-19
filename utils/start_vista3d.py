@@ -27,13 +27,10 @@ except ImportError:
 
 # Configure logging
 project_root = Path(__file__).resolve().parent.parent
-log_dir = project_root / 'output' / 'logs'
-log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_dir / 'start_vista.log'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -150,7 +147,9 @@ class Vista3DManager:
 
     def _setup_paths(self):
         """Setup paths from environment variables or use defaults."""
-        project_root = os.getenv('PROJECT_ROOT', str(self.project_root))
+        # Import PROJECT_ROOT from constants - it's auto-detected
+        from utils.constants import PROJECT_ROOT
+        project_root = os.getenv('PROJECT_ROOT', str(PROJECT_ROOT))
         output_folder = os.getenv('OUTPUT_FOLDER', 'output')
         self.local_outputs_path = Path(project_root) / output_folder
         self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/output")

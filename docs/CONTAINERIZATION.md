@@ -148,7 +148,6 @@ The following directories are mounted as volumes:
 
 - `./output:/app/output` - Output files and results
 - `./dicom:/app/dicom` - DICOM input files
-- `./logs:/app/logs` - Application logs
 - `./.env:/app/.env` - Environment configuration
 
 ## 🐳 Docker Services
@@ -387,7 +386,7 @@ lsof -i :8000
 #### 3. Permission Issues
 ```bash
 # Fix directory permissions
-sudo chown -R $USER:$USER output/ dicom/ logs/
+sudo chown -R $USER:$USER output/ dicom/
 
 # Check Docker permissions
 docker ps
@@ -467,7 +466,6 @@ All services include built-in health checks:
 - **Start Period**: 20-40 seconds
 
 ### Logging
-- Application logs: `./logs/`
 - Docker logs: `docker-compose logs`
 - Health check logs: Available in Docker logs
 
@@ -545,6 +543,6 @@ When reporting issues, collect:
 ### For issues related to:
 
 - **Docker**: Check Docker logs and documentation
-- **Application**: Check application logs in `logs/` directory
+- **Application**: Check Docker logs for application issues
 - **NVIDIA Vista3D**: Refer to NVIDIA documentation
 - **HPE Infrastructure**: Contact HPE support

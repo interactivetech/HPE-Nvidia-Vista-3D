@@ -48,13 +48,11 @@ from plyfile import PlyData, PlyElement
 
 
 def load_environment():
-    """Load environment variables from .env file"""
+    """Load environment variables from .env file and get project root"""
     load_dotenv()
-    project_root = os.getenv('PROJECT_ROOT')
-    if not project_root:
-        raise ValueError("PROJECT_ROOT not found in .env file")
-    
-    return project_root
+    # Import PROJECT_ROOT from constants - it's auto-detected
+    from utils.constants import PROJECT_ROOT
+    return str(PROJECT_ROOT)
 
 
 def check_voxels_folders_exist(output_path: Path) -> bool:

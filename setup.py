@@ -610,12 +610,12 @@ class SetupManager:
         
         config = {}
         
-        # Project root - automatically set to current project path
+        # Project root - automatically detected (no longer needs configuration)
         print("\n📍 Setting up project paths...")
-        config['PROJECT_ROOT'] = str(self.project_root.absolute())
         print(f"✅ Project root automatically detected:")
-        print(f"   Path: {config['PROJECT_ROOT']}")
+        print(f"   Path: {self.project_root.absolute()}")
         print("   This is where all Vista3D files and data will be stored")
+        print("   Note: PROJECT_ROOT is now auto-detected and no longer needs to be configured")
         
         # DICOM folder
         print("\n📍 Configuring DICOM input folder...")
@@ -632,7 +632,7 @@ class SetupManager:
             "DICOM folder name (relative to project root)",
             default="dicom"
         )
-        dicom_path = Path(config['PROJECT_ROOT']) / config['DICOM_FOLDER']
+        dicom_path = self.project_root / config['DICOM_FOLDER']
         print(f"✅ DICOM files will be stored in: {dicom_path}")
         print(f"   After adding DICOM files, convert them with: python utils/dicom2nifti.py")
         
@@ -642,13 +642,12 @@ class SetupManager:
         print("     • NIfTI converted files")
         print("     • Segmentation results")
         print("     • 3D visualization data")
-        print("     • Analysis logs")
         
         config['OUTPUT_FOLDER'] = self._prompt_user(
             "Output folder name (relative to project root)",
             default="output"
         )
-        output_path = Path(config['PROJECT_ROOT']) / config['OUTPUT_FOLDER']
+        output_path = self.project_root / config['OUTPUT_FOLDER']
         print(f"✅ Processed results will be stored in: {output_path}")
         
         # Image server configuration
@@ -783,7 +782,7 @@ class SetupManager:
         # Configuration summary
         print("\n" + "-"*60)
         print("📋 CONFIGURATION SUMMARY:")
-        print(f"   Project Root: {config['PROJECT_ROOT']}")
+        print(f"   Project Root: {self.project_root.absolute()}")
         print(f"   DICOM Input: {config['DICOM_FOLDER']}/")
         print(f"   Output Folder: {config['OUTPUT_FOLDER']}/")
         print(f"   Image Server: {config['IMAGE_SERVER']}")
@@ -1003,7 +1002,7 @@ class SetupManager:
         logger.info("📁 Creating required directories...")
         
         try:
-            project_root = Path(config['PROJECT_ROOT'])
+            project_root = self.project_root
             
             # Create directories
             directories = [
@@ -1575,7 +1574,7 @@ class SetupManager:
             print("   source .venv/bin/activate")
         
         # 1. DICOM files
-        dicom_folder = Path(config['PROJECT_ROOT']) / config['DICOM_FOLDER']
+        dicom_folder = self.project_root / config['DICOM_FOLDER']
         print(f"\n1. 📁 Add DICOM files to: {dicom_folder}")
         print("   • Place each patient's DICOM series in separate folders")
         print("   • Example: dicom/patient001/, dicom/patient002/")
@@ -1714,7 +1713,7 @@ class SetupManager:
         return env_content
 
     def check_existing_env(self) -> bool:
-        """Check if .env file already exists and update PROJECT_ROOT and NGC_API_KEY"""
+        """Check if .env file already exists and update NGC_API_KEY (PROJECT_ROOT no longer needed)"""
         if self.env_file.exists():
             logger.info("📄 Found existing .env file")
             
@@ -1725,24 +1724,19 @@ class SetupManager:
                 
                 updated = False
                 
-                # Check if PROJECT_ROOT is already set correctly
-                current_project_root = str(self.project_root.absolute())
-                if f'PROJECT_ROOT="{current_project_root}"' not in env_content:
-                    # Update PROJECT_ROOT in .env file
-                    logger.info("🔄 Updating PROJECT_ROOT in existing .env file...")
-                    
-                    # Replace PROJECT_ROOT line
-                    lines = env_content.split('\n')
-                    for i, line in enumerate(lines):
-                        if line.startswith('PROJECT_ROOT='):
-                            lines[i] = f'PROJECT_ROOT="{current_project_root}"'
-                            break
-                    
-                    env_content = '\n'.join(lines)
-                    updated = True
-                    logger.info(f"✅ Updated PROJECT_ROOT to: {current_project_root}")
-                else:
-                    logger.info("✅ PROJECT_ROOT is already set correctly")
+                # Remove PROJECT_ROOT line if it exists (no longer needed)
+                lines = env_content.split('\n')
+                new_lines = []
+                for line in lines:
+                    if not line.startswith('PROJECT_ROOT='):
+                        new_lines.append(line)
+                    else:
+                        updated = True
+                        logger.info("🔄 Removing PROJECT_ROOT from .env file (now auto-detected)")
+                
+                if updated:
+                    env_content = '\n'.join(new_lines)
+                    logger.info("✅ PROJECT_ROOT is now auto-detected and no longer needed in .env")
                 
                 # Check for NGC credentials
                 env_content = self.check_and_add_ngc_credentials(env_content)
@@ -1769,11 +1763,12 @@ class SetupManager:
             # Check for previous setup progress
             self._check_previous_run()
             
-            # Step 1: Check for existing .env file and update PROJECT_ROOT
+            # Step 1: Check for existing .env file and update configuration
             if not self.setup_state.get('env_file_created'):
                 if self.check_existing_env():
                     self._save_setup_state('env_file_created')
-                    print("\n🎉 Setup complete! Your .env file has been updated with the correct PROJECT_ROOT.")
+                    print("\n🎉 Setup complete! Your .env file has been updated.")
+                    print("PROJECT_ROOT is now auto-detected and no longer needs configuration.")
                     print("You can now proceed with:")
                     print("  • python utils/start_vista3d.py")
                     print("  • python utils/image_server.py")

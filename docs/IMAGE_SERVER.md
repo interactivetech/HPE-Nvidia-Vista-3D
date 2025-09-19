@@ -27,7 +27,7 @@ A production-ready medical imaging server with the following features:
 
 ### **Environment Variable Integration**
 - Automatically reads from `.env` file
-- Uses `PROJECT_ROOT` and `IMAGE_SERVER` configuration
+- Uses auto-detected project root and `IMAGE_SERVER` configuration
 - Configurable host and port (default: localhost:8888)
 
 ### **Advanced Medical Imaging Support**
@@ -100,7 +100,7 @@ Nvidia-Vista3d-segmenation/
 
 ### **Environment Variables (.env)**
 ```bash
-PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
+# PROJECT_ROOT is now auto-detected
 IMAGE_SERVER="http://localhost:8888"
 
 # Note: External image server variable is deprecated. Use IMAGE_SERVER.
@@ -108,7 +108,7 @@ IMAGE_SERVER="http://localhost:8888"
 # Remote Vista3D server URL
 VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
 
-# Output folder (relative to PROJECT_ROOT)
+# Output folder (relative to project root)
 OUTPUT_FOLDER="output"
 
 # Vessels of interest for segmentation
@@ -340,11 +340,11 @@ python utils/image_server.py --disable-dir-listing
 The server reads configuration from the `.env` file:
 
 ```env
-PROJECT_ROOT="/home/hpadmin/Nvidia-Vista3d-segmenation"
+# PROJECT_ROOT is now auto-detected
 IMAGE_SERVER="http://localhost:8888"
 ```
 
-- `PROJECT_ROOT`: Base directory for file serving (with security restrictions)
+- Project root is automatically detected from the script location
 - `IMAGE_SERVER`: Default host and port for the server
 
 ## Security Notes
@@ -354,7 +354,7 @@ IMAGE_SERVER="http://localhost:8888"
 ## File Access
 
 The server serves files from the project root with security restrictions:
-- **Document Root**: Project root directory (from `PROJECT_ROOT` env var)
+- **Document Root**: Project root directory (auto-detected)
 - **File Types**: All file types supported
 - **Directory Listing**: Enabled by default (can be disabled with `--disable-dir-listing`)
 - **Security**: Path traversal protection prevents access outside project root

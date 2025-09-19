@@ -203,8 +203,7 @@ nano .env
 
 **Key configuration options in `.env`:**
 ```bash
-# Project paths
-PROJECT_ROOT="/path/to/your/project"
+# Project paths (PROJECT_ROOT is now auto-detected)
 DICOM_FOLDER="dicom"
 OUTPUT_FOLDER="output"
 

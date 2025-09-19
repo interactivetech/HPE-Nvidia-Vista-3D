@@ -17,9 +17,8 @@ services:
       - HPE_CLUSTER_ENDPOINT=${HPE_CLUSTER_ENDPOINT}
       - HPE_API_KEY=${HPE_API_KEY}
     volumes:
-      - ./output:/app/output
-      - ./logs:/app/logs
-      - ./dicom:/app/dicom
+      - ${OUTPUT_FOLDER}:/app/output
+      - ${DICOM_FOLDER}:/app/dicom
       - ./.env:/app/.env
     networks:
       - local-network
@@ -43,12 +42,11 @@ services:
     environment:
       - VISTA3D_SERVER=${VISTA3D_SERVER:-http://vista3d-server:8000}
       - VISTA3D_API_KEY=${VISTA3D_API_KEY}
-      - OUTPUT_DIR=/app/output
-      - DICOM_DIR=/app/dicom
+      - OUTPUT_FOLDER=/app/output
+      - DICOM_FOLDER=/app/dicom
     volumes:
-      - ./output:/app/output
-      - ./dicom:/app/dicom
-      - ./logs:/app/logs
+      - ${OUTPUT_FOLDER}:/app/output
+      - ${DICOM_FOLDER}:/app/dicom
       - ./.env:/app/.env
     networks:
       - local-network
@@ -70,7 +68,7 @@ services:
       - NVIDIA_API_KEY=${VISTA3D_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
     volumes:
-      - ./output:/app/output
+      - ${OUTPUT_FOLDER:-./output}:/app/output
     networks:
       - local-network
     restart: unless-stopped
@@ -95,4 +93,3 @@ networks:
 volumes:
   output-data:
   dicom-data:
-  logs-data:

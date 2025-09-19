@@ -15,14 +15,14 @@ import shutil
 from dotenv import load_dotenv
 try:
     from utils.config_manager import ConfigManager
-    from utils.constants import MIN_FILE_SIZE_MB
+    from utils.constants import MIN_FILE_SIZE_MB, PROJECT_ROOT
 except ModuleNotFoundError:
     # Allow running as a script: python utils/segment.py
     import sys as _sys
     from pathlib import Path as _Path
     _sys.path.append(str(_Path(__file__).resolve().parents[1]))
     from utils.config_manager import ConfigManager
-    from utils.constants import MIN_FILE_SIZE_MB
+    from utils.constants import MIN_FILE_SIZE_MB, PROJECT_ROOT
 
 # Load environment variables
 load_dotenv()
@@ -31,7 +31,7 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 VISTA3D_SERVER = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
 VISTA3D_INFERENCE_URL = f"{VISTA3D_SERVER.rstrip('/')}/v1/vista3d/inference"
-PROJECT_ROOT = Path(os.getenv('PROJECT_ROOT', '.'))
+# PROJECT_ROOT is now imported from constants.py and auto-detected
 OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER', 'output')
 NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
 PATIENT_OUTPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER

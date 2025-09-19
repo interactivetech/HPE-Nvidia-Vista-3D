@@ -18,7 +18,7 @@ import extra_streamlit_components as stx
 sys.path.append(str(Path(__file__).parent / 'utils'))
 from utils.navigation import render_navigation
 from utils.mermaid import render_workflow_section
-from assets.nvidia_badge import render_nvidia_vista_card as _render_nvidia_vista_card
+from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
 #from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
 
@@ -172,7 +172,7 @@ def run_server_analysis():
         return None, f"Error: {str(e)}"
 
 def render_nvidia_vista_card():
-    """Delegate rendering to assets.nvidia_badge module."""
+    """Delegate rendering to assets.vista3d_badge module."""
     _render_nvidia_vista_card()
 
 def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:

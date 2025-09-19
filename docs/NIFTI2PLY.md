@@ -35,7 +35,7 @@ The `nifti2ply.py` script is an enhanced NIfTI to PLY (Polygon File Format) conv
 The script requires a `.env` file with the following variables:
 
 ```env
-PROJECT_ROOT=/path/to/your/project
+# PROJECT_ROOT is now auto-detected
 OUTPUT_FOLDER=output
 ```
 
@@ -124,9 +124,9 @@ python utils/nifti2ply.py --batch --threshold 0.2 --smooth 1.5 --verbose
 
 Loads environment variables from the `.env` file.
 
-**Returns**: `str` - Project root path
+**Returns**: `str` - Project root path (auto-detected)
 
-**Raises**: `ValueError` if PROJECT_ROOT not found in .env file
+**Raises**: `RuntimeError` if project root cannot be determined
 
 ### `check_voxels_folders_exist(output_path: Path)`
 

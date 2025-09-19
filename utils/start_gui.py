@@ -26,14 +26,10 @@ except ImportError:
     pass
 
 # Configure logging
-project_root = Path(__file__).resolve().parent.parent
-log_dir = project_root / 'output' / 'logs'
-log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_dir / 'start_gui.log'),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -313,68 +309,61 @@ class Vista3DGUIManager:
         logger.info("✅ Image server is accessible on all interfaces")
         logger.info("✅ CORS is enabled for cross-origin requests")
     
-    def create_systemd_service(self):
-        """Create systemd service for automatic startup"""
-        if os.geteuid() != 0:
-            logger.error("⚠️  This function requires root privileges to create systemd service")
-            logger.error("   Run with: sudo python3 start_gui.py --create-service")
-            return False
-        
-        service_name = "vista3d-gui"
-        service_file = f"/etc/systemd/system/{service_name}.service"
-        script_path = str(Path(__file__).absolute())
-        
-        logger.info("Creating systemd service for automatic startup...")
-        
-        service_content = f"""[Unit]
-Description=Vista-3D GUI Docker Containers (Streamlit App and Image Server)
-After=docker.service
-Requires=docker.service
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-User=root
-Group=root
-WorkingDirectory={self.project_root}
-ExecStart={sys.executable} {script_path}
-ExecStop=/usr/bin/docker compose down
-TimeoutStartSec=300
-TimeoutStopSec=60
-Restart=on-failure
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-"""
+    
+    def restart_containers(self) -> bool:
+        """Restart the GUI containers using docker compose"""
+        logger.info("Restarting GUI containers...")
         
         try:
-            with open(service_file, 'w') as f:
-                f.write(service_content)
-            
-            # Set proper permissions
-            os.chmod(service_file, 0o644)
-            
-            # Reload systemd and enable service
-            self.run_command("systemctl daemon-reload")
-            self.run_command(f"systemctl enable {service_name}")
-            
-            logger.info(f"✅ Systemd service created: {service_file}")
-            logger.info("✅ Service enabled for automatic startup")
-            
-            logger.info("\nUseful commands:")
-            logger.info(f"  Start service: sudo systemctl start {service_name}")
-            logger.info(f"  Stop service: sudo systemctl stop {service_name}")
-            logger.info(f"  Check status: sudo systemctl status {service_name}")
-            logger.info(f"  View logs: sudo journalctl -u {service_name} -f")
-            logger.info(f"  Disable service: sudo systemctl disable {service_name}")
-            
-            return True
+            # Restart containers using docker compose
+            result = self.run_command(f"docker compose restart", cwd=str(self.project_root))
+            if result.returncode == 0:
+                logger.info("✅ GUI containers restarted successfully")
+                
+                # Wait for containers to be ready
+                time.sleep(10)
+                
+                # Show container status
+                self.run_command("docker compose ps")
+                
+                # Wait for containers to be ready
+                if not self.wait_for_containers():
+                    logger.warning("Containers may not be fully ready, but continuing...")
+                
+                # Show container logs
+                self.show_container_logs()
+                
+                # Test configuration
+                self.test_configuration()
+                
+                # Success message
+                logger.info("==========================================")
+                app_port = self.env_vars['APP_PORT']
+                image_server_port = self.env_vars['IMAGE_SERVER_PORT']
+                logger.info(f"Streamlit app is running on port {app_port}")
+                logger.info(f"Image server is running on port {image_server_port}")
+                logger.info("✅ GUI containers are ready!")
+                logger.info("✅ External access is enabled")
+                logger.info("✅ All interfaces are accessible")
+                logger.info("==========================================")
+                
+                logger.info("\nUseful commands:")
+                logger.info("  View all logs: docker compose logs -f")
+                logger.info("  View app logs: docker logs -f hpe-nvidia-vista3d-app")
+                logger.info("  View image server logs: docker logs -f vista3d-image-server")
+                logger.info("  Stop containers: docker compose down")
+                logger.info("  Restart containers: docker compose restart")
+                logger.info(f"  Access Streamlit app: http://localhost:{app_port}")
+                logger.info(f"  Access image server: http://localhost:{image_server_port}")
+                
+                return True
+            else:
+                logger.error("❌ Failed to restart GUI containers")
+                return False
         except Exception as e:
-            logger.error(f"Error creating systemd service: {e}")
+            logger.error(f"Error restarting containers: {e}")
             return False
-    
+
     def run(self):
         """Main execution logic"""
         logger.info("Starting Vista-3D GUI containers...")
@@ -441,12 +430,7 @@ def main():
         epilog="""
 Examples:
   python3 start_gui.py                 # Start GUI containers
-  sudo python3 start_gui.py --create-service  # Create systemd service for auto-startup
-
-For automatic startup on boot:
-  1. Run: sudo python3 start_gui.py --create-service
-  2. The service will start automatically on boot
-  3. Check status: sudo systemctl status vista3d-gui
+  python3 start_gui.py --restart       # Restart GUI containers
 
 Container Configuration:
   The script starts two containers:
@@ -464,15 +448,18 @@ Container Configuration:
     # Use default ports
     python3 start_gui.py
     
+    # Restart containers
+    python3 start_gui.py --restart
+    
     # Use custom ports
     STREAMLIT_SERVER_PORT=8502 IMAGE_SERVER_PORT=8889 python3 start_gui.py
         """
     )
     
     parser.add_argument(
-        '--create-service',
+        '--restart',
         action='store_true',
-        help='Create systemd service for automatic startup (requires root)'
+        help='Restart the GUI containers using docker compose restart'
     )
     
     args = parser.parse_args()
@@ -480,8 +467,9 @@ Container Configuration:
     manager = Vista3DGUIManager()
     
     try:
-        if args.create_service:
-            success = manager.create_systemd_service()
+        if args.restart:
+            # Restart the containers
+            success = manager.restart_containers()
             sys.exit(0 if success else 1)
         else:
             # Default behavior - start the containers

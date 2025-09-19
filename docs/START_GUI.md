@@ -122,7 +122,6 @@ docker stop hpe-nvidia-vista3d-app vista3d-image-server
 
 Logs are written to:
 - Console output (stdout)
-- File: `output/logs/start_gui.log`
 
 ## Integration with Vista3D
 

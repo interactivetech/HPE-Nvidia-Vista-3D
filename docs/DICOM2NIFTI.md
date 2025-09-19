@@ -40,7 +40,7 @@ The `dicom2nifti.py` script is an enhanced DICOM to NIFTI conversion tool design
 The script requires a `.env` file with the following variables:
 
 ```env
-PROJECT_ROOT=/path/to/your/project
+# PROJECT_ROOT is now auto-detected
 DICOM_FOLDER=dicom
 ```
 
@@ -262,9 +262,9 @@ Typical processing times:
 
 2. **Missing environment variables**
    ```
-   ValueError: PROJECT_ROOT not found in .env file
+   RuntimeError: Could not determine project root
    ```
-   **Solution**: Create a `.env` file with required variables
+   **Solution**: Ensure you're running from within the Vista3D project directory
 
 3. **No patient folders found**
    ```

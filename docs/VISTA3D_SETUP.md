@@ -334,7 +334,7 @@ EXTERNAL_IMAGE_SERVER_PORT=8888
 EXTERNAL_IMAGE_SERVER_PROTOCOL=https
 
 # Project Configuration
-PROJECT_ROOT=/path/to/your/project
+# Note: PROJECT_ROOT is now auto-detected and no longer needs to be configured
 DICOM_FOLDER=dicom
 IMAGE_SERVER=http://localhost:8888
 VESSELS_OF_INTEREST=all
@@ -387,7 +387,7 @@ After Vista3D is running:
    ```bash
    # Copy and edit the environment template
    cp dot_env_template .env
-   # Edit .env to set your PROJECT_ROOT and other settings
+   # Edit .env to set your other settings (PROJECT_ROOT is now auto-detected)
    ```
 
 3. **Add NIFTI files**:
