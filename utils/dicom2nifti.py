@@ -312,9 +312,9 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
         # Create NIFTI base directory if it doesn't exist
         nifti_base_path.mkdir(parents=True, exist_ok=True)
         
-        # Get list of DICOM directories for progress tracking
+        # Get list of DICOM directories for progress tracking (ignore uploads folder)
         dicom_directories = [d for d in os.listdir(dicom_data_path) 
-                           if (dicom_data_path / d).is_dir()]
+                           if (dicom_data_path / d).is_dir() and d != 'uploads']
         
         print(f"📊 Found {len(dicom_directories)} DICOM directories to process")
         print(f"🔧 Using dcm2niix for robust conversion with NiiVue optimization")

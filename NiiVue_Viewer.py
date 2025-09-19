@@ -79,46 +79,31 @@ def render_sidebar():
                 except Exception as e:
                     st.write(f"❌ Connection error: {e}")
         
-        # Add uploaded files as special "patients"
-        uploaded_patients = []
-        if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
-            for key, file_info in st.session_state.uploaded_files.items():
-                uploaded_patients.append(f"📁 {file_info['name']}")
-        
-        # Combine regular patients and uploaded files
-        all_patients = patient_folders + uploaded_patients
+        # Only show regular patient folders
         # Add None option at the beginning
-        patient_options = [None] + all_patients
+        patient_options = [None] + patient_folders
         selected_patient = st.selectbox("Select Patient", patient_options, index=0)
 
         selected_file = None
         is_uploaded_file = False
         
         if selected_patient:
-            # Check if this is an uploaded file
-            if selected_patient.startswith("📁 "):
-                # This is an uploaded file
-                uploaded_filename = selected_patient[2:]  # Remove the 📁 prefix
-                selected_file = uploaded_filename
-                is_uploaded_file = True
-                st.info(f"Viewing uploaded file: {uploaded_filename}")
-            else:
-                # Regular patient folder
-                filenames = data_manager.get_server_data(f"{selected_patient}/nifti", 'files', IMAGE_EXTENSIONS)
+            # Regular patient folder
+            filenames = data_manager.get_server_data(f"{selected_patient}/nifti", 'files', IMAGE_EXTENSIONS)
 
-                # Create display names without .nii.gz extensions
-                if filenames:
-                    display_names = [
-                        filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
-                        for filename in filenames
-                    ]
-                    # Add None option at the beginning
-                    scan_options = [None] + display_names
-                    selected_display_name = st.selectbox("Select Scan", scan_options, index=0)
-                    # Map back to the actual filename
-                    if selected_display_name:
-                        selected_index = display_names.index(selected_display_name)
-                        selected_file = filenames[selected_index]
+            # Create display names without .nii.gz extensions
+            if filenames:
+                display_names = [
+                    filename.replace('.nii.gz', '').replace('.nii', '').replace('.dcm', '')
+                    for filename in filenames
+                ]
+                # Add None option at the beginning
+                scan_options = [None] + display_names
+                selected_display_name = st.selectbox("Select Scan", scan_options, index=0)
+                # Map back to the actual filename
+                if selected_display_name:
+                    selected_index = display_names.index(selected_display_name)
+                    selected_file = filenames[selected_index]
 
         # Update viewer config with selections
         viewer_config.selected_patient = selected_patient
@@ -273,15 +258,15 @@ def render_file_upload():
             }
             
             st.success(f"✅ Uploaded: {uploaded_file.name}")
-            st.info("The uploaded file is now available in the patient selection dropdown above.")
+            st.info("File automatically loaded into the viewer.")
         
-        # Display uploaded files
+        # Display current uploaded file status
         if st.session_state.uploaded_files:
-            st.write("**Uploaded Files:**")
+            st.write("**Currently Viewing:**")
             for key, file_info in st.session_state.uploaded_files.items():
                 col1, col2 = st.columns([3, 1])
                 with col1:
-                    st.write(f"• {file_info['name']}")
+                    st.write(f"📄 {file_info['name']}")
                 with col2:
                     if st.button("🗑️", key=f"delete_{key}", help="Remove this file"):
                         # Clean up file
@@ -299,7 +284,7 @@ def render_file_upload():
 
 
 # --- Main Application ---
-def render_viewer(selected_patient: str, selected_file: str):
+def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: bool = False):
     """Render the main NiiVue viewer."""
     if not selected_file:
         st.info(MESSAGES['select_patient_file'])
@@ -307,9 +292,9 @@ def render_viewer(selected_patient: str, selected_file: str):
 
     # Prepare volume URLs and overlays
     # Check if this is an uploaded file
-    if selected_patient and selected_patient.startswith("📁 "):
+    if is_uploaded_file:
         # For uploaded files, use the temporary file path
-        uploaded_filename = selected_patient[2:]  # Remove the 📁 prefix
+        uploaded_filename = selected_file
         # Find the file in session state
         uploaded_file_path = None
         if 'uploaded_files' in st.session_state:
@@ -332,7 +317,7 @@ def render_viewer(selected_patient: str, selected_file: str):
 
     # Create overlays based on voxel mode (only for regular patient files, not uploaded files)
     overlays = []
-    if not (selected_patient and selected_patient.startswith("📁 ")):
+    if not is_uploaded_file and selected_patient:
         overlays = voxel_manager.create_overlays(
             selected_patient,
             selected_file,
@@ -368,6 +353,10 @@ def render_viewer(selected_patient: str, selected_file: str):
 
 # Removed unused debug checkbox
 
+    # Show uploaded file indicator if applicable
+    if is_uploaded_file:
+        st.info(f"📄 Viewing uploaded file: **{selected_file}**")
+
     # Render the viewer using our template
     html_content = template_renderer.render_viewer(
         volume_list_js=volume_list_js,
@@ -396,11 +385,25 @@ def main():
     # Set page title
     st.header("🩻 NiiVue Viewer")
     
+    # Check if there's an uploaded file to auto-load
+    uploaded_file_info = None
+    if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
+        # Get the most recent uploaded file
+        uploaded_file_info = list(st.session_state.uploaded_files.values())[-1]
+    
     # Render sidebar and get selections
     selected_patient, selected_file = render_sidebar()
 
+    # If we have an uploaded file, use it directly - no patient selection needed
+    if uploaded_file_info:
+        selected_patient = None  # No patient selection for uploaded files
+        selected_file = uploaded_file_info['name']
+        is_uploaded_file = True
+    else:
+        is_uploaded_file = False
+
     # Render main viewer
-    render_viewer(selected_patient, selected_file)
+    render_viewer(selected_patient, selected_file, is_uploaded_file)
 
 
 if __name__ == "__main__":

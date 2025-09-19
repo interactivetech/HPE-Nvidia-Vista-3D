@@ -75,7 +75,7 @@ def check_voxels_folders_exist(output_path: Path) -> bool:
         return False
     
     for patient_dir in output_path.iterdir():
-        if patient_dir.is_dir():
+        if patient_dir.is_dir() and patient_dir.name != 'uploads':
             voxels_dir = patient_dir / "voxels"
             if voxels_dir.exists() and voxels_dir.is_dir():
                 return True
@@ -87,7 +87,7 @@ def get_patient_directories(output_path: Path, specific_patient=None):
     patient_dirs = []
     
     for patient_dir in output_path.iterdir():
-        if patient_dir.is_dir():
+        if patient_dir.is_dir() and patient_dir.name != 'uploads':
             # If specific patient requested, only process that one
             if specific_patient and patient_dir.name != specific_patient:
                 continue
