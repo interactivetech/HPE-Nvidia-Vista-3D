@@ -23,6 +23,13 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
 
+# Get output folder from environment - must be absolute path
+OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
+if not OUTPUT_FOLDER:
+    raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+if not os.path.isabs(OUTPUT_FOLDER):
+    raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+
 # Initialize our managers
 config_manager = ConfigManager()
 data_manager = DataManager(IMAGE_SERVER_URL)
@@ -38,6 +45,39 @@ def render_sidebar():
     with st.sidebar:
         # Patient folders are now directly in the output directory
         patient_folders = data_manager.get_server_data('', 'folders', ('',))
+        
+        # Debug information - only show if no patient folders found
+        if not patient_folders:
+            st.warning("No patient folders found. Check if:")
+            st.write("1. Image server is running")
+            st.write("2. OUTPUT_FOLDER contains patient directories")
+            st.write("3. Image server can access the output folder")
+            
+            # Show debug info only when there's an issue
+            with st.expander("Debug Info", expanded=False):
+                st.write(f"**Image Server URL:** {IMAGE_SERVER_URL}")
+                st.write(f"**External Image Server URL:** {EXTERNAL_IMAGE_SERVER_URL}")
+                st.write(f"**Output Folder:** {OUTPUT_FOLDER}")
+                st.write(f"**DataManager URL:** {data_manager.image_server_url}")
+                st.write(f"**Patient Folders Found:** {len(patient_folders)}")
+                
+                # Test the actual URL being called
+                test_url = f"{data_manager.image_server_url}/output/"
+                st.write(f"**Test URL:** {test_url}")
+                
+                # Try to test the connection directly
+                import requests
+                try:
+                    response = requests.get(test_url, timeout=5)
+                    st.write(f"**HTTP Response:** {response.status_code}")
+                    if response.status_code == 200:
+                        st.write("✅ Server is responding")
+                        st.write("**Response preview:**")
+                        st.code(response.text[:500] + "..." if len(response.text) > 500 else response.text)
+                    else:
+                        st.write(f"❌ Server returned HTTP {response.status_code}")
+                except Exception as e:
+                    st.write(f"❌ Connection error: {e}")
         
         # Add uploaded files as special "patients"
         uploaded_patients = []
@@ -87,8 +127,7 @@ def render_sidebar():
         # Extract data characteristics for modality-specific settings
         min_val, max_val, mean_val = None, None, None
         if selected_patient and selected_file:
-            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-            quality_file_path = os.path.join(output_folder, selected_patient, "nifti", f"{selected_file}.quality.json")
+            quality_file_path = os.path.join(OUTPUT_FOLDER, selected_patient, "nifti", f"{selected_file}.quality.json")
             if os.path.exists(quality_file_path):
                 try:
                     with open(quality_file_path, 'r') as f:
@@ -218,8 +257,7 @@ def render_file_upload():
             import shutil
             
             # Create uploads directory in the output folder (accessible by image server)
-            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-            uploads_dir = os.path.join(output_folder, 'uploads')
+            uploads_dir = os.path.join(OUTPUT_FOLDER, 'uploads')
             os.makedirs(uploads_dir, exist_ok=True)
             
             # Save file to uploads directory within output folder
@@ -268,8 +306,6 @@ def render_viewer(selected_patient: str, selected_file: str):
         return
 
     # Prepare volume URLs and overlays
-    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-    
     # Check if this is an uploaded file
     if selected_patient and selected_patient.startswith("📁 "):
         # For uploaded files, use the temporary file path
@@ -285,13 +321,14 @@ def render_viewer(selected_patient: str, selected_file: str):
         if uploaded_file_path and os.path.exists(uploaded_file_path):
             # For uploaded files, serve them through the image server
             # The file is in the output/uploads directory, so we can access it via HTTP
-            base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/uploads/{uploaded_filename}"
+            # Use the correct URL path with /output/ prefix
+            base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/uploads/{uploaded_filename}"
         else:
             st.error("Uploaded file not found. Please re-upload the file.")
             return
     else:
         # Regular patient file
-        base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/nifti/{selected_file}"
+        base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
 
     # Create overlays based on voxel mode (only for regular patient files, not uploaded files)
     overlays = []

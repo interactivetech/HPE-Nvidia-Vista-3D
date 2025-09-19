@@ -588,11 +588,6 @@ elif current_page == 'niivue':
     sys.path.append(str(Path(__file__).parent))
     exec(open('NiiVue_Viewer.py').read())
 
-elif current_page == 'dicom':
-    # Import and run DICOM Inspector content
-    sys.path.append(str(Path(__file__).parent))
-    exec(open('DICOM_Inspector.py').read())
-
 elif current_page == 'ply_viewer':
     # Import and run Open3D Viewer content
     sys.path.append(str(Path(__file__).parent))

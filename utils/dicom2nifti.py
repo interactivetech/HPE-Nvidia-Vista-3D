@@ -45,15 +45,31 @@ def check_dcm2niix_installation():
 def load_environment():
     """Load environment variables from .env file"""
     load_dotenv()
-    project_root = os.getenv('PROJECT_ROOT')
-    if not project_root:
-        raise ValueError("PROJECT_ROOT not found in .env file")
     
-    dicom_folder = os.getenv('DICOM_FOLDER')
-    if not dicom_folder:
-        raise ValueError("DICOM_FOLDER not found in .env file")
+    # Check if we're running in a Docker container
+    is_docker = os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER') == 'true'
     
-    return project_root, dicom_folder
+    if is_docker:
+        # In Docker container, use the mounted paths
+        dicom_folder = '/app/dicom'
+        output_folder = '/app/output'
+    else:
+        # On host machine, use environment variables
+        dicom_folder = os.getenv('DICOM_FOLDER')
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        
+        if not dicom_folder:
+            raise ValueError("DICOM_FOLDER not found in .env file")
+        if not output_folder:
+            raise ValueError("OUTPUT_FOLDER not found in .env file")
+        
+        # DICOM_FOLDER should be a full path now - no more PROJECT_ROOT needed
+        if not os.path.isabs(dicom_folder):
+            raise ValueError("DICOM_FOLDER must be set in .env file with full absolute path")
+        if not os.path.isabs(output_folder):
+            raise ValueError("OUTPUT_FOLDER must be set in .env file with full absolute path")
+    
+    return dicom_folder
 
 
 def load_label_dictionary():
@@ -256,22 +272,31 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
             raise RuntimeError("dcm2niix is required but not found. Please install dcm2niix first.")
         
         # Load environment variables
-        project_root, dicom_folder = load_environment()
+        dicom_folder = load_environment()
         
         # Load label dictionary
         label_dict = load_label_dictionary()
         
-        # Define paths
-        if os.path.isabs(dicom_folder):
-            dicom_data_path = Path(dicom_folder)
+        # Define paths - dicom_folder is now always absolute
+        dicom_data_path = Path(dicom_folder)
+        
+        # Check if we're running in a Docker container
+        is_docker = os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER') == 'true'
+        
+        if is_docker:
+            # In Docker container, use the mounted paths
+            output_folder = '/app/output'
         else:
-            dicom_data_path = Path(project_root) / dicom_folder
-            
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        nifti_base_path = Path(project_root) / output_folder
+            # On host machine, use environment variables
+            output_folder = os.getenv('OUTPUT_FOLDER')
+            if not output_folder:
+                raise ValueError("OUTPUT_FOLDER must be set in .env file with full path")
+            if not os.path.isabs(output_folder):
+                raise ValueError("OUTPUT_FOLDER must be set in .env file with full absolute path")
+        
+        nifti_base_path = Path(output_folder)
         
         print(f"🔬 Enhanced DICOM to NIFTI Conversion (dcm2niix + NiiVue)")
-        print(f"📁 Project Root: {project_root}")
         print(f"📁 DICOM Source: {dicom_data_path}")
         print(f"📁 NIFTI Destination Base: {nifti_base_path}")
         print("-" * 70)

@@ -147,11 +147,12 @@ class Vista3DManager:
 
     def _setup_paths(self):
         """Setup paths from environment variables or use defaults."""
-        # Import PROJECT_ROOT from constants - it's auto-detected
-        from utils.constants import PROJECT_ROOT
-        project_root = os.getenv('PROJECT_ROOT', str(PROJECT_ROOT))
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        self.local_outputs_path = Path(project_root) / output_folder
+        # Use full paths from .env - no more PROJECT_ROOT needed
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        if not output_folder:
+            raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+        
+        self.local_outputs_path = Path(output_folder)
         self.container_outputs_path = os.getenv('CONTAINER_OUTPUTS_PATH', "/workspace/output")
         self.local_images_path = self.local_outputs_path / "nifti"
         self.container_images_path = os.getenv('CONTAINER_IMAGES_DATA_PATH', "/workspace/output/nifti")

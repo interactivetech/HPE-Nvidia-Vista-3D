@@ -35,10 +35,7 @@ def render_dicom_tools():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("**DICOM Inspector**")
-        st.markdown("Inspect and analyze DICOM files")
-        if st.button("Launch DICOM Inspector", key="dicom_inspector"):
-            st.switch_page("pages/DICOM_Inspector.py")
+        pass
     
     with col2:
         st.markdown("**DICOM to NIfTI Converter**")
@@ -228,19 +225,6 @@ def main():
     
     st.title("🛠️ Tools & Utilities")
     st.markdown("Access various tools and utilities for medical image processing and 3D visualization.")
-    
-    st.markdown("---")
-    
-    # DICOM Inspector Section
-    st.subheader("📋 DICOM Inspector")
-    st.markdown("""
-    The DICOM Inspector is a tool for examining and analyzing DICOM medical imaging files to
-    help you understand the structure and content of your medical imaging data before processing.
-    """)
-    
-    if st.button("🚀 Launch DICOM Inspector", key="launch_dicom_inspector", type="primary"):
-        st.session_state.current_page = "dicom"
-        st.rerun()
     
     st.markdown("---")
     

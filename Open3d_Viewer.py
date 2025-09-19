@@ -31,7 +31,6 @@ Usage:
 """
 
 import streamlit as st
-import open3d as o3d
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -51,6 +50,22 @@ from scipy.optimize import minimize
 import math
 from PIL import Image
 import base64
+
+# Try to import Open3D with fallback handling
+try:
+    import open3d as o3d
+    OPEN3D_AVAILABLE = True
+except ImportError as e:
+    st.error(f"Open3D could not be imported: {e}")
+    OPEN3D_AVAILABLE = False
+except OSError as e:
+    if "libGL.so.1" in str(e):
+        st.error("OpenGL libraries not available. This is common in Docker containers.")
+        st.info("The application will use alternative visualization methods.")
+        OPEN3D_AVAILABLE = False
+    else:
+        st.error(f"Open3D import error: {e}")
+        OPEN3D_AVAILABLE = False
 
 # Import our data management modules
 from utils.data_manager import DataManager
@@ -132,14 +147,12 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                         # Map back to the actual filename
                         selected_index = display_names.index(selected_display_name)
                         selected_ply_file = ply_files[selected_index]
-                        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                        file_to_load = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
+                        file_to_load = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{selected_ply_file}"
                         selected_ply_files = [selected_ply_file]
                         
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
-                    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                    ply_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    ply_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
                     st.caption(f"PLY directory: {ply_url}")
         
         elif ply_mode == "Multiple PLY Files":
@@ -172,8 +185,7 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
                         st.info("No PLY files selected. Select specific files to display.")
                 else:
                     st.warning(f"No PLY files found for CT scan: {ct_scan_folder_name}")
-                    output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                    ply_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/"
+                    ply_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/"
                     st.caption(f"PLY directory: {ply_url}")
             else:
                 st.info("Please select a patient and CT scan first.")
@@ -192,10 +204,38 @@ def main():
     
     st.title("🔺 Open3D Viewer")
     
+    # Check if Open3D is available
+    if not OPEN3D_AVAILABLE:
+        st.error("🚫 Open3D is not available")
+        st.markdown("""
+        **Open3D requires OpenGL libraries that may not be available in this environment.**
+        
+        **Possible solutions:**
+        1. **For Docker containers**: The container needs to be rebuilt with OpenGL support
+        2. **For local development**: Install OpenGL libraries on your system
+        3. **Alternative**: Use the NiiVue Viewer for 3D visualization
+        
+        **To fix in Docker:**
+        ```bash
+        docker-compose down
+        docker-compose build --no-cache
+        docker-compose up
+        ```
+        """)
+        return
+    
     # Initialize managers
     load_dotenv()
     IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
     EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
+    
+    # Get output folder from environment - must be absolute path
+    OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
+    if not OUTPUT_FOLDER:
+        raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+    if not os.path.isabs(OUTPUT_FOLDER):
+        raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+    
     data_manager = DataManager(IMAGE_SERVER_URL)
     external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL)
     mesh_processor = MeshProcessor()
@@ -418,8 +458,7 @@ def main():
         
         for i, ply_file in enumerate(selected_ply_files):
             try:
-                output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-                file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/{output_folder}/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
+                file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/ply/{ct_scan_folder_name}/{ply_file}"
                 mesh, _ = mesh_processor.load_ply_file(file_url)
                 
                 if mesh is not None and not mesh.is_empty():

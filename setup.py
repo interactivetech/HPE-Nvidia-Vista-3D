@@ -629,10 +629,12 @@ class SetupManager:
         print("   3. This converts DICOM → NIfTI format for Vista3D processing")
         
         config['DICOM_FOLDER'] = self._prompt_user(
-            "DICOM folder name (relative to project root)",
-            default="dicom"
+            "DICOM folder absolute path (e.g., /Users/username/data/dicom)",
+            default=str(self.project_root / "dicom")
         )
-        dicom_path = self.project_root / config['DICOM_FOLDER']
+        dicom_path = Path(config['DICOM_FOLDER'])
+        if not dicom_path.is_absolute():
+            dicom_path = self.project_root / config['DICOM_FOLDER']
         print(f"✅ DICOM files will be stored in: {dicom_path}")
         print(f"   After adding DICOM files, convert them with: python utils/dicom2nifti.py")
         
@@ -644,10 +646,12 @@ class SetupManager:
         print("     • 3D visualization data")
         
         config['OUTPUT_FOLDER'] = self._prompt_user(
-            "Output folder name (relative to project root)",
-            default="output"
+            "Output folder absolute path (e.g., /Users/username/data/output)",
+            default=str(self.project_root / "output")
         )
-        output_path = self.project_root / config['OUTPUT_FOLDER']
+        output_path = Path(config['OUTPUT_FOLDER'])
+        if not output_path.is_absolute():
+            output_path = self.project_root / config['OUTPUT_FOLDER']
         print(f"✅ Processed results will be stored in: {output_path}")
         
         # Image server configuration

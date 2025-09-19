@@ -23,6 +23,13 @@ class DataManager:
 
     def __init__(self, image_server_url: str):
         self.image_server_url = image_server_url.rstrip('/')
+        
+        # Get output folder from environment - must be absolute path
+        self.output_folder = os.getenv('OUTPUT_FOLDER')
+        if not self.output_folder:
+            raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+        if not os.path.isabs(self.output_folder):
+            raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
 
     def parse_directory_listing(self, html_content: str) -> List[Dict[str, str]]:
         """Parse HTML directory listing to extract file and folder information."""
@@ -44,16 +51,16 @@ class DataManager:
 
     def get_folder_contents(self, folder_path: str) -> Optional[List[Dict[str, str]]]:
         """Fetch contents of a specific folder from the image server."""
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        url = f"{self.image_server_url}/{output_folder}/{folder_path.strip('/')}/"
+        # Use the URL path 'output' instead of the absolute path
+        url = f"{self.image_server_url}/output/{folder_path.strip('/')}/"
         try:
             response = requests.get(url, timeout=SERVER_TIMEOUT)
             if response.status_code == 200:
                 return self.parse_directory_listing(response.text)
             elif response.status_code != 404:
-                print(f"Image server returned HTTP {response.status_code}")
+                print(f"Image server returned HTTP {response.status_code} for URL: {url}")
         except requests.exceptions.RequestException as e:
-            print(f"Could not connect to image server: {e}")
+            print(f"Could not connect to image server at {url}: {e}")
         return None
 
     def get_server_data(self, path: str, data_type: str, file_extensions: tuple) -> List[str]:
@@ -89,8 +96,7 @@ class DataManager:
             ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
 
             # Check the voxels directory for this CT scan
-            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-            voxels_folder_url = f"{self.image_server_url}/{output_folder}/{patient_id}/voxels/{ct_scan_folder_name}/"
+            voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
 
             if __debug__:
                 print(f"DEBUG: Checking voxels URL: {voxels_folder_url}")
@@ -144,16 +150,13 @@ class DataManager:
     def get_voxel_directory_url(self, patient_id: str, filename: str) -> str:
         """Generate the URL for the voxel directory."""
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        return f"{self.image_server_url}/{output_folder}/{patient_id}/voxels/{ct_scan_folder_name}/"
+        return f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
     
     def get_ply_directory_url(self, patient_id: str, filename: str) -> str:
         """Generate the URL for the PLY directory."""
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        return f"{self.image_server_url}/{output_folder}/{patient_id}/ply/{ct_scan_folder_name}/"
+        return f"{self.image_server_url}/output/{patient_id}/ply/{ct_scan_folder_name}/"
     
     def get_file_url(self, patient_id: str, file_path: str) -> str:
         """Generate the full URL for a file within a patient's directory."""
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        return f"{self.image_server_url}/{output_folder}/{patient_id}/{file_path}"
+        return f"{self.image_server_url}/output/{patient_id}/{file_path}"

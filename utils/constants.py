@@ -10,52 +10,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-def get_project_root() -> Path:
-    """
-    Automatically detect the project root directory.
-    
-    This function finds the project root by looking for the setup.py file
-    or other project markers, making the configuration portable across
-    different environments (local, Docker, etc.).
-    
-    Returns:
-        Path: The absolute path to the project root directory
-        
-    Raises:
-        RuntimeError: If the project root cannot be determined
-    """
-    # First, try to get from environment variable (for backward compatibility)
-    project_root_env = os.getenv('PROJECT_ROOT')
-    if project_root_env:
-        return Path(project_root_env).resolve()
-    
-    # Try to find project root by looking for setup.py
-    current_file = Path(__file__).resolve()
-    
-    # Walk up the directory tree looking for setup.py
-    for parent in [current_file.parent] + list(current_file.parents):
-        if (parent / 'setup.py').exists():
-            return parent
-    
-    # If not found, try looking for other project markers
-    for parent in [current_file.parent] + list(current_file.parents):
-        if (parent / 'pyproject.toml').exists() or (parent / 'README.md').exists():
-            return parent
-    
-    # Fallback: use the directory containing this constants file
-    # This should work in most cases since constants.py is in utils/
-    project_root = current_file.parent.parent
-    if project_root.exists():
-        return project_root
-    
-    raise RuntimeError(
-        "Could not determine project root. Please ensure you're running "
-        "from within the Vista3D project directory or set PROJECT_ROOT "
-        "environment variable."
-    )
-
-# Get the project root automatically
-PROJECT_ROOT = get_project_root()
+# PROJECT_ROOT is no longer needed - all paths should be full paths from .env
 
 # File extensions
 NIFTI_EXTENSIONS = ('.nii', '.nii.gz')
@@ -63,7 +18,11 @@ DICOM_EXTENSIONS = ('.dcm',)
 IMAGE_EXTENSIONS = NIFTI_EXTENSIONS + DICOM_EXTENSIONS
 
 # Directory structure - get from environment variables
-OUTPUT_DIR = os.getenv('OUTPUT_FOLDER', 'output')
+OUTPUT_DIR = os.getenv('OUTPUT_FOLDER')
+if not OUTPUT_DIR:
+    raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+if not os.path.isabs(OUTPUT_DIR):
+    raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
 SCANS_DIR = "scans"
 VOXELS_DIR = "voxels"
 NIFTI_DIR = "nifti"

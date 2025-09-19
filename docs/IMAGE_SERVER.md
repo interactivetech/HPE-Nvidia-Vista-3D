@@ -108,8 +108,8 @@ IMAGE_SERVER="http://localhost:8888"
 # Remote Vista3D server URL
 VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
 
-# Output folder (relative to project root)
-OUTPUT_FOLDER="output"
+# Output folder (absolute path required)
+OUTPUT_FOLDER="/path/to/your/output"
 
 # Vessels of interest for segmentation
 VESSELS_OF_INTEREST="all"

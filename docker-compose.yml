@@ -10,12 +10,25 @@ services:
     environment:
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_THEME_BASE=dark
       - IMAGE_SERVER=http://image-server:8888
       - EXTERNAL_IMAGE_SERVER=http://localhost:8888
+      - OUTPUT_FOLDER=/app/output
+      - DICOM_FOLDER=/app/dicom
       - VISTA3D_SERVER=${VISTA3D_SERVER:-http://vista3d-server:8000}
       - VISTA3D_API_KEY=${VISTA3D_API_KEY}
       - HPE_CLUSTER_ENDPOINT=${HPE_CLUSTER_ENDPOINT}
       - HPE_API_KEY=${HPE_API_KEY}
+      - DOCKER_CONTAINER=true
+      # OpenGL headless rendering support
+      - DISPLAY=:99
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - MESA_GL_VERSION_OVERRIDE=3.3
+      - MESA_GLSL_VERSION_OVERRIDE=330
+      # Optional: Enable OpenGL testing
+      - TEST_OPENGL=${TEST_OPENGL:-false}
     volumes:
       - ${OUTPUT_FOLDER}:/app/output
       - ${DICOM_FOLDER}:/app/dicom
@@ -44,6 +57,7 @@ services:
       - VISTA3D_API_KEY=${VISTA3D_API_KEY}
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
+      - DOCKER_CONTAINER=true
     volumes:
       - ${OUTPUT_FOLDER}:/app/output
       - ${DICOM_FOLDER}:/app/dicom

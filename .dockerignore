@@ -76,7 +76,7 @@ dicom/
 .ipynb_checkpoints/
 
 # Streamlit
-.streamlit/
+# .streamlit/  # Commented out - needed for Docker build
 
 # UV
 # uv.lock  # Commented out - needed for Docker build

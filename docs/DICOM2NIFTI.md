@@ -41,7 +41,8 @@ The script requires a `.env` file with the following variables:
 
 ```env
 # PROJECT_ROOT is now auto-detected
-DICOM_FOLDER=dicom
+# Use absolute paths for external directories
+DICOM_FOLDER=/path/to/your/dicom
 ```
 
 ## Directory Structure

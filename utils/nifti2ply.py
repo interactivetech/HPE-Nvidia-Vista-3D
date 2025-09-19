@@ -48,11 +48,25 @@ from plyfile import PlyData, PlyElement
 
 
 def load_environment():
-    """Load environment variables from .env file and get project root"""
+    """Load environment variables from .env file and get output folder"""
     load_dotenv()
-    # Import PROJECT_ROOT from constants - it's auto-detected
-    from utils.constants import PROJECT_ROOT
-    return str(PROJECT_ROOT)
+    
+    # Check if we're running in a Docker container
+    is_docker = os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER') == 'true'
+    
+    if is_docker:
+        # In Docker container, use the mounted paths
+        output_folder = '/app/output'
+    else:
+        # On host machine, use environment variables
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        if not output_folder:
+            raise ValueError("OUTPUT_FOLDER must be set in .env file with full path")
+        # Use full paths from .env - no more PROJECT_ROOT needed
+        if not os.path.isabs(output_folder):
+            raise ValueError("OUTPUT_FOLDER must be set in .env file with full absolute path")
+    
+    return output_folder
 
 
 def check_voxels_folders_exist(output_path: Path) -> bool:
@@ -402,14 +416,10 @@ def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None
     """
     try:
         # Load environment variables
-        project_root = load_environment()
-        
-        # Define paths
-        output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-        output_base_path = Path(project_root) / output_folder
+        output_folder = load_environment()
+        output_base_path = Path(output_folder)
         
         print(f"🔬 Enhanced NIfTI to PLY Conversion (Vista-3D Pipeline)")
-        print(f"📁 Project Root: {project_root}")
         print(f"📁 Output Base: {output_base_path}")
         print("-" * 70)
         

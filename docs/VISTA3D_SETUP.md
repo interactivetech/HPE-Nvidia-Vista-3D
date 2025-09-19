@@ -335,7 +335,9 @@ EXTERNAL_IMAGE_SERVER_PROTOCOL=https
 
 # Project Configuration
 # Note: PROJECT_ROOT is now auto-detected and no longer needs to be configured
-DICOM_FOLDER=dicom
+# Use absolute paths for DICOM_FOLDER and OUTPUT_FOLDER
+DICOM_FOLDER=/path/to/your/dicom
+OUTPUT_FOLDER=/path/to/your/output
 IMAGE_SERVER=http://localhost:8888
 VESSELS_OF_INTEREST=all
 

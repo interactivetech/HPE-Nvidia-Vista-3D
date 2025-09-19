@@ -15,14 +15,14 @@ import shutil
 from dotenv import load_dotenv
 try:
     from utils.config_manager import ConfigManager
-    from utils.constants import MIN_FILE_SIZE_MB, PROJECT_ROOT
+    from utils.constants import MIN_FILE_SIZE_MB
 except ModuleNotFoundError:
     # Allow running as a script: python utils/segment.py
     import sys as _sys
     from pathlib import Path as _Path
     _sys.path.append(str(_Path(__file__).resolve().parents[1]))
     from utils.config_manager import ConfigManager
-    from utils.constants import MIN_FILE_SIZE_MB, PROJECT_ROOT
+    from utils.constants import MIN_FILE_SIZE_MB
 
 # Load environment variables
 load_dotenv()
@@ -31,15 +31,20 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 VISTA3D_SERVER = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
 VISTA3D_INFERENCE_URL = f"{VISTA3D_SERVER.rstrip('/')}/v1/vista3d/inference"
-# PROJECT_ROOT is now imported from constants.py and auto-detected
-OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER', 'output')
-NIFTI_INPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
-PATIENT_OUTPUT_BASE_DIR = PROJECT_ROOT / OUTPUT_FOLDER
+# Use full paths from .env - no more PROJECT_ROOT needed
+OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
+if not OUTPUT_FOLDER:
+    raise ValueError("OUTPUT_FOLDER must be set in .env file with full path")
+NIFTI_INPUT_BASE_DIR = Path(OUTPUT_FOLDER)
+PATIENT_OUTPUT_BASE_DIR = Path(OUTPUT_FOLDER)
 
 # Image server configuration (local by default)
 # Use IMAGE_SERVER only; external URL env is no longer used
 
-config_manager = ConfigManager(config_dir=str(PROJECT_ROOT / "conf"))
+# Get project root for config directory - use the directory containing this script
+script_dir = Path(__file__).parent
+project_root = script_dir.parent
+config_manager = ConfigManager(config_dir=str(project_root / "conf"))
 label_colors_list = config_manager.label_colors
 LABEL_DICT = {item['id']: item for item in label_colors_list}
 NAME_TO_ID_MAP = {item['name']: item['id'] for item in label_colors_list}
@@ -218,7 +223,8 @@ def main():
 
             try:
                 # Use the original nifti file path for inference
-                relative_path_to_nifti = nifti_file_path.relative_to(PROJECT_ROOT)
+                # Calculate relative path from output folder to the nifti file
+                relative_path_to_nifti = nifti_file_path.relative_to(NIFTI_INPUT_BASE_DIR)
                 
                 # Build URL using local image server configuration
                 vista3d_input_url = f"{IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"

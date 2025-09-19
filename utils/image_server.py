@@ -17,25 +17,19 @@ import io
 
 from dotenv import load_dotenv
 
-# Add project root to path for imports
-project_root = Path(__file__).parent.parent
-
 # Load environment variables
 load_dotenv()
 
-# Get folder paths from environment variables and resolve relative paths
+# Get folder paths from environment variables - should be full paths
 def resolve_folder_path(env_var_name: str, default_path: str) -> str:
-    """Resolve folder path from environment variable, handling relative paths."""
+    """Resolve folder path from environment variable - expects full paths."""
     folder_path = os.getenv(env_var_name, default_path)
     
-    # If it's a relative path, make it relative to project root
+    # All paths should be absolute now - no more PROJECT_ROOT
     if not os.path.isabs(folder_path):
-        # Resolve relative to project root
-        resolved_path = (project_root / folder_path).resolve()
-        return str(resolved_path)
-    else:
-        # It's already an absolute path
-        return folder_path
+        raise ValueError(f"{env_var_name} must be set in .env file with full absolute path, got: {folder_path}")
+    
+    return folder_path
 
 output_folder = resolve_folder_path('OUTPUT_FOLDER', 'output')
 dicom_folder = resolve_folder_path('DICOM_FOLDER', 'dicom')
@@ -54,6 +48,9 @@ def get_server_config():
 
 def load_image_server_config():
     """Load image server configuration from JSON file."""
+    # Get project root for config directory - use the directory containing this script
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
     config_path = project_root / "conf" / "image_server_conf.json"
     
     # Default configuration with resolved absolute paths
@@ -180,6 +177,9 @@ app = FastAPI(
 )
 
 # Mount the assets directory to serve static files like niivue.umd.js
+# Get project root for assets directory - use the directory containing this script
+script_dir = Path(__file__).parent
+project_root = script_dir.parent
 app.mount("/assets", StaticFiles(directory=project_root / "assets"), name="assets")
 
 @app.get("/health")
@@ -199,7 +199,7 @@ async def get_filtered_scans(
         label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
         
         # Construct path to original segmentation file
-        scan_path = project_root / output_folder / "scans" / patient_id / filename
+        scan_path = Path(output_folder) / "scans" / patient_id / filename
         
         if not scan_path.exists():
             raise HTTPException(status_code=404, detail=f"Scan file not found: {filename}")
@@ -252,7 +252,7 @@ async def get_filtered_voxels(
         label_id_list = [int(id.strip()) for id in label_ids.split(',') if id.strip()]
         
         # Construct path to voxels file (strict - no fallback)
-        voxels_dir = project_root / output_folder / patient_id / "voxels"
+        voxels_dir = Path(output_folder) / patient_id / "voxels"
         voxels_path = voxels_dir / filename
         if not voxels_path.exists():
             # Attempt to find a voxels file with matching stem or any .nii/.nii.gz in the voxels dir
@@ -317,7 +317,7 @@ async def get_available_voxel_labels(
 ):
     """Return available non-zero label IDs (and names) present in the voxels NIfTI for this patient/file."""
     try:
-        voxels_dir = project_root / output_folder / patient_id / "voxels"
+        voxels_dir = Path(output_folder) / patient_id / "voxels"
         voxels_path = voxels_dir / filename
         if not voxels_path.exists():
             # Attempt to find a voxels file with matching stem or any .nii/.nii.gz
@@ -347,6 +347,9 @@ async def get_available_voxel_labels(
         # Map IDs to names using conf/vista3d_label_colors.json if available
         id_to_name = {}
         try:
+            # Get project root for config directory
+            script_dir = Path(__file__).parent
+            project_root = script_dir.parent
             colors_path = project_root / "conf" / "vista3d_label_colors.json"
             if colors_path.exists():
                 with open(colors_path, 'r') as f:
@@ -373,8 +376,8 @@ def is_allowed_directory(path: Path) -> bool:
         # Get allowed folder paths from config (these are now absolute paths)
         allowed_folder_paths = [Path(folder["path"]) for folder in server_config.get("viewable_folders", [])]
         
-        # Allow root access
-        if path == project_root:
+        # Allow access to configured folders
+        if path == Path(output_folder) or path == Path(dicom_folder):
             return True
         
         # Check if the path is within any of the allowed folder paths
@@ -387,20 +390,26 @@ def is_allowed_directory(path: Path) -> bool:
                 # Path is not within this allowed path, continue checking
                 continue
         
-        # Check if it's a subdirectory of project root and matches URL path
+        # Check if it's a subdirectory of allowed folders and matches URL path
         try:
-            rel_path = path.relative_to(project_root)
-            path_parts = rel_path.parts
-            
-            if path_parts:
-                # Get allowed URL paths from config
-                allowed_url_paths = [folder["url_path"] for folder in server_config.get("viewable_folders", [])]
-                
-                # Allow configured URL paths and their subdirectories
-                if path_parts[0] in allowed_url_paths:
-                    return True
+            # Check against output and dicom folders
+            for base_folder in [Path(output_folder), Path(dicom_folder)]:
+                try:
+                    rel_path = path.relative_to(base_folder)
+                    path_parts = rel_path.parts
+                    
+                    if path_parts:
+                        # Get allowed URL paths from config
+                        allowed_url_paths = [folder["url_path"] for folder in server_config.get("viewable_folders", [])]
+                        
+                        # Allow configured URL paths and their subdirectories
+                        if path_parts[0] in allowed_url_paths:
+                            return True
+                except ValueError:
+                    # Path is not relative to this base folder, continue checking
+                    continue
         except ValueError:
-            # Path is not relative to project root
+            # Path is not relative to any allowed folder
             pass
             
         return False
@@ -499,8 +508,8 @@ async def serve_files(request: Request, full_path: str):
                     subpath = url_path[len(folder_url_path):].lstrip("/")
                     return actual_folder_path / subpath
         
-        # If not a configured folder, treat as relative to project root
-        return project_root / url_path
+        # If not a configured folder, treat as relative to output folder
+        return Path(output_folder) / url_path
     
     # Map URL path to actual path
     absolute_path = map_url_to_actual_path(full_path)
@@ -631,7 +640,8 @@ if __name__ == "__main__":
     # Run Uvicorn without SSL
     print(f"Starting HTTP Image Server with FastAPI/Uvicorn...")
     print(f"  URL: http://{host}:{port}")
-    print(f"  Serving from: {project_root.absolute()}")
+    print(f"  Output Folder: {output_folder}")
+    print(f"  DICOM Folder: {dicom_folder}")
     print(f"  Directory Listing Enabled: {not args.disable_dir_listing}")
     print(f"  CORS: Enabled for all origins")
     print(f"  Binding to: 0.0.0.0 (all interfaces)")

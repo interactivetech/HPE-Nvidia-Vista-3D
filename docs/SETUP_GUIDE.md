@@ -204,8 +204,9 @@ nano .env
 **Key configuration options in `.env`:**
 ```bash
 # Project paths (PROJECT_ROOT is now auto-detected)
-DICOM_FOLDER="dicom"
-OUTPUT_FOLDER="output"
+# Use absolute paths for external directories
+DICOM_FOLDER="/path/to/your/dicom"
+OUTPUT_FOLDER="/path/to/your/output"
 
 # Vista3D server (local or remote)
 VISTA3D_SERVER="http://localhost:8000"  # Local

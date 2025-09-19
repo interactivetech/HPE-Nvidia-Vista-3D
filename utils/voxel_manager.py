@@ -32,8 +32,7 @@ class VoxelManager:
         
         # First try to check via image server
         try:
-            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-            voxels_folder_url = f"{self.data.image_server_url}/{output_folder}/{patient_id}/voxels/"
+            voxels_folder_url = f"{self.data.image_server_url}/output/{patient_id}/voxels/"
             
             resp = requests.get(voxels_folder_url, timeout=5)
             if resp.status_code == 200:
@@ -60,8 +59,8 @@ class VoxelManager:
         
         # Fallback: Check local filesystem
         try:
-            output_folder = os.getenv('OUTPUT_FOLDER', 'output')
-            voxels_folder_path = os.path.join(output_folder, patient_id, 'voxels')
+            from .constants import OUTPUT_DIR
+            voxels_folder_path = os.path.join(OUTPUT_DIR, patient_id, 'voxels')
             
             if not os.path.exists(voxels_folder_path):
                 return False

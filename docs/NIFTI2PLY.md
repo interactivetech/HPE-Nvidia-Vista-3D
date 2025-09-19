@@ -36,7 +36,8 @@ The script requires a `.env` file with the following variables:
 
 ```env
 # PROJECT_ROOT is now auto-detected
-OUTPUT_FOLDER=output
+# Use absolute path for OUTPUT_FOLDER
+OUTPUT_FOLDER=/path/to/your/output
 ```
 
 ## Directory Structure

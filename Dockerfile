@@ -9,19 +9,47 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+# Disable Streamlit welcome screen and telemetry
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+ENV STREAMLIT_SERVER_HEADLESS=true
+ENV STREAMLIT_THEME_BASE=dark
+# OpenGL headless rendering support for Open3D
+ENV DISPLAY=:99
+ENV LIBGL_ALWAYS_SOFTWARE=1
+ENV MESA_GL_VERSION_OVERRIDE=3.3
+ENV MESA_GLSL_VERSION_OVERRIDE=330
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
-    libgl1-mesa-dri \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     libgcc-s1 \
+    libxi6 \
+    libxrandr2 \
+    libxss1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxinerama1 \
+    libxtst6 \
+    libasound2 \
+    libatk1.0-0 \
+    libcairo-gobject2 \
+    libgtk-3-0 \
+    libgdk-pixbuf-2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install virtual display for headless OpenGL rendering
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    mesa-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install UV package manager for faster dependency installation
@@ -51,5 +79,20 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# Run the application
-CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Create startup script for virtual display and application
+RUN echo '#!/bin/bash\n\
+# Start virtual display for OpenGL\n\
+Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &\n\
+# Wait for display to be ready\n\
+sleep 2\n\
+# Test OpenGL setup (optional - can be disabled for production)\n\
+if [ "${TEST_OPENGL:-false}" = "true" ]; then\n\
+    echo "Testing OpenGL setup..."\n\
+    python test_opengl.py\n\
+fi\n\
+# Run the application\n\
+exec uv run streamlit run app.py --server.port=8501 --server.address=0.0.0.0' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Run the application with virtual display
+CMD ["/app/start.sh"]

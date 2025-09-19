@@ -221,7 +221,6 @@ class Navigation:
             NavigationItem("about", "About", "home"),
             NavigationItem("niivue", "NiiVue Viewer", "niivue"),
             NavigationItem("ply_viewer", "Open3d Viewer", "ply_viewer", "🔺"),
-            NavigationItem("dicom", "DICOM Inspector", "dicom"),
         ]
         # Set default config
         self.config = {
