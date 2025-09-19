@@ -461,8 +461,8 @@ WantedBy=multi-user.target
         logger.info("  Stop container: docker stop vista3d")
         logger.info("  Access container shell: docker exec -it vista3d bash")
         vista3d_server = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
-        logger.info(f"  Test Vista-3D endpoint: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
-        logger.info(f"  Test with external image server: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"http://your-image-server:port/path/to/image.nii.gz\"}'")
+        logger.info("  Test Vista-3D endpoint: curl " + vista3d_server + "/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
+        logger.info("  Test with external image server: curl " + vista3d_server + "/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"http://your-image-server:port/path/to/image.nii.gz\"}'")
         
         return True
 
