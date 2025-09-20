@@ -14,6 +14,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import extra_streamlit_components as stx
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Fallback if python-dotenv is not available
+    pass
+
 # Add utils to path for imports
 sys.path.append(str(Path(__file__).parent / 'utils'))
 from utils.navigation import render_navigation

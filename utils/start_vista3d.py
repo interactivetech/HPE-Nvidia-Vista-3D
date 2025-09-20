@@ -53,7 +53,15 @@ class Vista3DManager:
 
     def _setup_env_vars(self):
         """Load environment variables from .env file or use defaults."""
+        # Read server configurations from .env
+        self.image_server = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
+        self.vista3d_server = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
+        
         self.env_vars = {
+            # Server Configuration from .env
+            'IMAGE_SERVER': self.image_server,
+            'VISTA3D_SERVER': self.vista3d_server,
+            
             # NVIDIA NGC Configuration
             'NGC_API_KEY': os.getenv('NGC_API_KEY'),
             'NGC_ORG_ID': os.getenv('NGC_ORG_ID'),
@@ -159,28 +167,50 @@ class Vista3DManager:
 
     def _setup_whitelist(self):
         """Setup the domain whitelist for image server access - allows any image server."""
-        # Permissive whitelist to allow any IP address or hostname
+        # Get image server from .env (will be set in _setup_env_vars)
+        image_server = getattr(self, 'image_server', 'http://localhost:8888')
+        
+        # Extract hostname and port from image server URL
+        try:
+            from urllib.parse import urlparse
+            parsed_url = urlparse(image_server)
+            image_host = parsed_url.hostname or 'localhost'
+            image_port = parsed_url.port or (8888 if parsed_url.scheme == 'http' else 443)
+        except:
+            image_host = 'localhost'
+            image_port = 8888
+        
+        # Permissive whitelist to allow any IP address or hostname, plus specific image server
         self.domain_whitelist = [
-            r".*",
+            # Specific image server from .env
+            image_server,
+            image_host,
+            f"{image_host}:{image_port}",
+            f"http://{image_host}",
+            f"http://{image_host}:{image_port}",
+            f"https://{image_host}",
+            f"https://{image_host}:{image_port}",
+            
+            # General permissive patterns
             r".*",
             r"http://.*",
             r"https://.*", 
             r"http://.*:.*",
             r"https://.*:.*",
-            r"http://.*",
-            r"https://.*",
-            r"http://.*:.*",
-            r"https://.*:.*",
             r"file:///.*",
-            r"file:///.*",
+            
+            # Local addresses
             "localhost",
             r"127\.0\.0\.1",
             r"0\.0\.0\.0",
             "::1",
+            
+            # Private network ranges
             r"10\..*",
             r"172\..*",
             r"192\.168\..*",
-            r"/workspace/output/nifti/.*",
+            
+            # Workspace paths
             r"/workspace/output/nifti/.*",
         ]
 
@@ -338,13 +368,17 @@ class Vista3DManager:
         """Test the Vista-3D configuration"""
         logger.info("Testing Vista-3D configuration...")
         
+        # Use Vista3D server from .env
+        vista3d_server = getattr(self, 'vista3d_server', 'http://localhost:8000')
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         
         # Test 1: Basic connectivity
         logger.info("Test 1: Testing Vista-3D connectivity...")
+        logger.info(f"Testing Vista-3D server: {vista3d_server}")
         try:
             import requests
-            response = requests.get(f"http://localhost:{vista3d_port}/health", timeout=10)
+            # Test the configured Vista3D server
+            response = requests.get(f"{vista3d_server}/health", timeout=10)
             logger.info(f"Vista-3D health check response: {response.status_code}")
         except Exception as e:
             logger.warning(f"Vista-3D health check failed (may be normal during startup): {e}")
@@ -446,8 +480,12 @@ WantedBy=multi-user.target
         
         # Success message
         logger.info("==========================================")
+        vista3d_server = getattr(self, 'vista3d_server', 'http://localhost:8000')
+        image_server = getattr(self, 'image_server', 'http://localhost:8888')
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
-        logger.info(f"Vista-3D is now running on port {vista3d_port}")
+        
+        logger.info(f"Vista-3D is now running on: {vista3d_server}")
+        logger.info(f"Configured to accept images from: {image_server}")
         logger.info("Vista-3D is configured to accept connections from any image server")
         logger.info("✅ External access is fully enabled")
         logger.info("✅ Any IP address or hostname is allowed")
@@ -460,9 +498,8 @@ WantedBy=multi-user.target
         logger.info("  View Vista-3D logs: docker logs -f vista3d")
         logger.info("  Stop container: docker stop vista3d")
         logger.info("  Access container shell: docker exec -it vista3d bash")
-        vista3d_server = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
-        logger.info("  Test Vista-3D endpoint: curl " + vista3d_server + "/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"test\"}'")
-        logger.info("  Test with external image server: curl " + vista3d_server + "/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{\"image\":\"http://your-image-server:port/path/to/image.nii.gz\"}'")
+        logger.info(f"  Test Vista-3D endpoint: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{{\"image\":\"test\"}}'")
+        logger.info(f"  Test with configured image server: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{{\"image\":\"{image_server}/path/to/image.nii.gz\"}}'")
         
         return True
 
@@ -481,11 +518,17 @@ For automatic startup on boot:
   2. The service will start automatically on boot
   3. Check status: sudo systemctl status vista3d
 
+Configuration:
+  The script reads configuration from the .env file in the project root:
+    IMAGE_SERVER=http://localhost:8888     # Your local image server URL
+    VISTA3D_SERVER=http://localhost:8000   # Vista3D server URL
+    OUTPUT_FOLDER=/path/to/output          # Output directory (absolute path)
+  
 Network Access Configuration:
   Vista3D is configured to accept connections from any image server by default.
   All network restrictions, CORS checks, and validation are disabled for maximum compatibility.
   
-  Key Environment Variables:
+  Key Environment Variables (from .env):
     USE_HOST_NETWORKING=True            # Use host networking (allows all interfaces)
     VISTA3D_PORT=8000                  # Port for Vista3D (when not using host networking)
     ALLOW_ANY_IMAGE_SERVER_HOST=True   # Allow any host/IP for image server access

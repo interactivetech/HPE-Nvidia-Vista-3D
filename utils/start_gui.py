@@ -58,8 +58,8 @@ class Vista3DGUIManager:
             'STREAMLIT_SERVER_ADDRESS': os.getenv('STREAMLIT_SERVER_ADDRESS', '0.0.0.0'),
             
             # Server URLs
-            'IMAGE_SERVER': os.getenv('IMAGE_SERVER', 'http://image-server:8888'),
-            'VISTA3D_SERVER': os.getenv('VISTA3D_SERVER', 'http://vista3d-server:8000'),
+            'IMAGE_SERVER': os.getenv('IMAGE_SERVER', 'http://localhost:8888'),
+            'VISTA3D_SERVER': os.getenv('VISTA3D_SERVER', 'http://localhost:8000'),
             
             # API Keys
             'VISTA3D_API_KEY': os.getenv('VISTA3D_API_KEY'),
@@ -441,8 +441,8 @@ Container Configuration:
     STREAMLIT_SERVER_PORT=8501        # Port for Streamlit app
     IMAGE_SERVER_PORT=8888            # Port for image server
     USE_HOST_NETWORKING=False         # Use bridge networking (default)
-    IMAGE_SERVER=http://image-server:8888  # Image server URL
-    VISTA3D_SERVER=http://vista3d-server:8000  # Vista3D server URL
+    IMAGE_SERVER=http://localhost:8888  # Image server URL
+    VISTA3D_SERVER=http://localhost:8000  # Vista3D server URL
   
   Examples:
     # Use default ports
