@@ -35,6 +35,8 @@ services:
       - ./.env:/app/.env
     networks:
       - local-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     depends_on:
       - image-server
@@ -64,6 +66,8 @@ services:
       - ./.env:/app/.env
     networks:
       - local-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/health"]

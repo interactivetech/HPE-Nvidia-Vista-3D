@@ -31,6 +31,10 @@ load_dotenv()
 IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 VISTA3D_SERVER = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
 VISTA3D_INFERENCE_URL = f"{VISTA3D_SERVER.rstrip('/')}/v1/vista3d/inference"
+
+# For Vista3D server communication, use the URL that Vista3D container can access
+# Vista3D server runs in separate container and needs container name access
+VISTA3D_IMAGE_SERVER_URL = os.getenv('VISTA3D_IMAGE_SERVER_URL', 'http://vista3d-image-server:8888')
 # Use full paths from .env - no more PROJECT_ROOT needed
 OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
 if not OUTPUT_FOLDER:
@@ -226,15 +230,16 @@ def main():
                 # Calculate relative path from output folder to the nifti file
                 relative_path_to_nifti = nifti_file_path.relative_to(NIFTI_INPUT_BASE_DIR)
                 
-                # Build URL using local image server configuration
-                vista3d_input_url = f"{IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"
+                # Build URL using Vista3D-accessible image server configuration
+                # Vista3D server runs in Docker and needs host.docker.internal access
+                vista3d_input_url = f"{VISTA3D_IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"
                 
                 payload = {"image": vista3d_input_url, "prompts": {"labels": target_vessels}}
                 headers = {"Content-Type": "application/json"}
 
                 print(f"\n  Processing: {nifti_file_path.name}")
                 print(f"    Vista3D Server: {VISTA3D_SERVER}")
-                print(f"    Image URL: {vista3d_input_url}")
+                print(f"    Image URL (Vista3D-accessible): {vista3d_input_url}")
                 print(f"    Target vessels: {target_vessels}")
                 
                 inference_response = requests.post(VISTA3D_INFERENCE_URL, json=payload, headers=headers, verify=False)

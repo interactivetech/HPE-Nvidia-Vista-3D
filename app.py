@@ -35,24 +35,64 @@ def check_image_server_status():
     # Get server URL from environment variable (matching image_server.py)
     image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
     
-    try:
-        # Make a quick HEAD request to check if server is responding
-        response = requests.head(image_server_url, timeout=3)
-        return True if response.status_code == 200 else False
-    except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+    # If running in Docker container, try multiple approaches
+    if os.getenv("DOCKER_CONTAINER") == "true":
+        # List of URLs to try in order
+        urls_to_try = [
+            image_server_url,  # Configured URL (likely host.docker.internal:8888)
+            "http://localhost:8888",  # localhost fallback
+            "http://127.0.0.1:8888",  # IP fallback
+            "http://image-server:8888",  # Container name (if image server is in same compose)
+        ]
+        
+        for url in urls_to_try:
+            try:
+                response = requests.head(url, timeout=2)
+                if response.status_code == 200:
+                    return True
+            except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+                continue
         return False
+    else:
+        # Running outside Docker, use the configured URL
+        try:
+            response = requests.head(image_server_url, timeout=3)
+            return True if response.status_code == 200 else False
+        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+            return False
 
 def check_vista3d_server_status():
     """Check if the Vista3D server is available."""
     # Get server URL from environment variable
     vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
     
-    try:
-        # Make a GET request to the Vista3D info endpoint
-        response = requests.get(f"{vista3d_server_url}/v1/vista3d/info", timeout=5)
-        return True if response.status_code == 200 else False
-    except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+    # If running in Docker container, try multiple approaches
+    if os.getenv("DOCKER_CONTAINER") == "true":
+        # List of URLs to try in order
+        urls_to_try = [
+            vista3d_server_url,  # Configured URL (likely host.docker.internal:8000)
+            "http://localhost:8000",  # localhost fallback
+            "http://127.0.0.1:8000",  # IP fallback
+        ]
+        
+        for base_url in urls_to_try:
+            try:
+                response = requests.get(f"{base_url}/v1/vista3d/info", timeout=3)
+                if response.status_code == 200:
+                    return True
+                # Log the specific error for debugging
+                print(f"Vista3D status check - {base_url}: HTTP {response.status_code}")
+            except requests.exceptions.RequestException as e:
+                print(f"Vista3D status check - {base_url}: {type(e).__name__}: {e}")
+                continue
         return False
+    else:
+        # Running outside Docker, use the configured URL
+        try:
+            response = requests.get(f"{vista3d_server_url}/v1/vista3d/info", timeout=5)
+            return True if response.status_code == 200 else False
+        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+            return False
 
 def run_server_analysis():
     """Run the server analysis script and return parsed data."""
@@ -473,23 +513,11 @@ if current_page == 'home':
     _render_hpe_badge()
     # Render NiiVue badge in sidebar
     #_render_niivue_badge()
+    
+    # Render server status widgets in sidebar
+    render_server_status_sidebar()
+    
     st.markdown('<h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Vessel Segmentation Viewer</h2>', unsafe_allow_html=True)
-    
-    # Image Data Analysis Section on main page
-    if check_image_server_status():
-        image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
-        st.info(f"🖥️ Image Server — Online • {image_server_url}")
-    else:
-        st.error("🖥️ Image Server — Offline. Start with: `python utils/image_server.py`")
-    
-    # Vista3D Server Status
-    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
-    if check_vista3d_server_status():
-        st.info(f"🧠 Vista3D Server — Online • {vista3d_server_url}")
-    else:
-        st.error(f"🧠 Vista3D Server — Offline • {vista3d_server_url}")
-    
-    st.markdown("---")
     st.header("🩻 Image Data")
     
     if check_image_server_status():

@@ -253,14 +253,16 @@ class Vista3DManager:
     def check_docker(self) -> bool:
         """Check if Docker is available and running"""
         try:
-            result = self.run_command("docker --version", check=False)
+            result = self.run_command("docker --version", check=False, capture_output=True)
             if result.returncode != 0:
                 logger.error("Docker is not installed or not in PATH")
+                logger.error("Install Docker with: curl -fsSL https://get.docker.com | sh")
                 return False
             
-            result = self.run_command("docker ps", check=False)
+            result = self.run_command("docker ps", check=False, capture_output=True)
             if result.returncode != 0:
                 logger.error("Docker daemon is not running")
+                logger.error("Start Docker with: sudo systemctl start docker")
                 return False
             
             logger.info("✅ Docker is available and running")
@@ -268,6 +270,101 @@ class Vista3DManager:
         except Exception as e:
             logger.error(f"Error checking Docker: {e}")
             return False
+    
+    def check_nvidia_support(self) -> bool:
+        """Check if NVIDIA GPU and Docker runtime are available"""
+        logger.info("Checking NVIDIA GPU support...")
+        
+        # Check if nvidia-smi is available
+        try:
+            result = self.run_command("nvidia-smi", check=False, capture_output=True)
+            if result.returncode != 0:
+                logger.error("❌ nvidia-smi not found - NVIDIA drivers not installed")
+                logger.error("Install NVIDIA drivers: sudo apt install nvidia-driver-<version>")
+                return False
+            
+            logger.info("✅ NVIDIA drivers detected")
+            
+            # Parse GPU information
+            try:
+                gpu_result = self.run_command(
+                    "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits", 
+                    check=False, capture_output=True
+                )
+                if gpu_result.returncode == 0 and gpu_result.stdout.strip():
+                    gpu_lines = gpu_result.stdout.strip().split('\n')
+                    logger.info(f"✅ Found {len(gpu_lines)} NVIDIA GPU(s):")
+                    for i, line in enumerate(gpu_lines):
+                        name, memory = line.split(', ')
+                        logger.info(f"   GPU {i}: {name} ({memory} MB)")
+                else:
+                    logger.warning("Could not parse GPU information")
+            except Exception as e:
+                logger.warning(f"Could not get detailed GPU info: {e}")
+            
+        except Exception as e:
+            logger.error(f"Error checking NVIDIA drivers: {e}")
+            return False
+        
+        # Check NVIDIA Container Toolkit
+        try:
+            result = self.run_command(
+                "docker run --rm --gpus all nvidia/cuda:11.0-base-ubuntu20.04 nvidia-smi", 
+                check=False, capture_output=True
+            )
+            if result.returncode != 0:
+                logger.error("❌ NVIDIA Container Toolkit not properly configured")
+                logger.error("Install with:")
+                logger.error("  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg")
+                logger.error("  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list")
+                logger.error("  sudo apt update && sudo apt-get install -y nvidia-container-toolkit")
+                logger.error("  sudo nvidia-ctk runtime configure --runtime=docker")
+                logger.error("  sudo systemctl restart docker")
+                return False
+            
+            logger.info("✅ NVIDIA Container Toolkit is properly configured")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error testing NVIDIA Container Toolkit: {e}")
+            return False
+    
+    def check_system_resources(self) -> bool:
+        """Check if system has adequate resources"""
+        logger.info("Checking system resources...")
+        
+        try:
+            # Check available memory
+            with open('/proc/meminfo', 'r') as f:
+                meminfo = f.read()
+            
+            for line in meminfo.split('\n'):
+                if line.startswith('MemAvailable:'):
+                    available_kb = int(line.split()[1])
+                    available_gb = available_kb / (1024 * 1024)
+                    
+                    if available_gb < 8:
+                        logger.warning(f"⚠️  Low available memory: {available_gb:.1f}GB (recommended: 8GB+)")
+                        logger.warning("Vista3D may run slowly or fail with insufficient memory")
+                    else:
+                        logger.info(f"✅ Sufficient memory available: {available_gb:.1f}GB")
+                    break
+            
+            # Check disk space
+            import shutil
+            output_folder = os.getenv('OUTPUT_FOLDER')
+            if output_folder:
+                free_space = shutil.disk_usage(output_folder).free / (1024**3)
+                if free_space < 10:
+                    logger.warning(f"⚠️  Low disk space in output folder: {free_space:.1f}GB (recommended: 10GB+)")
+                else:
+                    logger.info(f"✅ Sufficient disk space: {free_space:.1f}GB")
+            
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Could not check system resources: {e}")
+            return True  # Don't fail startup for this
     
     def stop_existing_container(self):
         """Stop and remove any existing Vista-3D container"""
@@ -295,7 +392,7 @@ class Vista3DManager:
     
     
     def start_vista3d_container(self) -> bool:
-        """Start the Vista-3D Docker container"""
+        """Start the Vista-3D Docker container with retry logic"""
         logger.info("Starting Vista-3D container...")
         
         # Build environment variables string
@@ -339,29 +436,137 @@ class Vista3DManager:
         host_entries += " --add-host=localhost:host-gateway"
         host_entries += " --add-host=127.0.0.1:host-gateway"
         
-        docker_cmd = f"""docker run --gpus all --rm -d --name {self.container_name} --runtime=nvidia --shm-size=8G {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
+        # Performance optimizations for server deployment
+        performance_opts = ""
         
+        # Memory and CPU settings
+        memory_limit = os.getenv('VISTA3D_MEMORY_LIMIT', '16G')
+        cpu_limit = os.getenv('VISTA3D_CPU_LIMIT', '8')
+        performance_opts += f" --memory={memory_limit} --cpus={cpu_limit}"
+        
+        # GPU optimizations
+        gpu_memory_fraction = os.getenv('GPU_MEMORY_FRACTION', '0.9')
+        performance_opts += f" -e GPU_MEMORY_FRACTION={gpu_memory_fraction}"
+        
+        # CUDA optimizations for server workloads
+        performance_opts += " -e CUDA_LAUNCH_BLOCKING=0"  # Non-blocking for better performance
+        performance_opts += " -e CUDA_CACHE_DISABLE=0"    # Enable CUDA cache
+        performance_opts += " -e CUDA_DEVICE_ORDER=PCI_BUS_ID"  # Consistent GPU ordering
+        
+        # Shared memory optimizations for large models
+        shm_size = os.getenv('VISTA3D_SHM_SIZE', '12G')
+        
+        # IPC and security optimizations
+        ipc_opts = "--ipc=host"  # Better for multi-GPU and performance
+        security_opts = "--security-opt=no-new-privileges"  # Security hardening
+        
+        # Restart policy for server deployment
+        restart_policy = "--restart=unless-stopped" if os.getenv('VISTA3D_AUTO_RESTART', 'true').lower() == 'true' else ""
+        
+        docker_cmd = f"""docker run --gpus all {restart_policy} -d --name {self.container_name} --runtime=nvidia --shm-size={shm_size} {performance_opts} {ipc_opts} {security_opts} {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
+        
+        # Try to start container with retries
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Starting container (attempt {attempt + 1}/{max_retries})...")
+                result = self.run_command(docker_cmd, capture_output=True)
+                
+                if result.returncode == 0:
+                    logger.info("✅ Vista-3D container started successfully!")
+                    
+                    # Wait for container to be ready and check health
+                    if self._wait_for_container_ready():
+                        return True
+                    else:
+                        logger.warning(f"Container started but health check failed on attempt {attempt + 1}")
+                        if attempt < max_retries - 1:
+                            logger.info("Retrying...")
+                            self.stop_existing_container()
+                            time.sleep(5)
+                            continue
+                        else:
+                            return False
+                else:
+                    logger.error(f"❌ Failed to start Vista-3D container (attempt {attempt + 1})")
+                    if result.stderr:
+                        logger.error(f"Error output: {result.stderr}")
+                    
+                    if attempt < max_retries - 1:
+                        logger.info("Retrying...")
+                        self.stop_existing_container()
+                        time.sleep(5)
+                    else:
+                        # Final attempt failed - show more detailed error info
+                        logger.error("All container start attempts failed")
+                        logger.error("Checking Docker image availability...")
+                        self.run_command("docker images | grep vista3d", check=False)
+                        logger.error("Checking for conflicting containers...")
+                        self.run_command("docker ps -a | grep vista", check=False)
+                        return False
+                        
+            except Exception as e:
+                logger.error(f"Error starting container (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    logger.info("Retrying...")
+                    time.sleep(5)
+                else:
+                    return False
+        
+        return False
+    
+    def _wait_for_container_ready(self) -> bool:
+        """Wait for container to be ready and perform health checks"""
+        logger.info("Waiting for container to be ready...")
+        
+        # Wait for container to start
+        time.sleep(10)
+        
+        # Check if container is running
         try:
-            result = self.run_command(docker_cmd)
-            if result.returncode == 0:
-                logger.info("✅ Vista-3D container started successfully!")
-                
-                # Wait for container to be ready
-                time.sleep(5)
-                
-                # Show container status
-                self.run_command(f"docker ps | grep {self.container_name}")
-                
-                # Show container logs
-                logger.info("Container logs (last 20 lines):")
-                self.run_command(f"docker logs {self.container_name} --tail 20")
-                
-                return True
-            else:
-                logger.error("❌ Failed to start Vista-3D container")
+            result = self.run_command(f"docker ps | grep {self.container_name}", check=False, capture_output=True)
+            if result.returncode != 0:
+                logger.error("Container is not running")
+                # Show container logs for debugging
+                self.run_command(f"docker logs {self.container_name} --tail 50")
                 return False
+            
+            logger.info("✅ Container is running")
+            
+            # Show container status
+            self.run_command(f"docker ps | grep {self.container_name}")
+            
+            # Show container logs
+            logger.info("Container logs (last 20 lines):")
+            self.run_command(f"docker logs {self.container_name} --tail 20")
+            
+            # Try to connect to the service (with timeout)
+            vista3d_server = getattr(self, 'vista3d_server', 'http://localhost:8000')
+            logger.info(f"Testing connectivity to {vista3d_server}...")
+            
+            max_wait_time = 60  # seconds
+            start_time = time.time()
+            
+            while time.time() - start_time < max_wait_time:
+                try:
+                    import requests
+                    response = requests.get(f"{vista3d_server}/health", timeout=5)
+                    if response.status_code == 200:
+                        logger.info("✅ Vista-3D service is responding to health checks")
+                        return True
+                except Exception:
+                    pass
+                
+                logger.info("Waiting for service to be ready...")
+                time.sleep(5)
+            
+            logger.warning("⚠️  Vista-3D service is not responding to health checks yet")
+            logger.warning("This may be normal - the container might still be initializing")
+            logger.warning("Check the container logs and try connecting after a few minutes")
+            return True  # Don't fail startup just because health check isn't ready yet
+            
         except Exception as e:
-            logger.error(f"Error starting container: {e}")
+            logger.error(f"Error checking container readiness: {e}")
             return False
     
     def test_configuration(self):
@@ -393,6 +598,60 @@ class Vista3DManager:
         logger.info("✅ Image server validation is disabled")
         logger.info("✅ URL validation is disabled")
         logger.info("✅ Host validation is disabled")
+    
+    def run_performance_test(self):
+        """Run basic performance tests on the Vista-3D container"""
+        logger.info("🏁 Running performance tests...")
+        
+        try:
+            # Test container resource usage
+            result = self.run_command(f"docker stats {self.container_name} --no-stream", check=False, capture_output=True)
+            if result.returncode == 0:
+                logger.info("📊 Container resource usage:")
+                lines = result.stdout.strip().split('\n')
+                if len(lines) > 1:  # Skip header
+                    stats = lines[1].split()
+                    if len(stats) >= 6:
+                        cpu_usage = stats[2]
+                        mem_usage = stats[3]
+                        logger.info(f"   CPU Usage: {cpu_usage}")
+                        logger.info(f"   Memory Usage: {mem_usage}")
+            
+            # Test GPU utilization
+            result = self.run_command("nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits", check=False, capture_output=True)
+            if result.returncode == 0:
+                logger.info("🎯 GPU utilization:")
+                gpu_lines = result.stdout.strip().split('\n')
+                for i, line in enumerate(gpu_lines):
+                    parts = line.split(', ')
+                    if len(parts) >= 3:
+                        gpu_util, mem_used, mem_total = parts
+                        mem_percent = (int(mem_used) / int(mem_total)) * 100
+                        logger.info(f"   GPU {i}: {gpu_util}% utilization, {mem_used}/{mem_total}MB memory ({mem_percent:.1f}%)")
+            
+            # Test API response time
+            vista3d_server = getattr(self, 'vista3d_server', 'http://localhost:8000')
+            logger.info("⚡ Testing API response time...")
+            try:
+                import requests
+                import time
+                
+                start_time = time.time()
+                response = requests.get(f"{vista3d_server}/health", timeout=5)
+                response_time = (time.time() - start_time) * 1000
+                
+                if response.status_code == 200:
+                    logger.info(f"   Health endpoint: {response_time:.1f}ms")
+                else:
+                    logger.warning(f"   Health endpoint returned status {response.status_code}")
+                    
+            except Exception as e:
+                logger.warning(f"   Could not test API response time: {e}")
+            
+            logger.info("✅ Performance test completed")
+            
+        except Exception as e:
+            logger.warning(f"Performance test failed: {e}")
     
     def create_systemd_service(self):
         """Create systemd service for automatic startup"""
@@ -460,10 +719,31 @@ WantedBy=multi-user.target
     def run(self):
         """Main execution logic"""
         logger.info("Starting Vista-3D container for remote image server access...")
+        logger.info("=" * 60)
+        
+        # Check system requirements
+        logger.info("📋 Checking system requirements...")
         
         # Check Docker availability
         if not self.check_docker():
+            logger.error("❌ Docker check failed")
             return False
+        
+        # Check NVIDIA GPU support (unless skipped)
+        skip_gpu_check = getattr(self, 'skip_gpu_check', False)
+        if not skip_gpu_check:
+            if not self.check_nvidia_support():
+                logger.error("❌ NVIDIA GPU support check failed")
+                logger.error("Vista3D requires NVIDIA GPU and Docker runtime support")
+                return False
+        else:
+            logger.warning("⚠️  Skipping GPU check as requested (--skip-gpu-check)")
+        
+        # Check system resources
+        self.check_system_resources()
+        
+        logger.info("✅ All system checks passed")
+        logger.info("=" * 60)
         
         # Create output directory
         self.create_output_directory()
@@ -478,28 +758,36 @@ WantedBy=multi-user.target
         # Test configuration
         self.test_configuration()
         
+        # Run performance tests (if requested or by default)
+        run_perf_test = getattr(self, 'run_performance_test_flag', True)
+        if run_perf_test:
+            self.run_performance_test()
+        
         # Success message
-        logger.info("==========================================")
+        logger.info("=" * 60)
+        logger.info("🎉 VISTA-3D SUCCESSFULLY STARTED!")
+        logger.info("=" * 60)
         vista3d_server = getattr(self, 'vista3d_server', 'http://localhost:8000')
         image_server = getattr(self, 'image_server', 'http://localhost:8888')
         vista3d_port = os.getenv('VISTA3D_PORT', '8000')
         
-        logger.info(f"Vista-3D is now running on: {vista3d_server}")
-        logger.info(f"Configured to accept images from: {image_server}")
-        logger.info("Vista-3D is configured to accept connections from any image server")
+        logger.info(f"🌐 Vista-3D Server: {vista3d_server}")
+        logger.info(f"📡 Image Server: {image_server}")
+        logger.info("🔓 Vista-3D is configured to accept connections from any image server")
         logger.info("✅ External access is fully enabled")
         logger.info("✅ Any IP address or hostname is allowed")
         logger.info("✅ CORS restrictions are disabled")
         logger.info("✅ Network validation is disabled")
         logger.info("✅ Image server validation is disabled")
-        logger.info("==========================================")
+        logger.info("=" * 60)
         
-        logger.info("\nUseful commands:")
-        logger.info("  View Vista-3D logs: docker logs -f vista3d")
-        logger.info("  Stop container: docker stop vista3d")
-        logger.info("  Access container shell: docker exec -it vista3d bash")
-        logger.info(f"  Test Vista-3D endpoint: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{{\"image\":\"test\"}}'")
-        logger.info(f"  Test with configured image server: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{{\"image\":\"{image_server}/path/to/image.nii.gz\"}}'")
+        logger.info("\n🛠️  Useful commands:")
+        logger.info("  📜 View Vista-3D logs: docker logs -f vista3d")
+        logger.info("  🛑 Stop container: docker stop vista3d")
+        logger.info("  🖥️  Access container shell: docker exec -it vista3d bash")
+        logger.info(f"  🧪 Test Vista-3D health: curl {vista3d_server}/health")
+        logger.info(f"  🔬 Test Vista-3D inference: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{{\"image\":\"test\"}}'")
+        logger.info(f"  📊 Test with image server: curl {vista3d_server}/v1/vista3d/inference -X POST -H 'Content-Type: application/json' -d '{{\"image\":\"{image_server}/path/to/image.nii.gz\"}}'")
         
         return True
 
@@ -509,7 +797,32 @@ def main():
         description="Vista-3D Docker Startup Script for Remote Image Server Access",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
+🚀 LINUX SERVER DEPLOYMENT:
+
+Prerequisites for Linux servers with NVIDIA GPU:
+  1. Ubuntu 18.04+ or RHEL/CentOS 7+
+  2. NVIDIA GPU with CUDA support (RTX/Tesla/A100/H100 series)
+  3. NVIDIA drivers installed (version 470+)
+  4. Docker and NVIDIA Container Toolkit
+  5. At least 8GB RAM and 10GB free disk space
+
+Quick Setup on fresh Linux server:
+  # Install Docker
+  curl -fsSL https://get.docker.com | sh
+  sudo usermod -aG docker $USER
+  newgrp docker
+  
+  # Install NVIDIA Container Toolkit
+  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+  sudo apt update && sudo apt-get install -y nvidia-container-toolkit
+  sudo nvidia-ctk runtime configure --runtime=docker
+  sudo systemctl restart docker
+  
+  # Test GPU access
+  sudo docker run --rm --gpus all nvidia/cuda:11.0-base-ubuntu20.04 nvidia-smi
+
+Usage Examples:
   python3 start_vista3d.py                 # Start Vista-3D container
   sudo python3 start_vista3d.py --create-service  # Create systemd service for auto-startup
 
@@ -518,36 +831,41 @@ For automatic startup on boot:
   2. The service will start automatically on boot
   3. Check status: sudo systemctl status vista3d
 
-Configuration:
-  The script reads configuration from the .env file in the project root:
-    IMAGE_SERVER=http://localhost:8888     # Your local image server URL
-    VISTA3D_SERVER=http://localhost:8000   # Vista3D server URL
-    OUTPUT_FOLDER=/path/to/output          # Output directory (absolute path)
+Configuration (.env file):
+  Required:
+    NGC_API_KEY=nvapi-xxxxxxxxxxxxx       # Get from NGC catalog
+    OUTPUT_FOLDER=/path/to/output          # Absolute path to output directory
   
+  Network Configuration:
+    IMAGE_SERVER=http://localhost:8888     # Your image server URL
+    VISTA3D_SERVER=http://localhost:8000   # Vista3D server URL
+    USE_HOST_NETWORKING=True              # Use host networking (recommended for servers)
+    VISTA3D_PORT=8000                    # Port when not using host networking
+  
+  GPU Configuration:
+    CUDA_VISIBLE_DEVICES=0               # GPU device ID to use
+    GPU_MEMORY_FRACTION=0.9              # GPU memory allocation (0.1-1.0)
+    
+  Performance Tuning:
+    VISTA3D_MEMORY_LIMIT=16G             # Container memory limit
+    VISTA3D_CPU_LIMIT=8                  # Container CPU limit
+    VISTA3D_SHM_SIZE=12G                 # Shared memory size
+    VISTA3D_AUTO_RESTART=true            # Auto-restart on failure
+
 Network Access Configuration:
   Vista3D is configured to accept connections from any image server by default.
   All network restrictions, CORS checks, and validation are disabled for maximum compatibility.
   
-  Key Environment Variables (from .env):
-    USE_HOST_NETWORKING=True            # Use host networking (allows all interfaces)
-    VISTA3D_PORT=8000                  # Port for Vista3D (when not using host networking)
-    ALLOW_ANY_IMAGE_SERVER_HOST=True   # Allow any host/IP for image server access
-    DISABLE_URL_VALIDATION=True        # Disable URL validation restrictions
-    ALLOW_ANY_IP_ACCESS=True           # Allow any IP address access
-    DISABLE_HOST_VALIDATION=True       # Disable host validation
-    ALLOW_HTTP_ACCESS=True             # Allow HTTP access
-    ALLOW_HTTPS_ACCESS=True            # Allow HTTPS access
-    DISABLE_CORS=True                  # Disable CORS restrictions
-    DISABLE_NETWORK_RESTRICTIONS=True  # Disable all network restrictions
-    VISTA3D_ALLOW_EXTERNAL_IMAGES=True # Allow external image access
-    VISTA3D_DISABLE_IMAGE_VALIDATION=True # Disable image validation
-  
-  Examples:
-    # Use host networking for maximum external access
-    USE_HOST_NETWORKING=True python3 start_vista3d.py
-    
-    # Use specific port with external access
-    USE_HOST_NETWORKING=False VISTA3D_PORT=8000 python3 start_vista3d.py
+  For servers with firewalls:
+    - Open port 8000 (or VISTA3D_PORT) for Vista3D API access
+    - Configure IMAGE_SERVER to match your setup
+    - Use USE_HOST_NETWORKING=True for maximum compatibility
+
+Troubleshooting:
+  🔍 Check GPU: nvidia-smi
+  🔍 Check Docker: docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+  🔍 Check logs: docker logs -f vista3d
+  🔍 Test API: curl http://localhost:8000/health
         """
     )
     
@@ -557,9 +875,25 @@ Network Access Configuration:
         help='Create systemd service for automatic startup (requires root)'
     )
     
+    parser.add_argument(
+        '--performance-test',
+        action='store_true',
+        help='Run additional performance tests after startup'
+    )
+    
+    parser.add_argument(
+        '--skip-gpu-check',
+        action='store_true',
+        help='Skip NVIDIA GPU validation (for testing only)'
+    )
+    
     args = parser.parse_args()
     
     manager = Vista3DManager()
+    
+    # Set command line options
+    manager.skip_gpu_check = args.skip_gpu_check
+    manager.run_performance_test_flag = args.performance_test or True  # Default to True
     
     try:
         if args.create_service:

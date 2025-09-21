@@ -185,8 +185,8 @@ After successful setup, you should see:
 ```
 🎉 Vista3D setup completed successfully!
 
-Vista3D is running on: http://localhost:8000
-API endpoint: http://localhost:8000/v1/vista3d/inference
+Vista3D is running on: http://localhost:8001
+API endpoint: http://localhost:8001/v1/vista3d/inference
 ```
 
 ### Test the API
@@ -198,12 +198,12 @@ sudo docker ps | grep vista3d
 sudo docker logs vista3d
 
 # Test API endpoint
-curl -X POST http://localhost:8000/v1/vista3d/inference \
+curl -X POST http://localhost:8001/v1/vista3d/inference \
   -H "Content-Type: application/json" \
   -d '{"image": "/workspace/output/nifti/test.nii.gz"}'
 
 # Query API for supported labels
-curl http://localhost:8000/v1/vista3d/info
+curl http://localhost:8001/v1/vista3d/info
 ```
 
 ## Container Management
@@ -294,7 +294,7 @@ sudo docker ps | grep vista3d
 sudo docker logs vista3d
 
 # Test API connectivity
-curl -v http://localhost:8000/v1/vista3d/info
+curl -v http://localhost:8001/v1/vista3d/info
 ```
 
 ### Log Files
@@ -319,7 +319,7 @@ NGC_ORG_ID=nvidia
 
 # Vista3D Configuration
 VISTA3D_CONTAINER_NAME=vista3d
-VISTA3D_PORT=8000
+VISTA3D_PORT=8001
 LOCAL_NIM_CACHE=~/.cache/nim
 
 # GPU Configuration
@@ -369,7 +369,7 @@ IMAGE_URI_HTTPS_ONLY=False
 
 ### Container Configuration
 - **Image**: `nvcr.io/nim/nvidia/vista3d:1.0.0`
-- **Port**: 8000 (Vista3D API)
+- **Port**: 8001 (Vista3D API)
 - **GPU**: All available GPUs
 - **Memory**: 8GB shared memory
 - **Volumes**: Project output directory mounted at `/workspace/output`
@@ -418,7 +418,7 @@ After Vista3D is running:
 
 - **API Keys**: The `.env` file contains sensitive credentials. Do not commit it to version control.
 - **Docker Access**: The script requires sudo access for Docker operations.
-- **Network**: Vista3D container runs on localhost:8000 by default.
+- **Network**: Vista3D container runs on localhost:8001 by default.
 - **File Access**: Container has access to the project output directory.
 
 ## Performance Tips

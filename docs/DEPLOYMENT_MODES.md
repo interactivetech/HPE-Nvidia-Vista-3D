@@ -7,7 +7,7 @@ This guide explains the different ways to deploy the HPE NVIDIA Vista3D Medical 
 The platform consists of three main components:
 - **Streamlit App** (Port 8501) - Web interface for medical imaging
 - **Image Server** (Port 8888) - HTTP server for medical image files
-- **Vista3D Server** (Port 8000) - AI segmentation service (requires GPU)
+- **Vista3D Server** (Port 8001) - AI segmentation service (requires GPU)
 
 ## 🎯 Deployment Modes
 
@@ -31,7 +31,7 @@ cp env.example .env
 nano .env
 
 # 2. Set these variables in .env:
-VISTA3D_SERVER=https://your-vista3d-server.com:8000
+VISTA3D_SERVER=https://your-vista3d-server.com:8001
 VISTA3D_API_KEY=your_nvidia_api_key_here
 IMAGE_SERVER=http://image-server:8888
 EXTERNAL_IMAGE_SERVER=http://localhost:8888
@@ -43,7 +43,7 @@ python3 utils/start_gui.py
 **Access Points**:
 - Streamlit App: http://localhost:8501
 - Image Server: http://localhost:8888
-- Vista3D Server: https://your-vista3d-server.com:8000 (remote)
+- Vista3D Server: https://your-vista3d-server.com:8001 (remote)
 
 ### Mode 2: All Services Local (Development)
 
@@ -53,7 +53,7 @@ python3 utils/start_gui.py
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Streamlit     │    │  Image Server   │    │  Vista3D Server │
-│   (Port 8501)   │◄──►│  (Port 8888)    │◄──►│  (Port 8000)    │
+│   (Port 8501)   │◄──►│  (Port 8888)    │◄──►│  (Port 8001)    │
 │   Local Docker  │    │  Local Docker   │    │  Local Docker   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -65,7 +65,7 @@ cp env.example .env
 nano .env
 
 # 2. Set these variables in .env:
-VISTA3D_SERVER=http://vista3d-server:8000
+VISTA3D_SERVER=http://vista3d-server:8001
 VISTA3D_API_KEY=your_nvidia_api_key_here
 IMAGE_SERVER=http://image-server:8888
 EXTERNAL_IMAGE_SERVER=http://localhost:8888
@@ -80,7 +80,7 @@ python3 utils/start_gui.py
 **Access Points**:
 - Streamlit App: http://localhost:8501
 - Image Server: http://localhost:8888
-- Vista3D Server: http://localhost:8000
+- Vista3D Server: http://localhost:8001
 
 ### Mode 3: Production with Auto-Startup
 
@@ -130,7 +130,7 @@ sudo journalctl -u vista3d-gui -f
 
 | Variable | Mode 1 (Remote) | Mode 2 (Local) | Description |
 |----------|----------------|----------------|-------------|
-| `VISTA3D_SERVER` | `https://remote-server:8000` | `http://vista3d-server:8000` | Vista3D server URL |
+| `VISTA3D_SERVER` | `https://remote-server:8001` | `http://vista3d-server:8001` | Vista3D server URL |
 | `VISTA3D_API_KEY` | `your_api_key` | `your_api_key` | NVIDIA API key |
 | `IMAGE_SERVER` | `http://image-server:8888` | `http://image-server:8888` | Internal image server URL |
 | `EXTERNAL_IMAGE_SERVER` | `http://localhost:8888` | `http://localhost:8888` | External image server URL |
@@ -141,7 +141,7 @@ sudo journalctl -u vista3d-gui -f
 |------|---------|--------|--------|-------------|
 | 8501 | Streamlit App | ✅ | ✅ | Web interface |
 | 8888 | Image Server | ✅ | ✅ | Medical image files |
-| 8000 | Vista3D Server | ❌ (Remote) | ✅ | AI segmentation |
+| 8001 | Vista3D Server | ❌ (Remote) | ✅ | AI segmentation |
 
 ### Network Requirements
 
@@ -150,7 +150,7 @@ sudo journalctl -u vista3d-gui -f
 - Local ports 8501, 8888
 
 **Mode 2 (Local Vista3D)**:
-- Local ports 8501, 8888, 8000
+- Local ports 8501, 8888, 8001
 - NVIDIA GPU with CUDA support
 
 ## 🚀 Quick Start Commands
@@ -158,7 +158,7 @@ sudo journalctl -u vista3d-gui -f
 ### Mode 1: Remote Vista3D
 ```bash
 # One command to start everything
-VISTA3D_SERVER=https://your-server:8000 VISTA3D_API_KEY=your_key python3 utils/start_gui.py
+VISTA3D_SERVER=https://your-server:8001 VISTA3D_API_KEY=your_key python3 utils/start_gui.py
 ```
 
 ### Mode 2: Local Vista3D
@@ -245,7 +245,7 @@ python3 utils/nifti2ply.py --batch
 curl -v $VISTA3D_SERVER/health
 
 # For local Vista3D
-curl -v http://localhost:8000/health
+curl -v http://localhost:8001/health
 
 # Check API key
 echo $VISTA3D_API_KEY
@@ -256,7 +256,7 @@ echo $VISTA3D_API_KEY
 # Check what's using the ports
 lsof -i :8501
 lsof -i :8888
-lsof -i :8000
+lsof -i :8001
 
 # Stop conflicting services
 sudo systemctl stop conflicting-service

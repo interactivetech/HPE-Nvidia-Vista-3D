@@ -50,7 +50,7 @@ The script supports the following environment variables:
 | `IMAGE_SERVER_PORT` | `8888` | Port for the image server |
 | `USE_HOST_NETWORKING` | `False` | Use host networking (allows all interfaces) |
 | `IMAGE_SERVER` | `http://image-server:8888` | Image server URL |
-| `VISTA3D_SERVER` | `http://vista3d-server:8000` | Vista3D server URL |
+| `VISTA3D_SERVER` | `http://vista3d-server:8001` | Vista3D server URL |
 | `VISTA3D_API_KEY` | - | API key for Vista3D server |
 | `HPE_CLUSTER_ENDPOINT` | - | HPE cluster endpoint |
 | `HPE_API_KEY` | - | HPE API key |

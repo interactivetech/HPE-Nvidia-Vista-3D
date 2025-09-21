@@ -28,7 +28,7 @@ OUTPUT_FOLDER="../output"                  # Parent directory (recommended)
 
 # Other configuration
 IMAGE_SERVER="http://localhost:8888"
-VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
+VISTA3D_SERVER="http://your-remote-vista3d-server:8001"
 VESSELS_OF_INTEREST="all"
 ```
 

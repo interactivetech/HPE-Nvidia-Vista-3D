@@ -20,7 +20,7 @@ This comprehensive guide explains how to containerize and run the HPE NVIDIA Vis
 ### Scenario 2: All Services Local (Development)
 - **Streamlit App**: Runs locally in Docker (port 8501)
 - **Image Server**: Runs locally in Docker (port 8888)
-- **Vista3D Server**: Runs locally in Docker (port 8000, requires GPU)
+- **Vista3D Server**: Runs locally in Docker (port 8001, requires GPU)
 - **Use Case**: Development, testing, single-machine deployments
 
 ## 🚀 Quick Start
@@ -48,7 +48,7 @@ python3 utils/start_gui.py
 **Environment Configuration:**
 ```bash
 # .env file for remote Vista3D
-VISTA3D_SERVER=https://your-vista3d-server.com:8000
+VISTA3D_SERVER=https://your-vista3d-server.com:8001
 VISTA3D_API_KEY=your_nvidia_api_key_here
 IMAGE_SERVER=http://image-server:8888
 EXTERNAL_IMAGE_SERVER=http://localhost:8888
@@ -73,7 +73,7 @@ python3 utils/start_gui.py
 **Environment Configuration:**
 ```bash
 # .env file for local Vista3D
-VISTA3D_SERVER=http://vista3d-server:8000
+VISTA3D_SERVER=http://vista3d-server:8001
 VISTA3D_API_KEY=your_nvidia_api_key_here
 IMAGE_SERVER=http://image-server:8888
 EXTERNAL_IMAGE_SERVER=http://localhost:8888
@@ -123,7 +123,7 @@ Copy `env.example` to `.env` and configure the following variables:
 #### For Remote Vista3D (Scenario 1):
 ```bash
 # Remote Vista3D Server
-VISTA3D_SERVER=https://your-vista3d-server.com:8000
+VISTA3D_SERVER=https://your-vista3d-server.com:8001
 VISTA3D_API_KEY=your_nvidia_api_key_here
 
 # Local services
@@ -134,7 +134,7 @@ STREAMLIT_SERVER_PORT=8501
 #### For Local Vista3D (Scenario 2):
 ```bash
 # Local Vista3D Server
-VISTA3D_SERVER=http://vista3d-server:8000
+VISTA3D_SERVER=http://vista3d-server:8001
 VISTA3D_API_KEY=your_nvidia_api_key_here
 
 # Local services
@@ -157,7 +157,7 @@ The following directories are mounted as volumes:
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Streamlit     │    │  Image Server   │    │  Vista3D Server │
-│   (Port 8501)   │◄──►│  (Port 8888)    │◄──►│  (Port 8000)    │
+│   (Port 8501)   │◄──►│  (Port 8888)    │◄──►│  (Port 8001)    │
 │                 │    │                 │    │  (Remote/Local) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -168,7 +168,7 @@ The following directories are mounted as volumes:
 |---------|-----------|------|---------|---------|
 | Streamlit App | `hpe-nvidia-vista3d-app` | 8501 | Web UI | local-network |
 | Image Server | `vista3d-image-server` | 8888 | Image processing | local-network |
-| Vista3D Server | `vista3d-server-local` | 8000 | AI segmentation | local-network |
+| Vista3D Server | `vista3d-server-local` | 8001 | AI segmentation | local-network |
 
 ### Main Application (`vista3d-app`)
 
@@ -249,17 +249,17 @@ docker-compose down -v
 ### Local Access
 - **Streamlit App**: http://localhost:8501
 - **Image Server**: http://localhost:8888
-- **Vista3D Server**: http://localhost:8000 (local only)
+- **Vista3D Server**: http://localhost:8001 (local only)
 
 ### Health Checks
 - **Streamlit**: http://localhost:8501/_stcore/health
 - **Image Server**: http://localhost:8888/health
-- **Vista3D**: http://localhost:8000/health (local only)
+- **Vista3D**: http://localhost:8001/health (local only)
 
 #### Testing Vista3D Server Health
 ```bash
 # Test Vista3D server connectivity
-curl -v http://localhost:8000/health
+curl -v http://localhost:8001/health
 ```
 
 ## Development
@@ -367,7 +367,7 @@ services:
 curl -v $VISTA3D_SERVER/health
 
 # For local Vista3D server specifically
-curl -v http://localhost:8000/health
+curl -v http://localhost:8001/health
 
 # Check API key
 echo $VISTA3D_API_KEY
@@ -378,7 +378,7 @@ echo $VISTA3D_API_KEY
 # Check what's using the port
 lsof -i :8501
 lsof -i :8888
-lsof -i :8000
+lsof -i :8001
 
 # Change ports in docker-compose.yml
 ```

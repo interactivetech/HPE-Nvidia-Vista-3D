@@ -834,7 +834,7 @@ class SetupManager:
                     return {
                         'setup_vista3d': True,
                         'config_updates': {
-                            'VISTA3D_SERVER': 'http://localhost:8000',
+                            'VISTA3D_SERVER': 'http://localhost:8001',
                             'IMAGE_SERVER': 'http://localhost:8888'
                         }
                     }
@@ -843,7 +843,7 @@ class SetupManager:
                     print("   Will install web interface and image server only")
                     remote_server = self._prompt_user(
                         "Enter remote Vista3D server URL",
-                        default="http://remote-gpu-server:8000"
+                        default="http://remote-gpu-server:8001"
                     )
                     return {
                         'setup_vista3d': False,
@@ -858,7 +858,7 @@ class SetupManager:
                     return {
                         'setup_vista3d': True,
                         'config_updates': {
-                            'VISTA3D_SERVER': 'http://localhost:8000',
+                            'VISTA3D_SERVER': 'http://localhost:8001',
                             # No image server for server-only setup
                         }
                     }
@@ -887,7 +887,7 @@ class SetupManager:
                     print("   You'll need to configure a remote Vista3D server")
                     remote_server = self._prompt_user(
                         "Enter remote Vista3D server URL",
-                        default="http://remote-gpu-server:8000"
+                        default="http://remote-gpu-server:8001"
                     )
                     return {
                         'setup_vista3d': False,
@@ -903,7 +903,7 @@ class SetupManager:
                     return {
                         'setup_vista3d': False,
                         'config_updates': {
-                            'VISTA3D_SERVER': 'http://localhost:8000',
+                            'VISTA3D_SERVER': 'http://localhost:8001',
                             'IMAGE_SERVER': 'http://localhost:8888'
                         }
                     }
