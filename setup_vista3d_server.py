@@ -393,25 +393,68 @@ class Vista3DServerSetupManager:
         
         config = {}
         
-        # NGC API Key
-        while True:
-            api_key = getpass.getpass("Enter NGC API Key (starts with 'nvapi-'): ").strip()
-            if api_key.startswith('nvapi-') and len(api_key) > 10:
-                config['NGC_API_KEY'] = api_key
-                break
-            print("Invalid API key. Must start with 'nvapi-' and be longer than 10 characters.")
+        # Check if NGC API key already exists in .env file
+        existing_ngc_key = self._check_existing_ngc_credentials()
+        if existing_ngc_key:
+            print(f"\n✅ Found existing NGC API key in .env file")
+            print(f"   Key: {existing_ngc_key[:10]}...{existing_ngc_key[-4:]}")
+            use_existing = self._ask_yes_no("Use existing NGC API key?", default=True)
+            
+            if use_existing:
+                config['NGC_API_KEY'] = existing_ngc_key
+                print("✅ Using existing NGC API key")
+            else:
+                print("🔄 Will prompt for new NGC API key")
+                existing_ngc_key = None
         
-        # NGC Org ID
-        config['NGC_ORG_ID'] = self._prompt_user(
-            "NGC Organization ID",
-            default="nvidia"
-        )
+        # NGC API Key - only prompt if not using existing
+        if not existing_ngc_key:
+            while True:
+                print("\nEnter your NGC API Key:")
+                print("(You can paste the key - it will be hidden for security)")
+                api_key = getpass.getpass("NGC API Key (starts with 'nvapi-'): ").strip()
+                if api_key.startswith('nvapi-') and len(api_key) > 10:
+                    config['NGC_API_KEY'] = api_key
+                    print("✅ API key accepted")
+                    break
+                print("❌ Invalid API key. Must start with 'nvapi-' and be longer than 10 characters.")
+                print("   Please try again...")
         
-        # Local NIM Cache
-        config['LOCAL_NIM_CACHE'] = self._prompt_user(
-            "Local NIM cache directory",
-            default="~/.cache/nim"
-        )
+        # NGC Org ID - check if already exists
+        existing_org_id = self._check_existing_env_value('NGC_ORG_ID')
+        if existing_org_id:
+            print(f"\n✅ Found existing NGC Organization ID: {existing_org_id}")
+            use_existing_org = self._ask_yes_no("Use existing Organization ID?", default=True)
+            if use_existing_org:
+                config['NGC_ORG_ID'] = existing_org_id
+            else:
+                config['NGC_ORG_ID'] = self._prompt_user(
+                    "NGC Organization ID",
+                    default="nvidia"
+                )
+        else:
+            config['NGC_ORG_ID'] = self._prompt_user(
+                "NGC Organization ID",
+                default="nvidia"
+            )
+        
+        # Local NIM Cache - check if already exists
+        existing_cache = self._check_existing_env_value('LOCAL_NIM_CACHE')
+        if existing_cache:
+            print(f"\n✅ Found existing NIM cache directory: {existing_cache}")
+            use_existing_cache = self._ask_yes_no("Use existing NIM cache directory?", default=True)
+            if use_existing_cache:
+                config['LOCAL_NIM_CACHE'] = existing_cache
+            else:
+                config['LOCAL_NIM_CACHE'] = self._prompt_user(
+                    "Local NIM cache directory",
+                    default="~/.cache/nim"
+                )
+        else:
+            config['LOCAL_NIM_CACHE'] = self._prompt_user(
+                "Local NIM cache directory",
+                default="~/.cache/nim"
+            )
         
         return config
     
@@ -506,7 +549,7 @@ class Vista3DServerSetupManager:
                 'docker', 'login', 'nvcr.io',
                 '-u', '$oauthtoken',
                 '-p', config['NGC_API_KEY']
-            ], check=True, input=config['NGC_API_KEY'], text=True)
+            ], check=True)
             
             # Pull Vista3D image
             logger.info("Pulling Vista3D Docker image (this may take several minutes)...")
@@ -613,6 +656,54 @@ class Vista3DServerSetupManager:
                 return False
             else:
                 print("Please answer 'y' or 'n'")
+    
+    def _check_existing_ngc_credentials(self) -> Optional[str]:
+        """Check if NGC API key already exists in .env file"""
+        if not self.env_file.exists():
+            return None
+        
+        try:
+            with open(self.env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('NGC_API_KEY='):
+                        # Extract the value, handling both quoted and unquoted values
+                        value = line.split('=', 1)[1].strip()
+                        if value.startswith('"') and value.endswith('"'):
+                            value = value[1:-1]
+                        elif value.startswith("'") and value.endswith("'"):
+                            value = value[1:-1]
+                        
+                        if value.startswith('nvapi-') and len(value) > 10:
+                            return value
+        except Exception as e:
+            logger.warning(f"Could not read .env file: {e}")
+        
+        return None
+    
+    def _check_existing_env_value(self, key: str) -> Optional[str]:
+        """Check if a specific environment variable already exists in .env file"""
+        if not self.env_file.exists():
+            return None
+        
+        try:
+            with open(self.env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith(f'{key}='):
+                        # Extract the value, handling both quoted and unquoted values
+                        value = line.split('=', 1)[1].strip()
+                        if value.startswith('"') and value.endswith('"'):
+                            value = value[1:-1]
+                        elif value.startswith("'") and value.endswith("'"):
+                            value = value[1:-1]
+                        
+                        if value and value != 'your-ngc-api-key-here':  # Skip placeholder values
+                            return value
+        except Exception as e:
+            logger.warning(f"Could not read .env file: {e}")
+        
+        return None
     
     def run_interactive_setup(self) -> bool:
         """Run the main interactive setup process"""
