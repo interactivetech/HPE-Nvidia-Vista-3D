@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Vista-3D GUI Docker Startup Script
-Starts the Streamlit app and image server containers for the Vista-3D GUI
+Vista-3D Frontend Docker Startup Script
+Starts the Streamlit app and image server containers for the Vista-3D frontend
 """
 
 import os
@@ -35,8 +35,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class Vista3DGUIManager:
-    """Manages Vista-3D GUI Docker containers (Streamlit app and image server)"""
+class Vista3DFrontendManager:
+    """Manages Vista-3D Frontend Docker containers (Streamlit app and image server)"""
 
     def __init__(self):
         self.script_dir = Path(__file__).parent
@@ -156,8 +156,8 @@ class Vista3DGUIManager:
             return False
     
     def stop_existing_containers(self):
-        """Stop and remove any existing GUI containers"""
-        logger.info("Stopping any existing GUI containers...")
+        """Stop and remove any existing frontend containers"""
+        logger.info("Stopping any existing frontend containers...")
         
         containers = [self.app_container_name, self.image_server_container_name]
         
@@ -182,8 +182,8 @@ class Vista3DGUIManager:
         logger.info(f"✅ Directories created: {self.local_outputs_path}, {self.local_dicom_path}")
     
     def build_docker_image(self) -> bool:
-        """Build the Docker image for the GUI containers"""
-        logger.info("Building Docker image for GUI containers...")
+        """Build the Docker image for the frontend containers"""
+        logger.info("Building Docker image for frontend containers...")
         
         try:
             # Build the image using docker compose
@@ -199,14 +199,14 @@ class Vista3DGUIManager:
             return False
     
     def start_containers(self) -> bool:
-        """Start the GUI containers using docker compose"""
-        logger.info("Starting GUI containers...")
+        """Start the frontend containers using docker compose"""
+        logger.info("Starting frontend containers...")
         
         try:
             # Start containers using docker compose
             result = self.run_command(f"docker compose up -d", cwd=str(self.project_root))
             if result.returncode == 0:
-                logger.info("✅ GUI containers started successfully")
+                logger.info("✅ Frontend containers started successfully")
                 
                 # Wait for containers to be ready
                 time.sleep(10)
@@ -216,7 +216,7 @@ class Vista3DGUIManager:
                 
                 return True
             else:
-                logger.error("❌ Failed to start GUI containers")
+                logger.error("❌ Failed to start frontend containers")
                 return False
         except Exception as e:
             logger.error(f"Error starting containers: {e}")
@@ -281,8 +281,8 @@ class Vista3DGUIManager:
         self.run_command(f"docker logs {self.image_server_container_name} --tail 20", check=False)
     
     def test_configuration(self):
-        """Test the GUI configuration"""
-        logger.info("Testing GUI configuration...")
+        """Test the frontend configuration"""
+        logger.info("Testing frontend configuration...")
         
         app_port = int(self.env_vars['APP_PORT'])
         image_server_port = int(self.env_vars['IMAGE_SERVER_PORT'])
@@ -311,14 +311,14 @@ class Vista3DGUIManager:
     
     
     def restart_containers(self) -> bool:
-        """Restart the GUI containers using docker compose"""
-        logger.info("Restarting GUI containers...")
+        """Restart the frontend containers using docker compose"""
+        logger.info("Restarting frontend containers...")
         
         try:
             # Restart containers using docker compose
             result = self.run_command(f"docker compose restart", cwd=str(self.project_root))
             if result.returncode == 0:
-                logger.info("✅ GUI containers restarted successfully")
+                logger.info("✅ Frontend containers restarted successfully")
                 
                 # Wait for containers to be ready
                 time.sleep(10)
@@ -342,7 +342,7 @@ class Vista3DGUIManager:
                 image_server_port = self.env_vars['IMAGE_SERVER_PORT']
                 logger.info(f"Streamlit app is running on port {app_port}")
                 logger.info(f"Image server is running on port {image_server_port}")
-                logger.info("✅ GUI containers are ready!")
+                logger.info("✅ Frontend containers are ready!")
                 logger.info("✅ External access is enabled")
                 logger.info("✅ All interfaces are accessible")
                 logger.info("==========================================")
@@ -358,7 +358,7 @@ class Vista3DGUIManager:
                 
                 return True
             else:
-                logger.error("❌ Failed to restart GUI containers")
+                logger.error("❌ Failed to restart frontend containers")
                 return False
         except Exception as e:
             logger.error(f"Error restarting containers: {e}")
@@ -366,7 +366,7 @@ class Vista3DGUIManager:
 
     def run(self):
         """Main execution logic"""
-        logger.info("Starting Vista-3D GUI containers...")
+        logger.info("Starting Vista-3D frontend containers...")
         
         # Check Docker availability
         if not self.check_docker():
@@ -406,7 +406,7 @@ class Vista3DGUIManager:
         image_server_port = self.env_vars['IMAGE_SERVER_PORT']
         logger.info(f"Streamlit app is running on port {app_port}")
         logger.info(f"Image server is running on port {image_server_port}")
-        logger.info("✅ GUI containers are ready!")
+        logger.info("✅ Frontend containers are ready!")
         logger.info("✅ External access is enabled")
         logger.info("✅ All interfaces are accessible")
         logger.info("==========================================")
@@ -425,12 +425,12 @@ class Vista3DGUIManager:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description="Vista-3D GUI Docker Startup Script",
+        description="Vista-3D Frontend Docker Startup Script",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 start_gui.py                 # Start GUI containers
-  python3 start_gui.py --restart       # Restart GUI containers
+  python3 start_vista3d_frontend.py                 # Start frontend containers
+  python3 start_vista3d_frontend.py --restart       # Restart frontend containers
 
 Container Configuration:
   The script starts two containers:
@@ -446,25 +446,25 @@ Container Configuration:
   
   Examples:
     # Use default ports
-    python3 start_gui.py
+    python3 start_vista3d_frontend.py
     
     # Restart containers
-    python3 start_gui.py --restart
+    python3 start_vista3d_frontend.py --restart
     
     # Use custom ports
-    STREAMLIT_SERVER_PORT=8502 IMAGE_SERVER_PORT=8889 python3 start_gui.py
+    STREAMLIT_SERVER_PORT=8502 IMAGE_SERVER_PORT=8889 python3 start_vista3d_frontend.py
         """
     )
     
     parser.add_argument(
         '--restart',
         action='store_true',
-        help='Restart the GUI containers using docker compose restart'
+        help='Restart the frontend containers using docker compose restart'
     )
     
     args = parser.parse_args()
     
-    manager = Vista3DGUIManager()
+    manager = Vista3DFrontendManager()
     
     try:
         if args.restart:
