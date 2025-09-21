@@ -459,38 +459,73 @@ class Vista3DServerSetupManager:
         return config
     
     def create_env_file(self, config: Dict) -> bool:
-        """Create .env file for server configuration"""
-        logger.info("📄 Creating .env file for Vista3D server...")
+        """Create or update .env file for server configuration"""
+        logger.info("📄 Creating/updating .env file for Vista3D server...")
         
         try:
-            # Read template
-            if not self.env_template.exists():
-                logger.error(f"Template file not found: {self.env_template}")
-                return False
+            # Read existing .env file if it exists
+            existing_env = {}
+            if self.env_file.exists():
+                logger.info(f"📖 Reading existing .env file: {self.env_file}")
+                with open(self.env_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            # Remove quotes if present
+                            if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                                value = value[1:-1]
+                            existing_env[key] = value
+                logger.info(f"✅ Found {len(existing_env)} existing environment variables")
+            else:
+                logger.info("📄 No existing .env file found, will create new one")
             
-            with open(self.env_template, 'r') as f:
-                env_content = f.read()
+            # Read template for any missing variables
+            template_env = {}
+            if self.env_template.exists():
+                with open(self.env_template, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            # Remove quotes if present
+                            if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                                value = value[1:-1]
+                            template_env[key] = value
             
-            # Replace template values with server configuration
-            for key, value in config.items():
-                lines = env_content.split('\n')
-                for i, line in enumerate(lines):
-                    if line.startswith(f'{key}='):
-                        lines[i] = f'{key}="{value}"'
-                        break
-                env_content = '\n'.join(lines)
+            # Merge configurations: existing -> template -> new config
+            merged_env = {}
+            merged_env.update(template_env)  # Start with template defaults
+            merged_env.update(existing_env)  # Override with existing values
+            merged_env.update(config)        # Override with new server config
             
-            # Add server-specific configurations
-            env_content += '\n\n# Vista3D Server Configuration\n'
-            env_content += f'VISTA3D_SERVER=http://localhost:{config.get("VISTA3D_PORT", "8000")}\n'
-            env_content += f'IMAGE_SERVER=http://localhost:8888\n'
-            env_content += f'USE_HOST_NETWORKING={config.get("USE_HOST_NETWORKING", "True")}\n'
+            # Add server-specific configurations if not already present
+            server_configs = {
+                'VISTA3D_SERVER': f'http://localhost:{config.get("VISTA3D_PORT", "8000")}',
+                'IMAGE_SERVER': 'http://localhost:8888',
+                'USE_HOST_NETWORKING': config.get('USE_HOST_NETWORKING', 'True')
+            }
             
-            # Write .env file
+            for key, value in server_configs.items():
+                if key not in merged_env:
+                    merged_env[key] = value
+            
+            # Write updated .env file
             with open(self.env_file, 'w') as f:
-                f.write(env_content)
+                f.write("# Vista3D Environment Configuration\n")
+                f.write("# Generated/updated by setup_vista3d_server.py\n\n")
+                
+                # Write all environment variables
+                for key, value in sorted(merged_env.items()):
+                    f.write(f'{key}="{value}"\n')
             
-            logger.info(f"✅ Created .env file: {self.env_file}")
+            logger.info(f"✅ Updated .env file: {self.env_file}")
+            logger.info(f"   Total variables: {len(merged_env)}")
+            logger.info(f"   Updated variables: {len(config)}")
             
             # Set proper permissions (readable by owner only)
             os.chmod(self.env_file, 0o600)
@@ -498,7 +533,7 @@ class Vista3DServerSetupManager:
             return True
             
         except Exception as e:
-            logger.error(f"❌ Failed to create .env file: {e}")
+            logger.error(f"❌ Failed to create/update .env file: {e}")
             return False
     
     def create_required_directories(self, config: Dict) -> bool:
