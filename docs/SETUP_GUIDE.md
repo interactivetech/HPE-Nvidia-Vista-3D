@@ -172,7 +172,8 @@ If you prefer to run each step manually or encounter issues:
 ### 1. Install System Dependencies
 ```bash
 # Install system dependencies only
-python3 setup.py --install-deps
+python3 setup_vista3d_server.py  # For server setup
+python3 setup_vista3d_frontend.py  # For frontend setup
 ```
 
 This will install:
@@ -223,7 +224,7 @@ VESSELS_OF_INTEREST="all"  # or specific structures
 ### 4. Set Up Vista3D (if running locally)
 ```bash
 # Set up Vista3D Docker container
-python3 setup.py --setup-vista3d
+python3 setup_vista3d_server.py
 
 # Or start Vista3D container manually
 python3 utils/start_vista3d.py
@@ -234,7 +235,8 @@ python3 utils/start_vista3d.py
 ```
 Nvidia-Vista3d-segmenation/
 ├── app.py                 # Main Streamlit web application
-├── setup.py              # Automated setup script
+├── setup_vista3d_server.py    # Server setup script
+├── setup_vista3d_frontend.py  # Frontend setup script
 ├── dot_env_template       # Environment configuration template
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
 ├── output/               # Generated files

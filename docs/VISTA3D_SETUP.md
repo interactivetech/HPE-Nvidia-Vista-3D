@@ -146,25 +146,25 @@ ngrok http 8888
 ### Complete Vista3D Setup
 ```bash
 # Full automated setup
-python3 setup.py --setup-vista3d
+python3 setup_vista3d_server.py
 ```
 
 ### Standard Project Setup (after Vista3D is installed)
 ```bash
 # Set up project environment, image server, etc.
-python3 setup.py
+python3 setup_vista3d_frontend.py
 ```
 
 ### Other Options
 ```bash
 # Start image server only
-python3 setup.py --start-server
+python3 setup_vista3d_frontend.py --start-server
 
 # Run DICOM conversion
-python3 setup.py --convert-dicom
+python3 setup_vista3d_frontend.py --convert-dicom
 
 # Show help
-python3 setup.py --help
+python3 setup_vista3d_frontend.py --help
 ```
 
 ### Manual Vista3D Management
@@ -382,7 +382,7 @@ After Vista3D is running:
 
 1. **Set up the project environment**:
    ```bash
-   python3 setup.py
+   python3 setup_vista3d_frontend.py
    ```
 
 2. **Configure your environment**:
@@ -411,7 +411,7 @@ After Vista3D is running:
 
 6. **Convert DICOM files** (if needed):
    ```bash
-   python3 setup.py --convert-dicom
+   python3 setup_vista3d_frontend.py --convert-dicom
    ```
 
 ## Security Considerations
