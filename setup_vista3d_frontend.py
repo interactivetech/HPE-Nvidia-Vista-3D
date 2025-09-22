@@ -578,10 +578,7 @@ class Vista3DFrontendSetupManager:
             # Create directories
             directories = [
                 project_root / config['DICOM_FOLDER'],
-                project_root / config['OUTPUT_FOLDER'],
-                project_root / config['OUTPUT_FOLDER'] / 'nifti',
-                project_root / config['OUTPUT_FOLDER'] / 'scans',
-                project_root / config['OUTPUT_FOLDER'] / 'voxels'
+                project_root / config['OUTPUT_FOLDER']
             ]
             
             for directory in directories:

@@ -543,10 +543,7 @@ class Vista3DServerSetupManager:
         try:
             # Create directories
             directories = [
-                Path(config['OUTPUT_FOLDER']),
-                Path(config['OUTPUT_FOLDER']) / 'nifti',
-                Path(config['OUTPUT_FOLDER']) / 'scans',
-                Path(config['OUTPUT_FOLDER']) / 'voxels'
+                Path(config['OUTPUT_FOLDER'])
             ]
             
             for directory in directories:

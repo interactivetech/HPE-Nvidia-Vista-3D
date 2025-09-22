@@ -53,8 +53,8 @@ mkdir -p dicom/PA00000001
 # Copy your DICOM files to dicom/PA00000001/
 
 # Option B: Place NIFTI files directly
-mkdir -p output/nifti
-# Copy your .nii.gz files to output/nifti/
+mkdir -p output/PA00000001/nifti
+# Copy your .nii.gz files to output/PA00000001/nifti/
 ```
 
 ### 4. Convert DICOM to NIFTI (if using DICOM files)
@@ -108,8 +108,8 @@ mkdir -p dicom/PA00000001
 # Copy your DICOM files to dicom/PA00000001/
 
 # Option B: Place NIFTI files directly
-mkdir -p output/nifti
-# Copy your .nii.gz files to output/nifti/
+mkdir -p output/PA00000001/nifti
+# Copy your .nii.gz files to output/PA00000001/nifti/
 ```
 
 **DICOM Folder Structure:**
