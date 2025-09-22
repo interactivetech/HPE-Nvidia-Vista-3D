@@ -1,11 +1,11 @@
-# 🚀 HPE NVIDIA Vista3D Medical AI Platform - Quick Start Guide
+# 🚀 HPE NVIDIA Vista3D Medical AI Platform - Setup Guide
 
 Get up and running with the HPE GreenLake Medical AI Platform with NVIDIA Vista3D in minutes!
 
 ## 📋 Prerequisites
 
 ### System Requirements
-- **Ubuntu Linux** (18.04+ recommended)
+- **Ubuntu Linux** (18.04+) or **macOS**
 - **NVIDIA GPU** with CUDA support (8GB+ VRAM recommended)
 - **16GB+ RAM** for large medical imaging datasets
 - **10GB+ free disk space**
@@ -29,186 +29,64 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 - **Anatomical Scope**: Supports segmentation of organs, vessels, bones, and soft tissue structures
 - **Important Note**: Does not segment the entire brain (optimized for body structures and lesions)
 
-## 🐳 Docker Deployment (Recommended)
+## 🚀 Quick Start (Single GPU Host)
 
-The **preferred method** for running the Vista3D platform is using Docker containers, which provides better isolation, easier deployment, and consistent environments.
+**Get up and running in 3 simple steps!**
 
-### 1. Clone the Repository
+### Step 1: Clone and Setup
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd Nvidia-Vista3d-segmenation
+cd HPE-Nvidia-Vista-3D
+
+# Run the unified setup script
+python3 setup.py
 ```
 
-### 2. Start GUI Containers
+**What the setup script does:**
+- ✅ Checks system requirements (OS, Python, GPU, Docker)
+- ✅ Sets up Python environment with all dependencies
+- ✅ Configures Docker containers for all services
+- ✅ Prompts for your NVIDIA NGC API key
+- ✅ Creates all necessary directories and files
+
+### Step 2: Start All Services
 ```bash
-# Start GUI containers (Streamlit + Image Server)
-python3 utils/start_gui.py
+# Start all services (web interface, image server, and Vista3D AI)
+python3 start.py
 ```
 
-### 3. Add Your Medical Images
+**This starts:**
+- 🌐 **Streamlit Web Interface** (http://localhost:8501)
+- 🖼️ **Image Server** (http://localhost:8888)
+- 🧠 **Vista3D AI Server** (http://localhost:8000)
+
+### Step 3: Process Your Images
 ```bash
-# Option A: Place DICOM files in patient-specific folders
+# Add your medical images
+# Option A: Place DICOM files in dicom/ folder
 mkdir -p dicom/PA00000001
 # Copy your DICOM files to dicom/PA00000001/
 
 # Option B: Place NIFTI files directly
-mkdir -p output/PA00000001/nifti
-# Copy your .nii.gz files to output/PA00000001/nifti/
+mkdir -p output/nifti
+# Copy your .nii.gz files to output/nifti/
+
+# Open your browser to http://localhost:8501
+# Use the Tools page in the web interface to:
+# - Convert DICOM to NIFTI
+# - Run AI segmentation
+# - View 3D visualizations
 ```
 
-### 4. Convert DICOM to NIFTI (if using DICOM files)
+**🎉 You're ready!** You now have a fully functional medical AI platform running on your GPU-enabled host.
+
+## 🔧 Advanced Configuration
+
+### Custom Configuration
+Edit the `.env` file created during setup:
+
 ```bash
-# Convert DICOM files to NIFTI format
-python3 utils/dicom2nifti.py
-```
-
-### 5. Run Segmentation
-```bash
-# Process NIFTI files with Vista3D
-python3 utils/segment.py
-```
-
-**🎉 You're ready!** Open your browser to `http://localhost:8501`
-
-## 🐍 Non-Docker Installation (Alternative)
-
-For development or environments where Docker is not available, you can install the platform directly on the host system.
-
-### 1. Clone the Repository
-```bash
-# Clone the repository
-git clone <repository-url>
-cd Nvidia-Vista3d-segmenation
-```
-
-### 2. Run Automated Installation
-```bash
-# Run the interactive installation script
-python3 utils/install.py
-```
-
-**The setup script will:**
-- ✅ Check system requirements (Ubuntu, Python 3.11+, GPU)
-- ✅ Set up Python virtual environment with dependencies
-- ✅ Install Docker and NVIDIA Container Toolkit (if needed)
-- ✅ Guide you through configuration
-- ✅ Set up Vista3D Docker container (optional)
-- ✅ Create project directories and configuration files
-
-**Follow the interactive prompts:**
-- Choose installation profile (Complete Local Setup recommended)
-- Enter your NVIDIA NGC API Key (starts with `nvapi-`)
-- Enter your NGC Organization ID (or press Enter for default)
-
-### 3. Add Your Medical Images
-```bash
-# Option A: Place DICOM files in patient-specific folders
-mkdir -p dicom/PA00000001
-# Copy your DICOM files to dicom/PA00000001/
-
-# Option B: Place NIFTI files directly
-mkdir -p output/PA00000001/nifti
-# Copy your .nii.gz files to output/PA00000001/nifti/
-```
-
-**DICOM Folder Structure:**
-```
-dicom/
-├── PA00000001/          # Patient folder
-│   ├── scan1.dcm
-│   ├── scan2.dcm
-│   └── ...
-├── PA00000002/          # Another patient
-└── ...
-```
-
-### 4. Convert DICOM to NIFTI (if using DICOM files)
-```bash
-# Activate virtual environment first
-source .venv/bin/activate
-
-# Convert DICOM files to NIFTI format
-python3 utils/dicom2nifti.py
-```
-
-### 5. Choose Deployment Mode
-
-#### Option A: Local GUI + Remote Vista3D (Recommended)
-```bash
-# Configure .env for remote Vista3D server
-VISTA3D_SERVER=https://your-vista3d-server.com:8000
-VISTA3D_API_KEY=your_nvidia_api_key
-
-# Start GUI containers (Streamlit + Image Server)
-python3 utils/start_gui.py
-```
-
-#### Option B: All Services Local (Development)
-```bash
-# Configure .env for local Vista3D
-VISTA3D_SERVER=http://vista3d-server:8000
-VISTA3D_API_KEY=your_nvidia_api_key
-
-# Start Vista3D server (requires GPU)
-python3 utils/start_vista3d.py
-
-# Start GUI containers (in separate terminal)
-python3 utils/start_gui.py
-```
-
-### 6. Run Segmentation
-```bash
-# Process NIFTI files with Vista3D
-python3 utils/segment.py
-```
-
-**🎉 You're ready!** Open your browser to `http://localhost:8501`
-
-## 🔧 Alternative: Step-by-Step Manual Setup
-
-If you prefer to run each step manually or encounter issues:
-
-### 1. Install System Dependencies
-```bash
-# Install system dependencies only
-python3 setup_vista3d_server.py  # For server setup
-python3 setup_vista3d_frontend.py  # For frontend setup
-```
-
-This will install:
-- Docker CE and NVIDIA Container Toolkit
-- Required system packages
-- NVIDIA drivers (if needed)
-
-### 2. Set Up Python Environment
-```bash
-# Create virtual environment
-uv venv
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Install dependencies
-uv sync
-```
-
-### 3. Configure Environment
-```bash
-# Copy environment template
-cp dot_env_template .env
-
-# Edit .env file with your settings
-nano .env
-```
-
-**Key configuration options in `.env`:**
-```bash
-# Project paths (PROJECT_ROOT is now auto-detected)
-# Use absolute paths for external directories
-DICOM_FOLDER="/path/to/your/dicom"
-OUTPUT_FOLDER="/path/to/your/output"
-
 # Vista3D server (local or remote)
 VISTA3D_SERVER="http://localhost:8000"  # Local
 # VISTA3D_SERVER="http://remote-server:8000"  # Remote
@@ -219,15 +97,22 @@ IMAGE_SERVER="http://localhost:8888"
 # Segmentation targets
 VESSELS_OF_INTEREST="all"  # or specific structures
 # LABEL_SET="HeadNeckCore"  # or use predefined label set
+
+# Custom paths
+DICOM_FOLDER="/path/to/your/dicom"
+OUTPUT_FOLDER="/path/to/your/output"
 ```
 
-### 4. Set Up Vista3D (if running locally)
-```bash
-# Set up Vista3D Docker container
-python3 setup_vista3d_server.py
+### Remote Vista3D Server
+If you want to use a remote Vista3D server instead of running it locally:
 
-# Or start Vista3D container manually
-python3 utils/start_vista3d.py
+```bash
+# Edit .env file
+VISTA3D_SERVER="https://your-remote-vista3d-server.com:8000"
+VISTA3D_API_KEY="your_nvidia_api_key"
+
+# Start only frontend services
+python3 start.py --frontend-only
 ```
 
 ## 📁 Project Structure

@@ -1,17 +1,46 @@
 # 🚀 Deployment Modes Guide
 
-This guide explains the different ways to deploy the HPE NVIDIA Vista3D Medical AI Platform using the provided startup scripts.
+This guide explains the different ways to deploy the HPE NVIDIA Vista3D Medical AI Platform.
 
 ## 📋 Overview
 
 The platform consists of three main components:
 - **Streamlit App** (Port 8501) - Web interface for medical imaging
 - **Image Server** (Port 8888) - HTTP server for medical image files
-- **Vista3D Server** (Port 8001) - AI segmentation service (requires GPU)
+- **Vista3D Server** (Port 8000) - AI segmentation service (requires GPU)
 
 ## 🎯 Deployment Modes
 
-### Mode 1: Local GUI + Remote Vista3D (Recommended)
+### Mode 1: Single GPU Host (Recommended)
+
+**Best for**: Single-user deployments, development, testing, local processing
+
+**Architecture**:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Streamlit     │    │  Image Server   │    │  Vista3D Server │
+│   (Port 8501)   │◄──►│  (Port 8888)    │◄──►│  (Port 8000)    │
+│   Local Docker  │    │  Local Docker   │    │  Local Docker   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+**Setup**:
+```bash
+# 1. Clone and setup
+git clone <repository-url>
+cd HPE-Nvidia-Vista-3D
+python3 setup.py
+
+# 2. Start all services
+python3 start.py
+```
+
+**Access Points**:
+- Streamlit App: http://localhost:8501
+- Image Server: http://localhost:8888
+- Vista3D Server: http://localhost:8000
+
+### Mode 2: Local GUI + Remote Vista3D
 
 **Best for**: Production deployments, shared GPU resources, cloud-based Vista3D
 
@@ -26,61 +55,23 @@ The platform consists of three main components:
 
 **Setup**:
 ```bash
-# 1. Configure environment for remote Vista3D
-cp env.example .env
-nano .env
+# 1. Setup frontend only
+git clone <repository-url>
+cd HPE-Nvidia-Vista-3D
+python3 setup.py
 
-# 2. Set these variables in .env:
-VISTA3D_SERVER=https://your-vista3d-server.com:8001
+# 2. Edit .env file for remote Vista3D
+VISTA3D_SERVER=https://your-vista3d-server.com:8000
 VISTA3D_API_KEY=your_nvidia_api_key_here
-IMAGE_SERVER=http://image-server:8888
-EXTERNAL_IMAGE_SERVER=http://localhost:8888
 
-# 3. Start GUI containers
-python3 utils/start_gui.py
+# 3. Start frontend services only
+python3 start.py --frontend-only
 ```
 
 **Access Points**:
 - Streamlit App: http://localhost:8501
 - Image Server: http://localhost:8888
-- Vista3D Server: https://your-vista3d-server.com:8001 (remote)
-
-### Mode 2: All Services Local (Development)
-
-**Best for**: Development, testing, single-machine deployments
-
-**Architecture**:
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Streamlit     │    │  Image Server   │    │  Vista3D Server │
-│   (Port 8501)   │◄──►│  (Port 8888)    │◄──►│  (Port 8001)    │
-│   Local Docker  │    │  Local Docker   │    │  Local Docker   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-**Setup**:
-```bash
-# 1. Configure environment for local Vista3D
-cp env.example .env
-nano .env
-
-# 2. Set these variables in .env:
-VISTA3D_SERVER=http://vista3d-server:8001
-VISTA3D_API_KEY=your_nvidia_api_key_here
-IMAGE_SERVER=http://image-server:8888
-EXTERNAL_IMAGE_SERVER=http://localhost:8888
-
-# 3. Start Vista3D server (requires GPU)
-python3 utils/start_vista3d.py
-
-# 4. Start GUI containers (in separate terminal)
-python3 utils/start_gui.py
-```
-
-**Access Points**:
-- Streamlit App: http://localhost:8501
-- Image Server: http://localhost:8888
-- Vista3D Server: http://localhost:8001
+- Vista3D Server: https://your-vista3d-server.com:8000 (remote)
 
 ### Mode 3: Production with Auto-Startup
 

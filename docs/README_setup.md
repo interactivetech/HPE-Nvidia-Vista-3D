@@ -98,7 +98,7 @@ python utils/segment.py
 # Open browser to http://localhost:8501
 ```
 
-## 🐍 Non-Docker Setup (Alternative)
+## 🔧 Advanced Configuration
 
 ### Prerequisites
 - Python 3.11+
@@ -123,8 +123,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone <repository-url>
 cd Nvidia-Vista3d-segmenation
 
-# Run automated installation
-python utils/install.py
+# Run unified setup
+python3 setup.py
 
 # Activate virtual environment
 source .venv/bin/activate

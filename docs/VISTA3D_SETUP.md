@@ -4,9 +4,8 @@ This guide explains how to set up and configure NVIDIA Vista3D NIM for the HPE M
 
 ## Overview
 
-The Vista3D setup can be done through two methods:
-1. **Docker Deployment (Recommended)**: Using `utils/start_vista3d.py` for containerized setup
-2. **Non-Docker Installation**: Using `utils/install.py` for direct host installation
+The Vista3D setup uses Docker containers for all services:
+1. **Docker Deployment**: Using `python setup.py` and `python start.py` for containerized setup
 
 ### **VISTA3D Model Capabilities & Limitations**
 
@@ -49,9 +48,9 @@ The Docker setup will:
 7. ✅ Start Vista3D container
 8. ✅ Verify container health
 
-## 🐍 Non-Docker Installation (Alternative)
+## 🔧 Advanced Configuration
 
-For development or environments where Docker is not available.
+For custom configuration and advanced settings.
 
 ### Prerequisites
 - **Ubuntu Linux** (18.04+ recommended)
@@ -66,8 +65,8 @@ For development or environments where Docker is not available.
 git clone <repository-url>
 cd <repository-directory>
 
-# Run automated installation
-python3 utils/install.py --setup-vista3d
+# Run unified setup
+python3 setup.py
 ```
 
 ### 3. Follow the Interactive Prompts
