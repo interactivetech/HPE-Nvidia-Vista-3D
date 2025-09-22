@@ -93,18 +93,15 @@ def create_patient_folder_structure(patient_id: str):
     """Create the new folder structure for a patient."""
     patient_base_dir = PATIENT_OUTPUT_BASE_DIR / patient_id
     nifti_dir = patient_base_dir / "nifti"
-    scans_dir = patient_base_dir / "scans"
     voxels_dir = patient_base_dir / "voxels"
     
     # Create all directories
     nifti_dir.mkdir(parents=True, exist_ok=True)
-    scans_dir.mkdir(parents=True, exist_ok=True)
     voxels_dir.mkdir(parents=True, exist_ok=True)
     
     return {
         'base': patient_base_dir,
         'nifti': nifti_dir,
-        'scans': scans_dir,
         'voxels': voxels_dir
     }
 
@@ -212,7 +209,7 @@ def main():
             if name_key in NAME_TO_ID_MAP:
                 target_vessel_ids.append(NAME_TO_ID_MAP[name_key])
         
-        # Create folder structure (will ensure scans and voxels directories exist)
+        # Create folder structure (will ensure nifti and voxels directories exist)
         print(f"  Ensuring folder structure for patient: {patient_folder_name}")
         patient_dirs = create_patient_folder_structure(patient_folder_name)
         print(f"  Patient directories ensured: {patient_dirs['base']}")
@@ -230,8 +227,8 @@ def main():
             # The NIfTI file is already in its final destination.
             # The copy step is no longer needed.
             
-            # Define segmentation output path in current structure
-            segmentation_output_path = patient_dirs['scans'] / nifti_file_path.name
+            # Define segmentation output path in voxels directory
+            segmentation_output_path = patient_dirs['voxels'] / nifti_file_path.name
 
             if not args.force and segmentation_output_path.exists():
                 print(f"\n  Skipping {nifti_file_path.name} as segmentation already exists. Use --force to overwrite.")
@@ -318,7 +315,7 @@ def main():
                 
                 print(f"    Data type of raw_nifti_img data: {raw_nifti_img.get_fdata().dtype}")
                 print(f"    NIfTI header datatype: {raw_nifti_img.header['datatype']}")
-                # Save full segmentation to scans folder
+                # Save full segmentation to voxels folder
                 nib.save(raw_nifti_img, segmentation_output_path)
                 print(f"    Successfully saved segmentation: {segmentation_output_path.name}")
                 

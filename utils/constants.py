@@ -23,7 +23,6 @@ if not OUTPUT_DIR:
     raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
 if not os.path.isabs(OUTPUT_DIR):
     raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
-SCANS_DIR = "scans"
 VOXELS_DIR = "voxels"
 NIFTI_DIR = "nifti"
 

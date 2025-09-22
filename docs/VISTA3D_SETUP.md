@@ -394,9 +394,9 @@ After Vista3D is running:
 
 3. **Add NIFTI files**:
    ```bash
-   # Place your .nii.gz files here
-   mkdir -p output/nifti
-   cp your_scan.nii.gz output/nifti/
+   # Place your .nii.gz files in patient-specific folders
+   mkdir -p output/PA00000001/nifti
+   cp your_scan.nii.gz output/PA00000001/nifti/
    ```
 
 4. **Start the web viewer**:

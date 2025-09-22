@@ -282,14 +282,12 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     # Determine folder paths based on structure
     if use_old_structure:
         nifti_folder_path = f"nifti/{patient_id}"
-        scans_folder_path = f"scans/{patient_id}"
         voxel_folder_path = f"scans/{patient_id}/voxels"
         mesh_folder_path = f"scans/{patient_id}/mesh"
         ply_folder_path = f"scans/{patient_id}/ply"
         structure_type = "old"
     else:
         nifti_folder_path = f"{patient_id}/nifti"
-        scans_folder_path = f"{patient_id}/scans"
         voxel_folder_path = f"{patient_id}/voxels"
         mesh_folder_path = f"{patient_id}/mesh"
         ply_folder_path = f"{patient_id}/ply"
@@ -326,8 +324,8 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     # Calculate total CT scan size
     total_ct_size_bytes = sum(scan.get('size_bytes', 0) for scan in ct_scans)
     
-    # Get scans folder contents for this patient
-    scans_contents = get_folder_contents(base_url, scans_folder_path)
+    # Get voxel folder contents for base segmentation files
+    voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
     
     voxel_data = {}
     total_voxel_files = 0
@@ -341,12 +339,12 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     total_ply_files = 0
     total_ply_size_bytes = 0
     
-    # Get voxel folder contents (different logic for new vs old structure)
+    # Get individual voxel subfolder contents (different logic for new vs old structure)
     if use_old_structure:
-        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
+        individual_voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
     else:
-        # In current structure, voxels are organized by CT scan subfolders
-        voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
+        # In current structure, individual voxels are organized by CT scan subfolders
+        individual_voxel_folder_contents = get_folder_contents(base_url, voxel_folder_path)
     
     # Get mesh folder contents (same structure as voxels)
     mesh_folder_contents = get_folder_contents(base_url, mesh_folder_path)
@@ -354,21 +352,20 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
     # Get PLY folder contents (same structure as voxels and mesh)
     ply_folder_contents = get_folder_contents(base_url, ply_folder_path)
     
-    if scans_contents:
-        # For each CT scan, check for corresponding voxel data
+    if voxel_folder_contents:
+        # For each CT scan, check for corresponding base segmentation file in voxels folder
         for ct_scan_info in ct_scans:
             ct_scan_name = ct_scan_info['name']
             
-            # Check for direct voxel file (segmentation result)
-            voxel_files = get_voxel_files(scans_contents)
-            voxel_file_names = [vf['name'] for vf in voxel_files]
+            # Check for base segmentation file directly in voxels folder
+            voxel_file_names = [vf['name'] for vf in voxel_folder_contents if not vf['is_directory']]
             has_voxel_file = ct_scan_name in voxel_file_names
             
             # Find the segmentation file size if it exists
             segmentation_size_bytes = 0
             if has_voxel_file:
-                for vf in voxel_files:
-                    if vf['name'] == ct_scan_name:
+                for vf in voxel_folder_contents:
+                    if not vf['is_directory'] and vf['name'] == ct_scan_name:
                         segmentation_size_bytes = vf['size_bytes']
                         break
             
@@ -376,11 +373,11 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
             scan_voxel_files = []
             scan_voxel_size_bytes = 0
             
-            if voxel_folder_contents:
+            if individual_voxel_folder_contents:
                 if use_old_structure:
                     # Old structure: Find voxel files that start with the scan name
                     scan_base_name = ct_scan_name.replace('.nii.gz', '')
-                    for item in voxel_folder_contents:
+                    for item in individual_voxel_folder_contents:
                         if not item['is_directory'] and item['name'].startswith(scan_base_name + '_'):
                             scan_voxel_files.append({
                                 'name': item['name'],
@@ -394,7 +391,7 @@ def analyze_patient_data(base_url: str, patient_id: str, use_old_structure: bool
                     ct_scan_voxel_folder = None
                     
                     # Find the subfolder for this CT scan
-                    for item in voxel_folder_contents:
+                    for item in individual_voxel_folder_contents:
                         if item['is_directory'] and item['name'] == scan_base_name:
                             ct_scan_voxel_folder = item['name']
                             break
