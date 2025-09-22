@@ -200,8 +200,6 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
                 # Display selection status
                 if selected_voxels:
                     st.info(f"Will display {len(selected_voxels)} individual voxels from the voxels directory.")
-                else:
-                    st.info("No individual voxels selected. Select specific structures to display.")
 
                 viewer_config.voxel_mode = "individual_voxels"
                 viewer_config.selected_individual_voxels = selected_voxels

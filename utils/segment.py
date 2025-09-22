@@ -215,6 +215,22 @@ def main():
         print(f"  Patient directories ensured: {patient_dirs['base']}")
 
         all_nifti_files = get_nifti_files_in_folder(patient_nifti_path)
+        
+        # Filter files by selected scans if specified
+        selected_scans_env = os.getenv('SELECTED_SCANS', '').strip()
+        if selected_scans_env:
+            selected_scan_names = [scan.strip() for scan in selected_scans_env.split(',') if scan.strip()]
+            if selected_scan_names:
+                # Filter nifti files to only include selected scans
+                filtered_nifti_files = []
+                for nifti_file in all_nifti_files:
+                    # Get the base name without extension
+                    base_name = nifti_file.stem.replace('.nii', '')
+                    if base_name in selected_scan_names:
+                        filtered_nifti_files.append(nifti_file)
+                all_nifti_files = filtered_nifti_files
+                print(f"  Filtered to {len(all_nifti_files)} selected scans: {selected_scan_names}")
+        
         if not all_nifti_files:
             # Also check if the 'nifti' folder itself is missing
             if not patient_nifti_path.exists():

@@ -66,6 +66,88 @@ def get_dicom_patient_folders() -> List[str]:
         return []
 
 
+def get_patients_with_nifti_files() -> List[str]:
+    """Get list of patient folders that have nii.gz files in their nifti folder."""
+    try:
+        # Load environment variables to get OUTPUT_FOLDER path
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        if not output_folder:
+            return []
+        
+        output_path = Path(output_folder)
+        
+        # Check if output directory exists
+        if not output_path.exists() or not output_path.is_dir():
+            return []
+        
+        # Get list of patient folders that have nifti files
+        patients_with_nifti = []
+        for entry in os.scandir(output_path):
+            if entry.is_dir() and entry.name != 'uploads':
+                patient_id = entry.name
+                nifti_dir = output_path / patient_id / "nifti"
+                
+                # Check if nifti directory exists and contains nii.gz files
+                if nifti_dir.exists() and nifti_dir.is_dir():
+                    has_nifti_files = False
+                    try:
+                        for nifti_file in os.scandir(nifti_dir):
+                            if nifti_file.is_file() and nifti_file.name.endswith('.nii.gz'):
+                                has_nifti_files = True
+                                break
+                    except (PermissionError, OSError):
+                        # Skip if we can't access the directory
+                        continue
+                    
+                    if has_nifti_files:
+                        patients_with_nifti.append(patient_id)
+        
+        return sorted(patients_with_nifti)
+        
+    except Exception as e:
+        st.error(f"Error getting patients with NIfTI files: {str(e)}")
+        return []
+
+
+def get_scans_for_patient(patient_id: str) -> List[str]:
+    """Get list of scan files (nii.gz) for a specific patient."""
+    try:
+        # Load environment variables to get OUTPUT_FOLDER path
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        if not output_folder:
+            return []
+        
+        output_path = Path(output_folder)
+        nifti_dir = output_path / patient_id / "nifti"
+        
+        # Check if nifti directory exists
+        if not nifti_dir.exists() or not nifti_dir.is_dir():
+            return []
+        
+        # Get list of nii.gz files
+        scan_files = []
+        try:
+            for nifti_file in os.scandir(nifti_dir):
+                if nifti_file.is_file() and nifti_file.name.endswith('.nii.gz'):
+                    # Remove .nii.gz extension for display
+                    display_name = nifti_file.name.replace('.nii.gz', '')
+                    scan_files.append(display_name)
+        except (PermissionError, OSError):
+            return []
+        
+        return sorted(scan_files)
+        
+    except Exception as e:
+        st.error(f"Error getting scans for patient {patient_id}: {str(e)}")
+        return []
+
+
 def render_dicom_tools():
     """Render DICOM processing tools."""
     st.subheader("📋 DICOM Processing Tools")
@@ -97,7 +179,7 @@ def render_dicom_tools():
 
 def render_segmentation_tools():
     """Render segmentation tools."""
-    st.subheader("🎯 Vista3D Segmentation Tools")
+    st.subheader("🎯 Vista3D Segmentation")
     st.markdown("""
     Run Vista3D AI segmentation on medical images to identify and segment anatomical structures.
     This tool processes NIfTI files and creates detailed segmentation masks with individual voxel files.
@@ -109,11 +191,11 @@ def render_segmentation_tools():
     with col1:
         st.markdown("**Segmentation Options**")
         
-        # Patient selection
-        patient_folders = get_dicom_patient_folders()
+        # Patient selection - only show patients with nifti files
+        patient_folders = get_patients_with_nifti_files()
         
         if not patient_folders:
-            st.warning("⚠️ No patient folders found in DICOM directory. Please check your DICOM_FOLDER path in .env file.")
+            st.warning("⚠️ No patient folders with NIfTI files found. Please check your OUTPUT_FOLDER path in .env file and ensure patients have been processed through DICOM to NIfTI conversion.")
             return
         
         selected_patients = st.multiselect(
@@ -123,6 +205,32 @@ def render_segmentation_tools():
             help="Select one or more patient folders to process. Leave empty or uncheck all to process no patients.",
             key="segmentation_patients"
         )
+        
+        # Scan selection - show available scans for selected patients
+        selected_scans = []
+        if selected_patients:
+            st.markdown("**Select Scans**")
+            all_available_scans = []
+            patient_scan_map = {}
+            
+            for patient in selected_patients:
+                scans = get_scans_for_patient(patient)
+                patient_scan_map[patient] = scans
+                all_available_scans.extend(scans)
+            
+            # Remove duplicates while preserving order
+            unique_scans = list(dict.fromkeys(all_available_scans))
+            
+            if unique_scans:
+                selected_scans = st.multiselect(
+                    "Select Scans to Process",
+                    options=unique_scans,
+                    default=unique_scans,  # Select all by default
+                    help="Select specific scans to process. Leave empty or uncheck all to process no scans.",
+                    key="segmentation_scans"
+                )
+            else:
+                st.warning("No scans found for selected patients.")
         
         # Force overwrite option
         force_overwrite = st.checkbox(
@@ -147,19 +255,28 @@ def render_segmentation_tools():
         )
     
     with col2:
-        # Display patient info
+        # Display patient and scan info
         if not selected_patients:
             st.warning("⚠️ **No patients selected**")
             st.markdown("Please select at least one patient to process.")
-        elif len(selected_patients) == len(patient_folders):
-            st.info(f"📁 **Processing:** All {len(patient_folders)} patients")
-        elif len(selected_patients) == 1:
-            st.info(f"📁 **Processing:** {selected_patients[0]}")
+        elif not selected_scans:
+            st.warning("⚠️ **No scans selected**")
+            st.markdown("Please select at least one scan to process.")
         else:
-            st.info(f"📁 **Processing:** {len(selected_patients)} patients")
+            if len(selected_patients) == len(patient_folders):
+                st.info(f"📁 **Patients:** All {len(patient_folders)} patients")
+            elif len(selected_patients) == 1:
+                st.info(f"📁 **Patients:** {selected_patients[0]}")
+            else:
+                st.info(f"📁 **Patients:** {len(selected_patients)} patients")
+            
+            if len(selected_scans) == 1:
+                st.info(f"🔬 **Scans:** {selected_scans[0]}")
+            else:
+                st.info(f"🔬 **Scans:** {len(selected_scans)} scans")
         
-        # Disable button if no patients selected
-        button_disabled = len(selected_patients) == 0
+        # Disable button if no patients or scans selected
+        button_disabled = len(selected_patients) == 0 or len(selected_scans) == 0
         
         segmentation_clicked = st.button("🎯 Start Vista3D Segmentation", key="start_segmentation", type="primary", disabled=button_disabled)
     
@@ -195,6 +312,9 @@ def render_segmentation_tools():
                     env['VESSELS_OF_INTEREST'] = vessels_of_interest
                 if label_set:
                     env['LABEL_SET'] = label_set
+                if selected_scans:
+                    # Pass selected scans as comma-separated list
+                    env['SELECTED_SCANS'] = ','.join(selected_scans)
                 
                 # Run the segmentation with real-time output
                 status_text.text("🎯 Initializing Vista3D segmentation...")
@@ -243,11 +363,11 @@ def render_segmentation_tools():
                         
                         progress_bar.progress(current_progress)
                         if len(selected_patients) == len(patient_folders):
-                            status_text.text(f"🎯 Running Vista3D segmentation for all patients... ({current_progress}%)")
+                            status_text.text(f"🎯 Running Vista3D segmentation for all patients and {len(selected_scans)} scans... ({current_progress}%)")
                         elif len(selected_patients) == 1:
-                            status_text.text(f"🎯 Running Vista3D segmentation for {selected_patients[0]}... ({current_progress}%)")
+                            status_text.text(f"🎯 Running Vista3D segmentation for {selected_patients[0]} with {len(selected_scans)} scans... ({current_progress}%)")
                         else:
-                            status_text.text(f"🎯 Running Vista3D segmentation for {len(selected_patients)} patients... ({current_progress}%)")
+                            status_text.text(f"🎯 Running Vista3D segmentation for {len(selected_patients)} patients with {len(selected_scans)} scans... ({current_progress}%)")
                 
                 # Wait for process to complete
                 return_code = process.wait()
