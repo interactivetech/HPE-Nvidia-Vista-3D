@@ -471,6 +471,7 @@ def render_segmentation_tools():
                     progress_bar.progress(100)
                     status_text.text("✅ Segmentation completed successfully!")
                     st.info("Vista3D segmentation completed successfully!")
+                    st.balloons()
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
@@ -645,6 +646,7 @@ def main():
                     progress_bar.progress(100)
                     status_text.text("✅ Conversion completed successfully!")
                     st.info("DICOM to NIfTI conversion completed successfully!")
+                    st.balloons()
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
@@ -863,6 +865,7 @@ def main():
                     progress_bar.progress(100)
                     status_text.text("✅ PLY conversion completed successfully!")
                     st.info("NIfTI to PLY conversion completed successfully!")
+                    st.balloons()
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
