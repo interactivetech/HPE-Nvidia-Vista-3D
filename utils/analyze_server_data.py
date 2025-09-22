@@ -128,6 +128,107 @@ def get_patient_folders(output_folder: str) -> list:
     # Sort by folder name
     return sorted(patient_folders, key=lambda x: x['name'])
 
+def get_patient_cards_data():
+    """
+    Get patient data formatted for the Image Data page cards.
+    
+    Returns:
+        dict: Dictionary containing patient cards data and summary statistics
+    """
+    try:
+        # Load configuration
+        output_folder = load_environment_config()
+        
+        # Get patient folders
+        patient_folders = get_patient_folders(output_folder)
+        
+        if not patient_folders:
+            return {
+                'error': 'No patient folders found in output directory',
+                'patient_cards': [],
+                'summary_stats': {}
+            }
+        
+        # Convert patient folders to card format
+        patient_cards = []
+        total_nifti_files = 0
+        total_voxel_files = 0
+        total_ply_files = 0
+        total_size_bytes = 0
+        
+        for folder_info in patient_folders:
+            # Count PLY files (mesh files)
+            ply_count = count_ply_files(Path(output_folder) / folder_info['name'])
+            
+            # Count total voxel files across all scans
+            total_voxels = sum(folder_info['scan_voxels'].values()) if folder_info['scan_voxels'] else 0
+            
+            # Create patient card
+            card = {
+                'patient_id': folder_info['name'],
+                'status': 'success',
+                'nifti_files': folder_info['scan_count'],
+                'voxel_files': total_voxels,
+                'ply_files': ply_count,
+                'total_size': folder_info['size_display'],
+                'ct_scan_details': [
+                    {
+                        'name': scan_name,
+                        'voxel_count': voxel_count
+                    }
+                    for scan_name, voxel_count in folder_info['scan_voxels'].items()
+                ] if folder_info['scan_voxels'] else []
+            }
+            
+            patient_cards.append(card)
+            
+            # Update totals
+            total_nifti_files += folder_info['scan_count']
+            total_voxel_files += total_voxels
+            total_ply_files += ply_count
+            total_size_bytes += folder_info['size_bytes']
+        
+        # Create summary statistics
+        summary_stats = {
+            'total_patients': len(patient_cards),
+            'total_nifti_files': total_nifti_files,
+            'total_voxel_files': total_voxel_files,
+            'total_ply_files': total_ply_files,
+            'total_data_size': format_file_size(total_size_bytes),
+            'generated_at': str(Path().cwd())  # Simple timestamp placeholder
+        }
+        
+        return {
+            'patient_cards': patient_cards,
+            'summary_stats': summary_stats
+        }
+        
+    except Exception as e:
+        return {
+            'error': f"Error analyzing server data: {str(e)}",
+            'patient_cards': [],
+            'summary_stats': {}
+        }
+
+def count_ply_files(patient_folder_path: Path) -> int:
+    """Count the number of PLY files in a patient's mesh folder."""
+    mesh_folder = patient_folder_path / "mesh"
+    
+    if not mesh_folder.exists() or not mesh_folder.is_dir():
+        return 0
+    
+    # Count .ply files in the mesh folder
+    ply_count = 0
+    try:
+        for item in mesh_folder.iterdir():
+            if item.is_file() and item.name.endswith('.ply'):
+                ply_count += 1
+    except (OSError, PermissionError):
+        # Skip if we can't access the folder
+        pass
+    
+    return ply_count
+
 def main():
     """Main function to list patient folders."""
     print("🔍 Analyzing output folder...")
