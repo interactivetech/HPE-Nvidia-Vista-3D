@@ -148,6 +148,101 @@ def get_scans_for_patient(patient_id: str) -> List[str]:
         return []
 
 
+def get_patients_with_voxels() -> List[str]:
+    """Get list of patient folders that have voxels (segmentation results)."""
+    try:
+        # Load environment variables to get OUTPUT_FOLDER path
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        if not output_folder:
+            return []
+        
+        output_path = Path(output_folder)
+        
+        # Check if output directory exists
+        if not output_path.exists() or not output_path.is_dir():
+            return []
+        
+        # Get list of patient folders that have voxels
+        patients_with_voxels = []
+        for entry in os.scandir(output_path):
+            if entry.is_dir() and entry.name != 'uploads':
+                patient_id = entry.name
+                voxels_dir = output_path / patient_id / "voxels"
+                
+                # Check if voxels directory exists and contains subdirectories (scan folders)
+                if voxels_dir.exists() and voxels_dir.is_dir():
+                    has_voxel_scans = False
+                    try:
+                        for voxel_entry in os.scandir(voxels_dir):
+                            if voxel_entry.is_dir():
+                                # Check if this scan folder contains .nii.gz files
+                                has_nifti_files = False
+                                for nifti_file in os.scandir(voxel_entry):
+                                    if nifti_file.is_file() and nifti_file.name.endswith('.nii.gz'):
+                                        has_nifti_files = True
+                                        break
+                                if has_nifti_files:
+                                    has_voxel_scans = True
+                                    break
+                    except (PermissionError, OSError):
+                        # Skip if we can't access the directory
+                        continue
+                    
+                    if has_voxel_scans:
+                        patients_with_voxels.append(patient_id)
+        
+        return sorted(patients_with_voxels)
+        
+    except Exception as e:
+        st.error(f"Error getting patients with voxels: {str(e)}")
+        return []
+
+
+def get_voxel_scans_for_patient(patient_id: str) -> List[str]:
+    """Get list of scan folders that contain voxel files for a specific patient."""
+    try:
+        # Load environment variables to get OUTPUT_FOLDER path
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        output_folder = os.getenv('OUTPUT_FOLDER')
+        if not output_folder:
+            return []
+        
+        output_path = Path(output_folder)
+        voxels_dir = output_path / patient_id / "voxels"
+        
+        # Check if voxels directory exists
+        if not voxels_dir.exists() or not voxels_dir.is_dir():
+            return []
+        
+        # Get list of scan folders that contain .nii.gz files
+        scan_folders = []
+        try:
+            for voxel_entry in os.scandir(voxels_dir):
+                if voxel_entry.is_dir():
+                    # Check if this folder contains .nii.gz files
+                    has_nifti_files = False
+                    for nifti_file in os.scandir(voxel_entry):
+                        if nifti_file.is_file() and nifti_file.name.endswith('.nii.gz'):
+                            has_nifti_files = True
+                            break
+                    
+                    if has_nifti_files:
+                        scan_folders.append(voxel_entry.name)
+        except (PermissionError, OSError):
+            return []
+        
+        return sorted(scan_folders)
+        
+    except Exception as e:
+        st.error(f"Error getting voxel scans for patient {patient_id}: {str(e)}")
+        return []
+
+
 def render_dicom_tools():
     """Render DICOM processing tools."""
     st.subheader("📋 DICOM Processing Tools")
@@ -589,11 +684,11 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Patient selection
-        patient_folders = get_dicom_patient_folders()
+        # Patient selection - only show patients with voxels
+        patient_folders = get_patients_with_voxels()
         
         if not patient_folders:
-            st.warning("⚠️ No patient folders found in DICOM directory. Please check your DICOM_FOLDER path in .env file.")
+            st.warning("⚠️ No patient folders with voxels found. Please check your OUTPUT_FOLDER path in .env file and ensure patients have been processed through Vista3D segmentation.")
             return
         
         selected_patients_ply = st.multiselect(
@@ -603,6 +698,32 @@ def main():
             help="Select one or more patient folders to process. Leave empty or uncheck all to process no patients.",
             key="nifti2ply_patients"
         )
+        
+        # Scan selection - show available voxel scans for selected patients
+        selected_scans_ply = []
+        if selected_patients_ply:
+            st.markdown("**Select Voxel Scans**")
+            all_available_voxel_scans = []
+            patient_voxel_scan_map = {}
+            
+            for patient in selected_patients_ply:
+                voxel_scans = get_voxel_scans_for_patient(patient)
+                patient_voxel_scan_map[patient] = voxel_scans
+                all_available_voxel_scans.extend(voxel_scans)
+            
+            # Remove duplicates while preserving order
+            unique_voxel_scans = list(dict.fromkeys(all_available_voxel_scans))
+            
+            if unique_voxel_scans:
+                selected_scans_ply = st.multiselect(
+                    "Select Voxel Scans to Convert",
+                    options=unique_voxel_scans,
+                    default=unique_voxel_scans,  # Select all by default
+                    help="Select specific voxel scan folders to convert to PLY. Leave empty or uncheck all to process no scans.",
+                    key="nifti2ply_scans"
+                )
+            else:
+                st.warning("No voxel scans found for selected patients.")
         
         # Conversion options
         force_overwrite_ply = st.checkbox("Force Overwrite PLY", value=False, help="Overwrite existing PLY files")
@@ -614,19 +735,28 @@ def main():
         verbose_output = st.checkbox("Verbose Output", value=False, help="Enable detailed output")
     
     with col2:
-        # Display patient info
+        # Display patient and scan info
         if not selected_patients_ply:
             st.warning("⚠️ **No patients selected**")
             st.markdown("Please select at least one patient to process.")
-        elif len(selected_patients_ply) == len(patient_folders):
-            st.info(f"📁 **Processing:** All {len(patient_folders)} patients")
-        elif len(selected_patients_ply) == 1:
-            st.info(f"📁 **Processing:** {selected_patients_ply[0]}")
+        elif not selected_scans_ply:
+            st.warning("⚠️ **No voxel scans selected**")
+            st.markdown("Please select at least one voxel scan to process.")
         else:
-            st.info(f"📁 **Processing:** {len(selected_patients_ply)} patients")
+            if len(selected_patients_ply) == len(patient_folders):
+                st.info(f"📁 **Patients:** All {len(patient_folders)} patients")
+            elif len(selected_patients_ply) == 1:
+                st.info(f"📁 **Patients:** {selected_patients_ply[0]}")
+            else:
+                st.info(f"📁 **Patients:** {len(selected_patients_ply)} patients")
+            
+            if len(selected_scans_ply) == 1:
+                st.info(f"🔬 **Voxel Scans:** {selected_scans_ply[0]}")
+            else:
+                st.info(f"🔬 **Voxel Scans:** {len(selected_scans_ply)} scans")
         
-        # Disable button if no patients selected
-        button_disabled_ply = len(selected_patients_ply) == 0
+        # Disable button if no patients or scans selected
+        button_disabled_ply = len(selected_patients_ply) == 0 or len(selected_scans_ply) == 0
         
         conversion_ply_clicked = st.button("🔺 Start NIfTI to PLY Conversion", key="start_nifti2ply", type="primary", disabled=button_disabled_ply)
     
@@ -656,6 +786,11 @@ def main():
                 # Add selected patients as arguments
                 cmd_args.extend(selected_patients_ply)
             
+            # Set environment variables for selected scans
+            env = os.environ.copy()
+            if selected_scans_ply:
+                env['SELECTED_VOXEL_SCANS'] = ','.join(selected_scans_ply)
+            
             # Create progress containers
             progress_container = st.container()
             output_container = st.container()
@@ -680,7 +815,8 @@ def main():
                     text=True,
                     bufsize=1,
                     universal_newlines=True,
-                    cwd=Path(__file__).parent
+                    cwd=Path(__file__).parent,
+                    env=env
                 )
                 
                 # Read output line by line
@@ -714,11 +850,11 @@ def main():
                         
                         progress_bar.progress(current_progress)
                         if len(selected_patients_ply) == len(patient_folders):
-                            status_text.text(f"🔺 Converting NIfTI to PLY for all patients... ({current_progress}%)")
+                            status_text.text(f"🔺 Converting voxels to PLY for all patients with {len(selected_scans_ply)} scans... ({current_progress}%)")
                         elif len(selected_patients_ply) == 1:
-                            status_text.text(f"🔺 Converting NIfTI to PLY for {selected_patients_ply[0]}... ({current_progress}%)")
+                            status_text.text(f"🔺 Converting voxels to PLY for {selected_patients_ply[0]} with {len(selected_scans_ply)} scans... ({current_progress}%)")
                         else:
-                            status_text.text(f"🔺 Converting NIfTI to PLY for {len(selected_patients_ply)} patients... ({current_progress}%)")
+                            status_text.text(f"🔺 Converting voxels to PLY for {len(selected_patients_ply)} patients with {len(selected_scans_ply)} scans... ({current_progress}%)")
                 
                 # Wait for process to complete
                 return_code = process.wait()

@@ -105,14 +105,14 @@ def render_server_status_sidebar():
     if check_image_server_status():
         image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
         
-        st.sidebar.info(f"🖥️ **Image Server**  \n🟢 Online • {image_server_url}")
+        st.sidebar.info(f"🖥️ **Image Server**  \n✅ Online • {image_server_url}")
     else:
         st.sidebar.error(f"🖥️ **Image Server**  \n❌ Offline  \nStart with: `python utils/image_server.py`")
     
     # Vista3D Server Status
     vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
     if check_vista3d_server_status():
-        st.sidebar.info(f"🧠 **Vista3D Server**  \n🟢 Online • {vista3d_server_url}")
+        st.sidebar.info(f"🧠 **Vista3D Server**  \n✅ Online • {vista3d_server_url}")
     else:
         st.sidebar.error(f"🧠 **Vista3D Server**  \n❌ Offline • {vista3d_server_url}")
 
@@ -136,6 +136,9 @@ if current_page == 'home':
     # Render NiiVue badge in sidebar
     #_render_niivue_badge()
     
+    # Add spacing between HPE badge and server status widgets
+    st.sidebar.markdown("")
+    
     # Render server status widgets in sidebar
     render_server_status_sidebar()
     
@@ -148,7 +151,7 @@ if current_page == 'home':
     This platform provides comprehensive tools for medical image analysis, visualization, and 3D reconstruction. 
     Use the navigation menu on the left to access different features:
     
-    - **📊 Image Data**: Browse and analyze patient medical imaging data
+    - **📥 Image Data**: Browse and analyze patient medical imaging data
     - **🩻 NiiVue Viewer**: Interactive medical image viewer for NIfTI files
     - **🔺 Open3D Viewer**: 3D mesh and point cloud visualization
     - **🛠️ Tools**: Utilities for medical image processing

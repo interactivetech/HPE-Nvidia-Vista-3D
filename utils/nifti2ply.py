@@ -463,6 +463,19 @@ def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None
                     # Get voxels subfolders
                     voxels_subfolders = get_voxels_subfolders(voxels_dir)
                     
+                    # Filter by selected voxel scans if specified
+                    selected_voxel_scans_env = os.getenv('SELECTED_VOXEL_SCANS', '').strip()
+                    if selected_voxel_scans_env:
+                        selected_scan_names = [scan.strip() for scan in selected_voxel_scans_env.split(',') if scan.strip()]
+                        if selected_scan_names:
+                            # Filter voxels subfolders to only include selected scans
+                            filtered_subfolders = []
+                            for subfolder in voxels_subfolders:
+                                if subfolder.name in selected_scan_names:
+                                    filtered_subfolders.append(subfolder)
+                            voxels_subfolders = filtered_subfolders
+                            print(f"  Filtered to {len(voxels_subfolders)} selected voxel scans: {selected_scan_names}")
+                    
                     if not voxels_subfolders:
                         print(f"⚠️  No voxels subfolders found in {voxels_dir}")
                         patient_pbar.update(1)

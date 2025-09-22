@@ -17,7 +17,7 @@
         "key": "image_data",
         "label": "Image Data",
         "page_key": "image_data",
-        "icon": "📊",
+        "icon": "📥",
         "is_image": false,
         "enabled": true,
         "order": 2,
