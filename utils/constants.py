@@ -230,7 +230,7 @@ MESSAGES = {
 DEBUG_MODE = False
 
 # File size filtering
-MIN_FILE_SIZE_MB = 5.0  # Minimum file size in MB for processing
+MIN_FILE_SIZE_MB = 3.5  # Minimum file size in MB for processing
 
 # Configuration file paths
 CONFIG_FILES = {
