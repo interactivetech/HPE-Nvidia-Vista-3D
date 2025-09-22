@@ -16,8 +16,6 @@ import base64
 import mimetypes
 from typing import List, Dict, Optional
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import extra_streamlit_components as stx
 import numpy as np
 import tempfile
@@ -118,313 +116,28 @@ def run_server_analysis():
         return None, f"Error: {str(e)}"
 
 def render_patient_cards(patient_cards: List[Dict]):
-    """Render patient data as simple sections."""
+    """Render patient data as simple sections (legacy function - now redirects to clean view)."""
+    # This function is kept for backward compatibility but now redirects to the clean view
     if not patient_cards:
         st.warning("No patient data available")
         return
     
-    # Display patient data as sections
-    for i, card in enumerate(patient_cards):
+    # For backward compatibility, just show a simple list
+    for card in patient_cards:
         if card['status'] == 'error':
-            # Error section
             st.error(f"**{card['patient_id']}** - Error: {card['error_message']}")
         else:
-            # Patient section
-            st.markdown(f"### {card['patient_id']}")
-            
-            # Patient info in columns
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("🩻 CT Scans", card['ct_scans'])
-            
-            with col2:
-                st.metric("🧠 Voxel Files", card['voxel_files'])
-            
-            with col3:
-                st.metric("🔺 PLY Files", card['ply_files'])
-            
-            with col4:
-                st.metric("💾 Total Size", card['total_size'])
-            
-            # Show NIfTI file previews
-            if card.get('ct_scans', 0) > 0:
-                st.markdown("**🩻 CT Scan Previews:**")
-                nifti_files = get_nifti_files_for_patient(card['patient_id'])
-                if nifti_files:
-                    # Show first few NIfTI files as previews
-                    display_files = nifti_files[:3]  # Show max 3 files
-                    for i, nifti_url in enumerate(display_files):
-                        nifti_name = nifti_url.split('/')[-1].replace('.nii.gz', '')
-                        create_nifti_preview(nifti_url, nifti_name, f"{card['patient_id']}_{i}")
-                        if i < len(display_files) - 1:
-                            st.markdown("---")
-            
-            # Show mini STL viewer if mesh files are available
-            if card.get('mesh_files', 0) > 0:
-                # Get STL file URLs for this patient
-                stl_files = get_stl_files_for_patient(card['patient_id'])
-                if stl_files:
-                    # Show first STL file as mini viewer
-                    st.markdown("**🔺 3D Model Preview:**")
-                    create_mini_stl_viewer_in_card(stl_files[0], card['patient_id'])
-            
-            # Add separator between patients
-            if i < len(patient_cards) - 1:
-                st.markdown("---")
+            with st.expander(f"Patient: {card['patient_id']} ({card['nifti_files']} NIfTI files)", expanded=False):
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("NIfTI Files", card['nifti_files'])
+                with col2:
+                    st.metric("Voxel Files", card['voxel_files'])
+                with col3:
+                    st.metric("PLY Files", card.get('ply_files', 0))
+                with col4:
+                    st.metric("Total Size", card['total_size'])
 
-def prepare_chart_data(patients_data: List[Dict]) -> pd.DataFrame:
-    """Prepare patient data for the stacked bar chart."""
-    chart_data = []
-    
-    for patient in patients_data:
-        patient_id = patient.get('id', 'Unknown')
-        ct_scans = patient.get('ct_scans', 0)
-        voxel_files = patient.get('voxel_files', 0)
-        ply_files = patient.get('ply_files', 0)
-        
-        # Calculate scans - this is the number of individual voxel files per patient
-        # In the current data structure, scans are represented by voxel files
-        scans = voxel_files
-        
-        # Extract size information from data_size string (e.g., "123.4 MB")
-        data_size_str = patient.get('data_size', 'Unknown')
-        size_mb = 0
-        if data_size_str != 'Unknown' and 'MB' in data_size_str:
-            try:
-                size_mb = float(data_size_str.replace('MB', '').strip())
-            except:
-                size_mb = 0
-        elif data_size_str != 'Unknown' and 'GB' in data_size_str:
-            try:
-                size_gb = float(data_size_str.replace('GB', '').strip())
-                size_mb = size_gb * 1024  # Convert GB to MB
-            except:
-                size_mb = 0
-        
-        # Prepare scan names for hover tooltip
-        scan_names = []
-        if patient.get('scans'):
-            scan_names = [scan.get('name', 'Unknown') for scan in patient['scans']]
-        
-        chart_data.append({
-            'Patient': patient_id,
-            'CT Scans': ct_scans,
-            'Scans': scans,
-            'Voxels': voxel_files,  # Using voxel_files as the voxel count
-            'PLY Files': ply_files,
-            'Size (MB)': size_mb,
-            'Scan Names': scan_names
-        })
-    
-    return pd.DataFrame(chart_data)
-
-def render_patient_data_chart(patients_data: List[Dict]):
-    """Render a comprehensive chart showing patient data with file counts and folder sizes."""
-    if not patients_data:
-        st.warning("No patient data available for chart")
-        return
-    
-    # Prepare data for the chart
-    df = prepare_chart_data(patients_data)
-    
-    # Create tabs for different chart views
-    tab1, tab2, tab3 = st.tabs(["📊 File Counts", "💾 Folder Sizes", "📈 Combined View"])
-    
-    with tab1:
-        # File counts stacked bar chart
-        chart_df = pd.melt(
-            df, 
-            id_vars=['Patient'], 
-            value_vars=['CT Scans', 'Scans', 'Voxels', 'PLY Files'],
-            var_name='Data Type', 
-            value_name='Count'
-        )
-        
-        # Add scan names to the chart data for hover tooltips
-        chart_df_with_scans = chart_df.merge(df[['Patient', 'Scan Names']], on='Patient', how='left')
-        chart_df_with_scans['Scan Names Text'] = chart_df_with_scans['Scan Names'].apply(
-            lambda x: '<br>'.join(x) if x else 'No scan data'
-        )
-        
-        fig = px.bar(
-            chart_df_with_scans, 
-            x='Patient', 
-            y='Count', 
-            color='Data Type',
-            title='Patient File Counts - CT Scans, Scans, Voxels, and PLY Files',
-            labels={'Count': 'Number of Files', 'Patient': 'Patient ID'},
-            color_discrete_map={
-                'CT Scans': '#1f77b4',
-                'Scans': '#ff7f0e', 
-                'Voxels': '#2ca02c',
-                'PLY Files': '#d62728'
-            },
-            hover_data={'Scan Names Text': True}
-        )
-        
-        fig.update_layout(
-            xaxis_tickangle=-45,
-            height=500,
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with tab2:
-        # Folder sizes bar chart
-        fig = px.bar(
-            df, 
-            x='Patient', 
-            y='Size (MB)',
-            title='Patient Folder Sizes',
-            labels={'Size (MB)': 'Folder Size (MB)', 'Patient': 'Patient ID'},
-            color='Size (MB)',
-            color_continuous_scale='Viridis'
-        )
-        
-        fig.update_layout(
-            xaxis_tickangle=-45,
-            height=500,
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with tab3:
-        # Combined view with dual y-axis
-        from plotly.subplots import make_subplots
-        
-        # Create subplot with secondary y-axis
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        # Add file counts as stacked bars
-        chart_df = pd.melt(
-            df, 
-            id_vars=['Patient'], 
-            value_vars=['CT Scans', 'Scans', 'Voxels', 'PLY Files'],
-            var_name='Data Type', 
-            value_name='Count'
-        )
-        
-        # Add scan names for hover tooltips
-        chart_df_with_scans = chart_df.merge(df[['Patient', 'Scan Names']], on='Patient', how='left')
-        chart_df_with_scans['Scan Names Text'] = chart_df_with_scans['Scan Names'].apply(
-            lambda x: '<br>'.join(x) if x else 'No scan data'
-        )
-        
-        for data_type in ['CT Scans', 'Scans', 'Voxels', 'PLY Files']:
-            data_subset = chart_df_with_scans[chart_df_with_scans['Data Type'] == data_type]
-            fig.add_trace(
-                go.Bar(
-                    x=data_subset['Patient'], 
-                    y=data_subset['Count'],
-                    name=data_type,
-                    marker_color={
-                        'CT Scans': '#1f77b4',
-                        'Scans': '#ff7f0e', 
-                        'Voxels': '#2ca02c',
-                        'PLY Files': '#d62728'
-                    }[data_type],
-                    customdata=data_subset['Scan Names Text'],
-                    hovertemplate=f'<b>{data_type}</b><br>' +
-                                 'Patient: %{x}<br>' +
-                                 'Count: %{y}<br>' +
-                                 'Scan Names:<br>%{customdata}<br>' +
-                                 '<extra></extra>'
-                ),
-                secondary_y=False
-            )
-        
-        # Add folder sizes as line chart
-        df['Scan Names Text'] = df['Scan Names'].apply(
-            lambda x: '<br>'.join(x) if x else 'No scan data'
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=df['Patient'], 
-                y=df['Size (MB)'],
-                name='Folder Size (MB)',
-                mode='lines+markers',
-                line=dict(color='red', width=3),
-                marker=dict(size=8),
-                customdata=df['Scan Names Text'],
-                hovertemplate='<b>Folder Size</b><br>' +
-                             'Patient: %{x}<br>' +
-                             'Size: %{y} MB<br>' +
-                             'Scan Names:<br>%{customdata}<br>' +
-                             '<extra></extra>'
-            ),
-            secondary_y=True
-        )
-        
-        # Update layout
-        fig.update_layout(
-            title_text="Patient Data Overview - File Counts & Folder Sizes",
-            xaxis_tickangle=-45,
-            height=600,
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        
-        # Set y-axes titles
-        fig.update_yaxes(title_text="Number of Files", secondary_y=False)
-        fig.update_yaxes(title_text="Folder Size (MB)", secondary_y=True)
-        
-        st.plotly_chart(fig, use_container_width=True)
-
-def render_patient_details_visualization(patients_data: List[Dict]):
-    """Render comprehensive patient details visualization."""
-    if not patients_data:
-        st.warning("No patient data available")
-        return
-    
-    # Prepare data for visualization
-    df = prepare_chart_data(patients_data)
-    
-    # Interactive Data Table
-    
-    # Prepare table data
-    table_data = []
-    for patient in patients_data:
-        # Get actual NIfTI file names from the analysis data
-        # The scan names are stored in the 'scans' array with the actual file names
-        scan_names = []
-        if patient.get('scans'):
-            # Extract the actual file names from the scans array
-            # These are the base names without .nii.gz extension
-            scan_names = [scan.get('name', 'Unknown') for scan in patient['scans']]
-        
-        # Format scan names for display - show actual NIfTI file names
-        if scan_names:
-            # Join the scan names with commas for display
-            scan_names_text = ', '.join(scan_names)
-        else:
-            # Fallback to count if no scan names available
-            scan_names_text = f"{patient['ct_scans']} scans"
-        
-        table_data.append({
-            'Patient ID': patient['id'],
-            'CT Scans': scan_names_text,
-            'Voxel Files': patient['voxel_files'],
-            'PLY Files': patient.get('ply_files', 0),
-            'Data Size': patient.get('data_size', 'Unknown')
-        })
-    
-    table_df = pd.DataFrame(table_data)
-    st.dataframe(
-        table_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Patient ID": st.column_config.TextColumn("Patient ID", width="medium"),
-            "CT Scans": st.column_config.TextColumn("CT Scans", width="large"),
-            "Voxel Files": st.column_config.NumberColumn("Voxel Files", width="small"),
-            "PLY Files": st.column_config.NumberColumn("PLY Files", width="small"),
-            "Data Size": st.column_config.TextColumn("Data Size", width="medium")
-        }
-    )
 
 def render_server_status_sidebar():
     """Render server status message in sidebar."""
@@ -972,6 +685,133 @@ def create_mini_stl_viewer(stl_files: List[str], patient_id: str) -> None:
             if i < len(display_files) - 1:
                 st.markdown("---")
 
+def render_clean_data_view(patient_cards: List[Dict], stats: Dict):
+    """Render a clean, organized view of the patient data."""
+    
+    # Header with key metrics
+    st.markdown("### 📊 Data Overview")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Patients", stats.get('total_patients', 0))
+    with col2:
+        st.metric("NIfTI Files", stats.get('total_nifti_files', 0))
+    with col3:
+        st.metric("Total Size", stats.get('total_data_size', '0 B'))
+    with col4:
+        st.metric("Last Updated", stats.get('generated_at', 'Unknown')[:10])
+    
+    st.markdown("---")
+    
+    # Patient data in a clean table format
+    if patient_cards:
+        st.markdown("### 👥 Patient Data")
+        
+        # Create a clean data table
+        table_data = []
+        for card in patient_cards:
+            if card['status'] == 'success':
+                # Get scan names for display
+                scan_names = []
+                if card.get('ct_scan_details'):
+                    scan_names = [scan['name'] for scan in card['ct_scan_details']]
+                
+                table_data.append({
+                    'Patient ID': card['patient_id'],
+                    'NIfTI Files': f"{card['nifti_files']} files",
+                    'Voxel Files': card['voxel_files'],
+                    'PLY Files': card.get('ply_files', 0),
+                    'Total Size': card['total_size'],
+                    'File Names': ', '.join(scan_names[:3]) + ('...' if len(scan_names) > 3 else '')
+                })
+            else:
+                table_data.append({
+                    'Patient ID': card['patient_id'],
+                    'NIfTI Files': 'Error',
+                    'Voxel Files': 'Error',
+                    'PLY Files': 'Error',
+                    'Total Size': 'Error',
+                    'File Names': card.get('error_message', 'Unknown error')
+                })
+        
+        # Display as a clean table
+        df = pd.DataFrame(table_data)
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Patient ID": st.column_config.TextColumn("Patient ID", width="medium"),
+                "NIfTI Files": st.column_config.TextColumn("NIfTI Files", width="small"),
+                "Voxel Files": st.column_config.NumberColumn("Voxel Files", width="small"),
+                "PLY Files": st.column_config.NumberColumn("PLY Files", width="small"),
+                "Total Size": st.column_config.TextColumn("Total Size", width="medium"),
+                "File Names": st.column_config.TextColumn("File Names", width="large")
+            }
+        )
+        
+        # Detailed view for selected patient
+        st.markdown("### 🔍 Patient Details")
+        patient_options = [f"{card['patient_id']} ({card['nifti_files']} NIfTI files)" for card in patient_cards if card['status'] == 'success']
+        
+        if patient_options:
+            selected_patient = st.selectbox(
+                "Select a patient to view details:",
+                options=patient_options,
+                index=0
+            )
+            
+            # Find the selected patient data
+            selected_patient_id = selected_patient.split(' (')[0]
+            selected_card = next((card for card in patient_cards if card['patient_id'] == selected_patient_id), None)
+            
+            if selected_card and selected_card['status'] == 'success':
+                render_patient_detail_view(selected_card)
+        else:
+            st.info("No patient data available for detailed view")
+
+def render_patient_detail_view(card: Dict):
+    """Render detailed view for a selected patient."""
+    
+    # Patient header
+    st.markdown(f"#### Patient: {card['patient_id']}")
+    
+    # Key metrics for this patient
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("NIfTI Files", card['nifti_files'])
+    with col2:
+        st.metric("Voxel Files", card['voxel_files'])
+    with col3:
+        st.metric("PLY Files", card.get('ply_files', 0))
+    with col4:
+        st.metric("Total Size", card['total_size'])
+    
+    # File details
+    if card.get('file_details'):
+        st.markdown("##### File Details")
+        for i, file_info in enumerate(card['file_details']):
+            with st.expander(f"{file_info['type']} {i+1}: {file_info['name']}", expanded=False):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Size:** {file_info['size_display']}")
+                with col2:
+                    st.write(f"**Type:** {file_info['type']}")
+                
+                # Show subfolder information for voxel and PLY files
+                if file_info.get('subfolder'):
+                    st.write(f"**Subfolder:** {file_info['subfolder']}")
+                
+                # Show file type status
+                status_cols = st.columns(3)
+                with status_cols[0]:
+                    if file_info['type'] == 'NIfTI':
+                        st.success("✅ NIfTI File")
+                    elif file_info['type'] == 'Voxel':
+                        st.info("🧠 Voxel File")
+                    elif file_info['type'] == 'PLY':
+                        st.success("🔺 PLY File")
+
 def main():
     """Main function for the Image Data page."""
     # Note: This function is called from app.py, so navigation is already rendered
@@ -990,81 +830,23 @@ def main():
     st.markdown("Browse and analyze medical imaging data from your patients.")
     
     if check_image_server_status():
-        with st.spinner("Analyzing server data..."):
+        with st.spinner("Loading data..."):
             cards_data, error = run_server_analysis()
         
         if cards_data and not error:
             stats = cards_data['summary_stats']
             patient_cards = cards_data['patient_cards']
             
-            # Summary Statistics
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
-            with col1:
-                st.metric(
-                    label="Total Patients",
-                    value=stats.get('total_patients', 0),
-                    help="Number of patient folders found"
-                )
-            
-            with col2:
-                st.metric(
-                    label="Total CT Scans",
-                    value=stats.get('total_ct_scans', 0),
-                    help="Total number of CT scans across all patients"
-                )
-            
-            with col3:
-                st.metric(
-                    label="Patients with Voxels",
-                    value=stats.get('patients_with_voxels', 0),
-                    help="Number of patients with voxel data"
-                )
-            
-            with col4:
-                st.metric(
-                    label="Patients with PLY",
-                    value=stats.get('patients_with_ply', 0),
-                    help="Number of patients with PLY data"
-                )
-            
-            with col5:
-                st.metric(
-                    label="Total Data Size",
-                    value=stats.get('total_data_size', 'Unknown'),
-                    help="Total size of all patient data"
-                )
-            
-            # Patient Cards Display
-            st.markdown("---")
-            render_patient_cards(patient_cards)
-            
-            # Optional: Keep the old visualization as an expandable section
-            with st.expander("📊 Detailed Analysis & Charts", expanded=False):
-                # Convert cards data to old format for compatibility with existing charts
-                patients_for_charts = []
-                for card in patient_cards:
-                    if card['status'] == 'success':
-                        patients_for_charts.append({
-                            'id': card['patient_id'],
-                            'ct_scans': card['ct_scans'],
-                            'voxel_files': card['voxel_files'],
-                            'ply_files': card['ply_files'],
-                            'data_size': card['total_size'],
-                            'scans': [{'name': scan['name'], 'voxel_count': scan['voxel_count']} for scan in card['ct_scan_details']]
-                        })
-                
-                if patients_for_charts:
-                    render_patient_data_chart(patients_for_charts)
-                    render_patient_details_visualization(patients_for_charts)
+            # Render clean data view
+            render_clean_data_view(patient_cards, stats)
         
         elif error:
-            st.error(f"❌ Analysis failed: {error}")
+            st.error(f"❌ Failed to load data: {error}")
         else:
-            st.warning("⚠️ No analysis data available")
+            st.warning("⚠️ No data available")
     
     else:
-        st.warning("⚠️ Image server is offline. Start the server to view data analysis.")
+        st.warning("⚠️ Image server is offline. Start the server to view data.")
         st.code("python utils/image_server.py", language="bash")
 
 if __name__ == "__main__":

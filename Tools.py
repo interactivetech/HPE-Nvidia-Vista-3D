@@ -469,6 +469,21 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
+        # Patient selection
+        patient_folders = get_dicom_patient_folders()
+        
+        if not patient_folders:
+            st.warning("⚠️ No patient folders found in DICOM directory. Please check your DICOM_FOLDER path in .env file.")
+            return
+        
+        selected_patients_ply = st.multiselect(
+            "Select Patients",
+            options=patient_folders,
+            default=patient_folders,  # Select all by default
+            help="Select one or more patient folders to process. Leave empty or uncheck all to process no patients.",
+            key="nifti2ply_patients"
+        )
+        
         # Conversion options
         force_overwrite_ply = st.checkbox("Force Overwrite PLY", value=False, help="Overwrite existing PLY files")
         threshold = st.number_input("Threshold", min_value=0.0, value=0.1, step=0.01, 
@@ -479,9 +494,24 @@ def main():
         verbose_output = st.checkbox("Verbose Output", value=False, help="Enable detailed output")
     
     with col2:
-        pass
+        # Display patient info
+        if not selected_patients_ply:
+            st.warning("⚠️ **No patients selected**")
+            st.markdown("Please select at least one patient to process.")
+        elif len(selected_patients_ply) == len(patient_folders):
+            st.info(f"📁 **Processing:** All {len(patient_folders)} patients")
+        elif len(selected_patients_ply) == 1:
+            st.info(f"📁 **Processing:** {selected_patients_ply[0]}")
+        else:
+            st.info(f"📁 **Processing:** {len(selected_patients_ply)} patients")
+        
+        # Disable button if no patients selected
+        button_disabled_ply = len(selected_patients_ply) == 0
+        
+        conversion_ply_clicked = st.button("🔺 Start NIfTI to PLY Conversion", key="start_nifti2ply", type="primary", disabled=button_disabled_ply)
     
-    if st.button("🔺 Start NIfTI to PLY Conversion", key="start_nifti2ply", type="primary"):
+    # Check if PLY conversion button was clicked
+    if conversion_ply_clicked:
         with st.spinner("Starting NIfTI to PLY conversion..."):
             # Prepare command arguments
             cmd_args = ["python", "utils/nifti2ply.py", "--batch"]
@@ -500,6 +530,11 @@ def main():
             
             if verbose_output:
                 cmd_args.append("--verbose")
+            
+            # Add patient selection if specific patients are chosen
+            if len(selected_patients_ply) < len(patient_folders):
+                # Add selected patients as arguments
+                cmd_args.extend(selected_patients_ply)
             
             # Create progress containers
             progress_container = st.container()
@@ -548,7 +583,7 @@ def main():
                         )
                         
                         # Update progress based on output keywords
-                        if "Processing patients" in output:
+                        if "Processing patients" in output or "Processing specific patient" in output:
                             current_progress = min(30, current_progress + 5)
                         elif "Processing subfolder" in output:
                             current_progress = min(60, current_progress + 10)
@@ -558,7 +593,12 @@ def main():
                             current_progress = 100
                         
                         progress_bar.progress(current_progress)
-                        status_text.text(f"🔺 Converting NIfTI to PLY... ({current_progress}%)")
+                        if len(selected_patients_ply) == len(patient_folders):
+                            status_text.text(f"🔺 Converting NIfTI to PLY for all patients... ({current_progress}%)")
+                        elif len(selected_patients_ply) == 1:
+                            status_text.text(f"🔺 Converting NIfTI to PLY for {selected_patients_ply[0]}... ({current_progress}%)")
+                        else:
+                            status_text.text(f"🔺 Converting NIfTI to PLY for {len(selected_patients_ply)} patients... ({current_progress}%)")
                 
                 # Wait for process to complete
                 return_code = process.wait()
@@ -566,7 +606,7 @@ def main():
                 if return_code == 0:
                     progress_bar.progress(100)
                     status_text.text("✅ PLY conversion completed successfully!")
-                    st.success("🎉 NIfTI to PLY conversion completed successfully!")
+                    st.info("NIfTI to PLY conversion completed successfully!")
                     
                     # Show final output
                     final_output = "\n".join(output_lines)

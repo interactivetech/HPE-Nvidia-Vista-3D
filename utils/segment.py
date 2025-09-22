@@ -41,8 +41,8 @@ if os.getenv('DOCKER_CONTAINER') == 'true' or os.path.exists('/.dockerenv'):
     # We're in Docker, but Vista3D server needs to access host machine
     DEFAULT_IMAGE_SERVER_URL = 'http://host.docker.internal:8888'
 else:
-    # We're running locally, Vista3D server is in Docker and needs host access
-    DEFAULT_IMAGE_SERVER_URL = 'http://host.docker.internal:8888'
+    # We're running locally, both servers are local - use localhost
+    DEFAULT_IMAGE_SERVER_URL = 'http://localhost:8888'
 
 VISTA3D_IMAGE_SERVER_URL = os.getenv('VISTA3D_IMAGE_SERVER_URL', DEFAULT_IMAGE_SERVER_URL)
 # Use full paths from .env - no more PROJECT_ROOT needed
