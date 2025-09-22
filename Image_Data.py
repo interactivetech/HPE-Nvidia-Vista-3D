@@ -141,7 +141,10 @@ def main():
     
     with st.spinner("Analyzing server data..."):
         try:
-            # Import and run the analysis
+            # Clear any cached data and import fresh
+            import importlib
+            import utils.analyze_server_data
+            importlib.reload(utils.analyze_server_data)
             from utils.analyze_server_data import get_patient_cards_data, load_environment_config, get_patient_folders, format_file_size
             
             # Load configuration
