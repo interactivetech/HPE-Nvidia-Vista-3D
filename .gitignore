@@ -4,6 +4,7 @@ dicom
 .DS_Store
 output*
 dicom*
+.setup_state*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
