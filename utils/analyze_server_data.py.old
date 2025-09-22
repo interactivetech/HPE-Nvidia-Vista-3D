@@ -583,117 +583,6 @@ def test_server_connection(base_url: str) -> bool:
         print(f"❌ Error testing connection: {e}")
         return False
 
-def generate_patient_cards_data(analysis_data: List[Dict]) -> Dict:
-    """Generate patient cards data for display in app.py."""
-    
-    total_patients = len(analysis_data)
-    total_ct_scans = sum(patient.get('total_ct_scans', 0) for patient in analysis_data)
-    total_ct_size_bytes = sum(patient.get('total_ct_size_bytes', 0) for patient in analysis_data)
-    total_voxel_size_bytes = sum(patient.get('total_voxel_size_bytes', 0) for patient in analysis_data)
-    total_mesh_size_bytes = sum(patient.get('total_mesh_size_bytes', 0) for patient in analysis_data)
-    total_ply_size_bytes = sum(patient.get('total_ply_size_bytes', 0) for patient in analysis_data)
-    total_data_size_bytes = sum(patient.get('total_patient_size_bytes', 0) for patient in analysis_data)
-    
-    # Calculate statistics
-    patients_with_data = len([p for p in analysis_data if p.get('total_ct_scans', 0) > 0])
-    patients_with_voxels = len([p for p in analysis_data if p.get('total_voxel_files', 0) > 0])
-    patients_with_meshes = len([p for p in analysis_data if p.get('total_mesh_files', 0) > 0])
-    patients_with_ply = len([p for p in analysis_data if p.get('total_ply_files', 0) > 0])
-    
-    # Prepare patient cards data
-    patient_cards = []
-    
-    for patient in analysis_data:
-        if patient.get('error'):
-            # Create error card
-            card_data = {
-                'patient_id': patient['patient_id'],
-                'status': 'error',
-                'error_message': patient['error'],
-                'ct_scans': 0,
-                'voxel_files': 0,
-                'mesh_files': 0,
-                'ply_files': 0,
-                'total_size': '0 B',
-                'ct_scan_details': [],
-                'has_voxel_data': False,
-                'has_mesh_data': False,
-                'has_ply_data': False
-            }
-        else:
-            # Create normal card
-            ct_scan_details = []
-            if patient.get('ct_scans'):
-                for ct_scan_info in patient['ct_scans']:
-                    ct_scan_name = ct_scan_info.get('name', 'Unknown')
-                    ct_scan_size = ct_scan_info.get('size_bytes', 0)
-                    voxel_info = patient.get('voxel_data', {}).get(ct_scan_name, {})
-                    mesh_info = patient.get('mesh_data', {}).get(ct_scan_name, {})
-                    ply_info = patient.get('ply_data', {}).get(ct_scan_name, {})
-                    
-                    # Remove .nii.gz extension for display
-                    scan_display_name = ct_scan_name.replace('.nii.gz', '')
-                    
-                    has_voxel_file = voxel_info.get('has_voxel_file', False)
-                    voxel_count = voxel_info.get('voxel_count', 0)
-                    mesh_count = mesh_info.get('mesh_count', 0)
-                    ply_count = ply_info.get('ply_count', 0)
-                    
-                    ct_scan_details.append({
-                        'name': scan_display_name,
-                        'original_name': ct_scan_name,
-                        'size_bytes': ct_scan_size,
-                        'size_display': format_file_size(ct_scan_size),
-                        'has_voxel_file': has_voxel_file,
-                        'voxel_count': voxel_count,
-                        'mesh_count': mesh_count,
-                        'ply_count': ply_count,
-                        'has_voxel_data': has_voxel_file or voxel_count > 0,
-                        'has_mesh_data': mesh_count > 0,
-                        'has_ply_data': ply_count > 0
-                    })
-            
-            card_data = {
-                'patient_id': patient['patient_id'],
-                'status': 'success',
-                'error_message': None,
-                'ct_scans': patient.get('total_ct_scans', 0),
-                'voxel_files': patient.get('total_voxel_files', 0),
-                'mesh_files': patient.get('total_mesh_files', 0),
-                'ply_files': patient.get('total_ply_files', 0),
-                'total_size': format_file_size(patient.get('total_patient_size_bytes', 0)),
-                'total_size_bytes': patient.get('total_patient_size_bytes', 0),
-                'ct_scan_details': ct_scan_details,
-                'has_voxel_data': patient.get('total_voxel_files', 0) > 0,
-                'has_mesh_data': patient.get('total_mesh_files', 0) > 0,
-                'has_ply_data': patient.get('total_ply_files', 0) > 0,
-                'structure_type': patient.get('structure_type', 'current')
-            }
-        
-        patient_cards.append(card_data)
-    
-    # Summary statistics
-    summary_stats = {
-        'total_patients': total_patients,
-        'patients_with_ct_scans': patients_with_data,
-        'patients_with_voxels': patients_with_voxels,
-        'patients_with_meshes': patients_with_meshes,
-        'patients_with_ply': patients_with_ply,
-        'total_ct_scans': total_ct_scans,
-        'total_ct_size': format_file_size(total_ct_size_bytes),
-        'total_voxel_size': format_file_size(total_voxel_size_bytes),
-        'total_mesh_size': format_file_size(total_mesh_size_bytes),
-        'total_ply_size': format_file_size(total_ply_size_bytes),
-        'total_data_size': format_file_size(total_data_size_bytes),
-        'total_data_size_bytes': total_data_size_bytes
-    }
-    
-    return {
-        'summary_stats': summary_stats,
-        'patient_cards': patient_cards,
-        'generated_at': time.strftime('%Y-%m-%d %H:%M:%S')
-    }
-
 def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None) -> str:
     """Generate a comprehensive report from the analysis data."""
     
@@ -861,84 +750,12 @@ def generate_report(analysis_data: List[Dict], output_file: Optional[str] = None
     
     return report_content
 
-def get_patient_cards_data(image_server_url: str = None) -> Dict:
-    """Get patient cards data for display in app.py."""
-    if image_server_url is None:
-        image_server_url = load_environment_config()
-    
-    # Test server connection
-    if not test_server_connection(image_server_url):
-        return {
-            'error': 'Cannot connect to image server',
-            'summary_stats': {},
-            'patient_cards': [],
-            'generated_at': time.strftime('%Y-%m-%d %H:%M:%S')
-        }
-    
-    # Get output folder contents to find patients (current structure)
-    output_contents = get_folder_contents(image_server_url, "")
-    patient_folders = []
-    
-    if output_contents:
-        # Filter for patient folders in the current structure
-        patient_folders = [item for item in output_contents if item['is_directory'] and is_patient_folder(item['name'])]
-    
-    # If no patients found in current structure, fall back to old structure
-    if not patient_folders:
-        nifti_contents = get_folder_contents(image_server_url, "nifti")
-        if nifti_contents:
-            patient_folders = [item for item in nifti_contents if item['is_directory'] and is_patient_folder(item['name'])]
-            # Mark these as old structure for later processing
-            for folder in patient_folders:
-                folder['old_structure'] = True
-    
-    if not patient_folders:
-        return {
-            'error': 'No patient folders found in output directory',
-            'summary_stats': {},
-            'patient_cards': [],
-            'generated_at': time.strftime('%Y-%m-%d %H:%M:%S')
-        }
-    
-    # Analyze each patient
-    analysis_data = []
-    for patient_folder in patient_folders:
-        # Check if this patient uses old structure
-        use_old_structure = patient_folder.get('old_structure', False)
-        try:
-            patient_data = analyze_patient_data(image_server_url, patient_folder['name'], use_old_structure)
-            analysis_data.append(patient_data)
-        except Exception as e:
-            # Add error data for this patient
-            analysis_data.append({
-                'patient_id': patient_folder['name'],
-                'ct_scans': [],
-                'total_ct_scans': 0,
-                'total_ct_size_bytes': 0,
-                'voxel_data': {},
-                'total_voxel_files': 0,
-                'total_voxel_size_bytes': 0,
-                'mesh_data': {},
-                'total_mesh_files': 0,
-                'total_mesh_size_bytes': 0,
-                'ply_data': {},
-                'total_ply_files': 0,
-                'total_ply_size_bytes': 0,
-                'total_patient_size_bytes': 0,
-                'error': f'Analysis failed: {str(e)}',
-                'structure_type': 'unknown'
-            })
-    
-    # Generate patient cards data
-    return generate_patient_cards_data(analysis_data)
-
 def main():
     """Main function to analyze server data and generate report."""
     parser = argparse.ArgumentParser(description="Analyze image server data and generate comprehensive report")
     parser.add_argument("--url", help="Override IMAGE_SERVER URL from environment")
     parser.add_argument("--output", "-o", help="Save report to file")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress progress output")
-    parser.add_argument("--cards", action="store_true", help="Output patient cards data as JSON")
     
     args = parser.parse_args()
     
@@ -1020,22 +837,16 @@ def main():
                 'structure_type': 'unknown'
             })
     
-    # Generate and display report or cards data
-    if args.cards:
-        # Output patient cards data as JSON
-        cards_data = generate_patient_cards_data(analysis_data)
-        print(json.dumps(cards_data, indent=2))
+    # Generate and display report
+    if not args.quiet:
+        print("\n📋 Generating report...")
+    
+    report = generate_report(analysis_data, args.output)
+    
+    if not args.quiet:
+        print("\n" + report)
     else:
-        # Generate and display report
-        if not args.quiet:
-            print("\n📋 Generating report...")
-        
-        report = generate_report(analysis_data, args.output)
-        
-        if not args.quiet:
-            print("\n" + report)
-        else:
-            print(report)
+        print(report)
 
 if __name__ == "__main__":
     main()

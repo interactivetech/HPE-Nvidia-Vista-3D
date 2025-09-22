@@ -28,6 +28,44 @@ def run_command(command: List[str], description: str = "") -> tuple[bool, str, s
         return False, "", f"Error running command: {str(e)}"
 
 
+def get_dicom_patient_folders() -> List[str]:
+    """Get list of patient folders from DICOM directory."""
+    try:
+        # Load environment variables to get DICOM folder path
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        # Check if we're running in a Docker container
+        is_docker = os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER') == 'true'
+        
+        if is_docker:
+            # In Docker container, use the mounted paths
+            dicom_folder = '/app/dicom'
+        else:
+            # On host machine, use environment variables
+            dicom_folder = os.getenv('DICOM_FOLDER')
+            if not dicom_folder:
+                return []
+        
+        dicom_path = Path(dicom_folder)
+        
+        # Check if DICOM directory exists
+        if not dicom_path.exists() or not dicom_path.is_dir():
+            return []
+        
+        # Get list of subdirectories (patient folders)
+        patient_folders = []
+        for entry in os.scandir(dicom_path):
+            if entry.is_dir() and entry.name != 'uploads':
+                patient_folders.append(entry.name)
+        
+        return sorted(patient_folders)
+        
+    except Exception as e:
+        st.error(f"Error getting patient folders: {str(e)}")
+        return []
+
+
 def render_dicom_tools():
     """Render DICOM processing tools."""
     st.subheader("📋 DICOM Processing Tools")
@@ -71,12 +109,19 @@ def render_segmentation_tools():
     with col1:
         st.markdown("**Segmentation Options**")
         
-        # Patient folder selection
-        patient_folder = st.text_input(
-            "Patient Folder", 
-            value="", 
-            placeholder="Leave empty to process all patients",
-            help="Specify a specific patient folder to process, or leave empty to process all patients"
+        # Patient selection
+        patient_folders = get_dicom_patient_folders()
+        
+        if not patient_folders:
+            st.warning("⚠️ No patient folders found in DICOM directory. Please check your DICOM_FOLDER path in .env file.")
+            return
+        
+        selected_patients = st.multiselect(
+            "Select Patients",
+            options=patient_folders,
+            default=patient_folders,  # Select all by default
+            help="Select one or more patient folders to process. Leave empty or uncheck all to process no patients.",
+            key="segmentation_patients"
         )
         
         # Force overwrite option
@@ -102,15 +147,32 @@ def render_segmentation_tools():
         )
     
     with col2:
-        pass
+        # Display patient info
+        if not selected_patients:
+            st.warning("⚠️ **No patients selected**")
+            st.markdown("Please select at least one patient to process.")
+        elif len(selected_patients) == len(patient_folders):
+            st.info(f"📁 **Processing:** All {len(patient_folders)} patients")
+        elif len(selected_patients) == 1:
+            st.info(f"📁 **Processing:** {selected_patients[0]}")
+        else:
+            st.info(f"📁 **Processing:** {len(selected_patients)} patients")
+        
+        # Disable button if no patients selected
+        button_disabled = len(selected_patients) == 0
+        
+        segmentation_clicked = st.button("🎯 Start Vista3D Segmentation", key="start_segmentation", type="primary", disabled=button_disabled)
     
-    if st.button("🎯 Start Vista3D Segmentation", key="start_segmentation", type="primary"):
+    # Check if segmentation button was clicked
+    if segmentation_clicked:
         with st.spinner("Starting Vista3D segmentation..."):
             # Prepare command arguments
             cmd_args = ["python", "utils/segment.py"]
             
-            if patient_folder:
-                cmd_args.append(patient_folder)
+            # Add patient selection if specific patients are chosen
+            if len(selected_patients) < len(patient_folders):
+                # Add selected patients as arguments
+                cmd_args.extend(selected_patients)
             
             if force_overwrite:
                 cmd_args.append("--force")
@@ -180,7 +242,12 @@ def render_segmentation_tools():
                             current_progress = 100
                         
                         progress_bar.progress(current_progress)
-                        status_text.text(f"🎯 Running Vista3D segmentation... ({current_progress}%)")
+                        if len(selected_patients) == len(patient_folders):
+                            status_text.text(f"🎯 Running Vista3D segmentation for all patients... ({current_progress}%)")
+                        elif len(selected_patients) == 1:
+                            status_text.text(f"🎯 Running Vista3D segmentation for {selected_patients[0]}... ({current_progress}%)")
+                        else:
+                            status_text.text(f"🎯 Running Vista3D segmentation for {len(selected_patients)} patients... ({current_progress}%)")
                 
                 # Wait for process to complete
                 return_code = process.wait()
@@ -188,7 +255,7 @@ def render_segmentation_tools():
                 if return_code == 0:
                     progress_bar.progress(100)
                     status_text.text("✅ Segmentation completed successfully!")
-                    st.success("🎉 Vista3D segmentation completed successfully!")
+                    st.info("Vista3D segmentation completed successfully!")
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
@@ -217,11 +284,14 @@ def render_segmentation_tools():
 
 def main():
     """Main function to render the Tools page."""
-    st.set_page_config(
-        page_title="Tools - HPE-NVIDIA Vista 3D",
-        page_icon="🛠️",
-        layout="wide"
-    )
+    # Note: st.set_page_config() is handled by the main app.py
+    # Only set page config when running as standalone
+    if __name__ == "__main__":
+        st.set_page_config(
+            page_title="Tools - HPE-NVIDIA Vista 3D",
+            page_icon="🛠️",
+            layout="wide"
+        )
     
     st.title("🛠️ Tools & Utilities")
     st.markdown("Access various tools and utilities for medical image processing and 3D visualization.")
@@ -238,15 +308,44 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
+        # Patient selection
+        patient_folders = get_dicom_patient_folders()
+        
+        if not patient_folders:
+            st.warning("⚠️ No patient folders found in DICOM directory. Please check your DICOM_FOLDER path in .env file.")
+            return
+        
+        selected_patients = st.multiselect(
+            "Select Patients",
+            options=patient_folders,
+            default=patient_folders,  # Select all by default
+            help="Select one or more patient folders to process. Leave empty or uncheck all to process no patients."
+        )
+        
         # Conversion options
         force_overwrite = st.checkbox("Force Overwrite", value=False, help="Overwrite existing NIfTI files")
-        min_size_mb = st.number_input("Minimum File Size (MB)", min_value=0.0, value=0.5, step=0.1, 
+        min_size_mb = st.number_input("Minimum File Size (MB)", min_value=0.0, value=5.0, step=0.1, 
                                     help="Delete NIfTI files smaller than this size")
     
     with col2:
-        pass
+        # Display patient info
+        if not selected_patients:
+            st.warning("⚠️ **No patients selected**")
+            st.markdown("Please select at least one patient to process.")
+        elif len(selected_patients) == len(patient_folders):
+            st.info(f"📁 **Processing:** All {len(patient_folders)} patients")
+        elif len(selected_patients) == 1:
+            st.info(f"📁 **Processing:** {selected_patients[0]}")
+        else:
+            st.info(f"📁 **Processing:** {len(selected_patients)} patients")
+        
+        # Disable button if no patients selected
+        button_disabled = len(selected_patients) == 0
+        
+        conversion_clicked = st.button("🔄 Start DICOM to NIfTI Conversion", key="start_dicom2nifti", type="primary", disabled=button_disabled)
     
-    if st.button("🔄 Start DICOM to NIfTI Conversion", key="start_dicom2nifti", type="primary"):
+    # Check if conversion button was clicked
+    if conversion_clicked:
         with st.spinner("Starting DICOM to NIfTI conversion..."):
             # Prepare command arguments
             cmd_args = ["python", "utils/dicom2nifti.py"]
@@ -256,6 +355,11 @@ def main():
             
             if min_size_mb > 0:
                 cmd_args.extend(["--min-size-mb", str(int(min_size_mb))])
+            
+            # Add patient selection if specific patients are chosen
+            if len(selected_patients) < len(patient_folders):
+                # Specific patients selected - use --patient argument
+                cmd_args.extend(["--patient"] + selected_patients)
             
             # Create progress containers
             progress_container = st.container()
@@ -304,7 +408,7 @@ def main():
                         )
                         
                         # Update progress based on output keywords
-                        if "Processing patients" in output:
+                        if "Processing patients" in output or "Processing specific patient" in output:
                             current_progress = min(50, current_progress + 5)
                         elif "Successfully processed" in output:
                             current_progress = min(90, current_progress + 10)
@@ -312,7 +416,12 @@ def main():
                             current_progress = 100
                         
                         progress_bar.progress(current_progress)
-                        status_text.text(f"🔄 Converting DICOM files... ({current_progress}%)")
+                        if len(selected_patients) == len(patient_folders):
+                            status_text.text(f"🔄 Converting DICOM files for all patients... ({current_progress}%)")
+                        elif len(selected_patients) == 1:
+                            status_text.text(f"🔄 Converting DICOM files for {selected_patients[0]}... ({current_progress}%)")
+                        else:
+                            status_text.text(f"🔄 Converting DICOM files for {len(selected_patients)} patients... ({current_progress}%)")
                 
                 # Wait for process to complete
                 return_code = process.wait()
@@ -320,7 +429,7 @@ def main():
                 if return_code == 0:
                     progress_bar.progress(100)
                     status_text.text("✅ Conversion completed successfully!")
-                    st.success("🎉 DICOM to NIfTI conversion completed successfully!")
+                    st.info("DICOM to NIfTI conversion completed successfully!")
                     
                     # Show final output
                     final_output = "\n".join(output_lines)

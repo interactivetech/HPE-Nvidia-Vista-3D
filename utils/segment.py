@@ -33,13 +33,16 @@ VISTA3D_SERVER = os.getenv('VISTA3D_SERVER', 'http://localhost:8000')
 VISTA3D_INFERENCE_URL = f"{VISTA3D_SERVER.rstrip('/')}/v1/vista3d/inference"
 
 # For Vista3D server communication, use the URL that Vista3D container can access
-# Vista3D server runs in separate container and needs container name access
-# Use localhost when running locally, or the container name when in Docker
+# Vista3D server runs in separate container and needs to access the host machine
+# When Vista3D is in Docker and image server is on host, use host.docker.internal
+# When both are local, use localhost
 # Check if we're running in Docker by looking for container environment
 if os.getenv('DOCKER_CONTAINER') == 'true' or os.path.exists('/.dockerenv'):
-    DEFAULT_IMAGE_SERVER_URL = 'http://vista3d-image-server:8888'
+    # We're in Docker, but Vista3D server needs to access host machine
+    DEFAULT_IMAGE_SERVER_URL = 'http://host.docker.internal:8888'
 else:
-    DEFAULT_IMAGE_SERVER_URL = 'http://localhost:8888'
+    # We're running locally, Vista3D server is in Docker and needs host access
+    DEFAULT_IMAGE_SERVER_URL = 'http://host.docker.internal:8888'
 
 VISTA3D_IMAGE_SERVER_URL = os.getenv('VISTA3D_IMAGE_SERVER_URL', DEFAULT_IMAGE_SERVER_URL)
 # Use full paths from .env - no more PROJECT_ROOT needed
@@ -154,7 +157,7 @@ def create_individual_voxel_files(segmentation_img, ct_scan_name: str, voxels_ba
 
 def main():
     parser = argparse.ArgumentParser(description="Vista3D Batch Segmentation Script")
-    parser.add_argument("patient_folder", type=str, nargs='?', default=None, help="Name of the patient folder to process.")
+    parser.add_argument("patient_folders", type=str, nargs='*', default=None, help="Name(s) of the patient folder(s) to process.")
     parser.add_argument("--force", action="store_true", help="Overwrite existing segmentation files.")
     args = parser.parse_args()
 
@@ -163,12 +166,14 @@ def main():
     PATIENT_OUTPUT_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
     patient_folders_to_process = []
-    if args.patient_folder:
-        if (NIFTI_INPUT_BASE_DIR / args.patient_folder).is_dir():
-            patient_folders_to_process.append(args.patient_folder)
-        else:
-            print(f"Error: Specified patient folder not found: {NIFTI_INPUT_BASE_DIR / args.patient_folder}")
-            return
+    if args.patient_folders:
+        # Validate that all specified patient folders exist
+        for patient_folder in args.patient_folders:
+            if (NIFTI_INPUT_BASE_DIR / patient_folder).is_dir():
+                patient_folders_to_process.append(patient_folder)
+            else:
+                print(f"Error: Specified patient folder not found: {NIFTI_INPUT_BASE_DIR / patient_folder}")
+                return
     else:
         patient_folders_to_process = [f.name for f in NIFTI_INPUT_BASE_DIR.iterdir() if f.is_dir()]
 
@@ -238,8 +243,8 @@ def main():
                 relative_path_to_nifti = nifti_file_path.relative_to(NIFTI_INPUT_BASE_DIR)
                 
                 # Build URL using Vista3D-accessible image server configuration
-                # Vista3D server runs in Docker and needs host.docker.internal access
-                vista3d_input_url = f"{VISTA3D_IMAGE_SERVER_URL.rstrip('/')}/{relative_path_to_nifti}"
+                # Vista3D server needs the full path including /output/ prefix
+                vista3d_input_url = f"{VISTA3D_IMAGE_SERVER_URL.rstrip('/')}/output/{relative_path_to_nifti}"
                 
                 payload = {"image": vista3d_input_url, "prompts": {"labels": target_vessels}}
                 headers = {"Content-Type": "application/json"}

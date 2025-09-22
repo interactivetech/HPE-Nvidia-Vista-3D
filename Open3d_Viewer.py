@@ -195,12 +195,15 @@ def render_ply_selection(selected_patient: str, selected_file: str, data_manager
 
 def main():
     """Main Streamlit application."""
-    st.set_page_config(
-        page_title="Open3D Viewer",
-        page_icon="🔺",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    # Note: st.set_page_config() is handled by the main app.py
+    # Only set page config when running as standalone
+    if __name__ == "__main__":
+        st.set_page_config(
+            page_title="Open3D Viewer",
+            page_icon="🔺",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
     
     st.title("🔺 Open3D Viewer")
     
@@ -301,7 +304,7 @@ def main():
     st.sidebar.header("Visualization Controls")
     view_mode = st.sidebar.selectbox(
         "View Mode",
-        ["Solid", "Point Cloud", "Statistics", "Simple"],
+        ["Solid", "Point Cloud", "Statistics"],
         help="Choose how to display the mesh"
     )
     
@@ -717,11 +720,6 @@ def main():
                         if len(processed_meshes) > 1:
                             st.info(f"Statistics view showing only the first mesh: {name}")
                 
-                elif view_mode == "Simple":
-                    # Simple mode - point cloud visualization
-                    if processed_meshes:
-                        fig = mesh_visualizer.create_simple_plot(processed_meshes)
-                        st.plotly_chart(fig, use_container_width=True)
                 
             
             except Exception as e:

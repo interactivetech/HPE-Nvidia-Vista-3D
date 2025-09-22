@@ -258,13 +258,14 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         return {'status': 'failed', 'error': str(e)}
 
 
-def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
+def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folders=None):
     """
     Convert DICOM files to NIFTI format using dcm2niix with NiiVue optimization.
     
     Args:
         force_overwrite: If True, overwrite existing NIFTI directories
         min_size_mb: If > 0, delete NIFTI files smaller than this size in MB.
+        patient_folders: If specified, only process these specific patient folders. Can be a single string or list of strings.
     """
     try:
         # Check dcm2niix installation first
@@ -313,10 +314,28 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5):
         nifti_base_path.mkdir(parents=True, exist_ok=True)
         
         # Get list of DICOM directories for progress tracking (ignore uploads folder)
-        dicom_directories = [d for d in os.listdir(dicom_data_path) 
-                           if (dicom_data_path / d).is_dir() and d != 'uploads']
+        all_dicom_directories = [d for d in os.listdir(dicom_data_path) 
+                               if (dicom_data_path / d).is_dir() and d != 'uploads']
         
-        print(f"📊 Found {len(dicom_directories)} DICOM directories to process")
+        # Filter by patient folders if specified
+        if patient_folders:
+            # Handle both single string and list of strings
+            if isinstance(patient_folders, str):
+                patient_folders = [patient_folders]
+            
+            # Validate that all specified patient folders exist
+            missing_folders = [p for p in patient_folders if p not in all_dicom_directories]
+            if missing_folders:
+                raise ValueError(f"Patient folders not found in DICOM directory: {missing_folders}. Available folders: {all_dicom_directories}")
+            
+            dicom_directories = patient_folders
+            if len(patient_folders) == 1:
+                print(f"📊 Processing specific patient: {patient_folders[0]}")
+            else:
+                print(f"📊 Processing {len(patient_folders)} specific patients: {', '.join(patient_folders)}")
+        else:
+            dicom_directories = all_dicom_directories
+            print(f"📊 Found {len(dicom_directories)} DICOM directories to process")
         print(f"🔧 Using dcm2niix for robust conversion with NiiVue optimization")
         print("-" * 70)
         
@@ -471,6 +490,25 @@ if __name__ == "__main__":
             kwargs['min_size_mb'] = int(sys.argv[index + 1])
         except (ValueError, IndexError):
             print("Error: --min-size-mb requires an integer value (e.g., --min-size-mb 10)")
+            sys.exit(1)
+    
+    if '--patient' in sys.argv:
+        try:
+            index = sys.argv.index('--patient')
+            # Collect all patient arguments until we hit another flag or end of args
+            patient_folders = []
+            i = index + 1
+            while i < len(sys.argv) and not sys.argv[i].startswith('--'):
+                patient_folders.append(sys.argv[i])
+                i += 1
+            
+            if not patient_folders:
+                print("Error: --patient requires at least one patient folder name (e.g., --patient Patient001)")
+                sys.exit(1)
+            
+            kwargs['patient_folders'] = patient_folders if len(patient_folders) > 1 else patient_folders[0]
+        except IndexError:
+            print("Error: --patient requires at least one patient folder name (e.g., --patient Patient001)")
             sys.exit(1)
 
     convert_dicom_to_nifti(force_overwrite=force_overwrite, **kwargs)

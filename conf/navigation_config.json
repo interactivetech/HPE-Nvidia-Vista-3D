@@ -14,13 +14,23 @@
         "description": "Application information and welcome page"
       },
       {
+        "key": "image_data",
+        "label": "Image Data",
+        "page_key": "image_data",
+        "icon": "📊",
+        "is_image": false,
+        "enabled": true,
+        "order": 2,
+        "description": "Browse and analyze medical imaging data from patients"
+      },
+      {
         "key": "niivue",
         "label": "NiiVue Viewer",
         "page_key": "niivue",
         "icon": "🩻",
         "is_image": false,
         "enabled": true,
-        "order": 2,
+        "order": 3,
         "description": "Medical image viewer interface"
       },
       {
@@ -30,7 +40,7 @@
         "icon": "🔺",
         "is_image": false,
         "enabled": true,
-        "order": 3,
+        "order": 4,
         "description": "3D mesh and point cloud viewer"
       },
       {
@@ -40,7 +50,7 @@
         "icon": "📋",
         "is_image": false,
         "enabled": false,
-        "order": 4,
+        "order": 5,
         "description": "DICOM file inspection and analysis"
       },
       {
@@ -50,7 +60,7 @@
         "icon": "🛠️",
         "is_image": false,
         "enabled": true,
-        "order": 5,
+        "order": 6,
         "description": "Tools and utilities for medical image processing"
       }
     ],
