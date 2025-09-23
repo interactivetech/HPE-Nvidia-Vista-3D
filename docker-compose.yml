@@ -83,6 +83,7 @@ services:
       - NGC_ORG_ID=${NGC_ORG_ID}
       - IMAGE_SERVER=http://image-server:8888
       - VISTA3D_SERVER=http://localhost:8000
+      - IMAGE_URI_HTTPS_ONLY=False
       - CUDA_VISIBLE_DEVICES=0
       - NVIDIA_VISIBLE_DEVICES=0
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility

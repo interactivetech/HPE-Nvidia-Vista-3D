@@ -82,14 +82,14 @@ def check_voxels_folders_exist(output_path: Path) -> bool:
     return False
 
 
-def get_patient_directories(output_path: Path, specific_patient=None):
+def get_patient_directories(output_path: Path, specific_patients=None):
     """Get list of patient directories that have voxels folders."""
     patient_dirs = []
     
     for patient_dir in output_path.iterdir():
         if patient_dir.is_dir() and patient_dir.name != 'uploads':
-            # If specific patient requested, only process that one
-            if specific_patient and patient_dir.name != specific_patient:
+            # If specific patients requested, only process those
+            if specific_patients and patient_dir.name not in specific_patients:
                 continue
                 
             voxels_dir = patient_dir / "voxels"
@@ -401,7 +401,7 @@ def convert_single_file(input_file, output_file, threshold=0.1, label_value=None
 
 
 def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None, 
-                         smooth=1.0, ascii=False, specific_patient=None, verbose=False):
+                         smooth=1.0, ascii=False, specific_patients=None, verbose=False):
     """
     Convert all NIfTI files in voxels folders to PLY format.
     
@@ -411,7 +411,7 @@ def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None
         label_value: Specific label value to extract
         smooth: Smoothing factor for mesh
         ascii: Whether to write ASCII PLY format
-        specific_patient: Process only specific patient ID
+        specific_patients: Process only specific patient IDs (list of strings)
         verbose: Enable verbose output
     """
     try:
@@ -428,11 +428,11 @@ def convert_voxels_to_ply(force_overwrite=False, threshold=0.1, label_value=None
             raise FileNotFoundError(f"Output directory not found: {output_base_path}")
         
         # Get patient directories (this will only return those with voxels folders)
-        patient_dirs = get_patient_directories(output_base_path, specific_patient)
+        patient_dirs = get_patient_directories(output_base_path, specific_patients)
         
         if not patient_dirs:
-            if specific_patient:
-                print(f"⚠️  Patient {specific_patient} not found or has no voxels folder - skipping")
+            if specific_patients:
+                print(f"⚠️  Patients {specific_patients} not found or have no voxels folders - skipping")
                 return
             else:
                 print(f"⚠️  No patient directories with voxels folders found - skipping conversion")
@@ -601,6 +601,7 @@ Examples:
   # Batch processing
   python nifti2ply.py --batch                         # Process all voxels folders
   python nifti2ply.py --batch --patient PA00000002    # Process specific patient
+  python nifti2ply.py --batch --patient PA00000002 PA00000014  # Process multiple patients
   python nifti2ply.py --batch --force --threshold 0.5 # Force overwrite with custom threshold
         """
     )
@@ -612,8 +613,8 @@ Examples:
     # Batch processing arguments
     parser.add_argument('--batch', action='store_true',
                        help='Process all voxels folders in output directory')
-    parser.add_argument('--patient', type=str, default=None,
-                       help='Process specific patient ID (only with --batch)')
+    parser.add_argument('--patient', type=str, nargs='*', default=None,
+                       help='Process specific patient ID(s) (only with --batch). Can specify multiple patients.')
     parser.add_argument('--force', action='store_true',
                        help='Force overwrite existing PLY files')
     
@@ -634,13 +635,19 @@ Examples:
     # Determine mode
     if args.batch:
         # Batch processing mode
+        # Handle patient selection - if no patients specified, process all
+        # If patients specified, convert to list (handles both single and multiple patients)
+        specific_patients = None
+        if args.patient:
+            specific_patients = args.patient if isinstance(args.patient, list) else [args.patient]
+        
         convert_voxels_to_ply(
             force_overwrite=args.force,
             threshold=args.threshold,
             label_value=args.label,
             smooth=args.smooth,
             ascii=args.ascii,
-            specific_patient=args.patient,
+            specific_patients=specific_patients,
             verbose=args.verbose
         )
     else:

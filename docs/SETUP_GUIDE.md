@@ -119,6 +119,18 @@ docker compose up vista3d-app image-server
 python3 start.py --frontend-only
 ```
 
+### Vista3D Server Only
+If you want to run only the Vista3D server (for distributed deployments):
+
+```bash
+# Edit .env file
+NGC_API_KEY="your_nvidia_api_key"
+NGC_ORG_ID="nvidia"
+
+# Start only Vista3D server
+docker compose --profile local-vista3d up vista3d-server
+```
+
 ## 📁 Project Structure
 
 ```

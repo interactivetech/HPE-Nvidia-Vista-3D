@@ -223,6 +223,10 @@ class Vista3DUnifiedManager:
                     env_vars_list.append(f"-e {k}='{escaped_v}'")
                 else:
                     env_vars_list.append(f"-e {k}={v_str}")
+        
+        # Add required Vista3D environment variables
+        env_vars_list.append("-e IMAGE_URI_HTTPS_ONLY=False")
+        
         env_vars = " ".join(env_vars_list)
 
         # Build volume mounts
@@ -529,6 +533,68 @@ class Vista3DUnifiedManager:
         
         return True
 
+    def run_vista3d_only(self):
+        """Start only Vista3D server"""
+        logger.info("Starting Vista3D server only...")
+        
+        # Check Docker availability
+        if not self.check_docker():
+            return False
+        
+        # Check Docker Compose availability
+        if not self.check_docker_compose():
+            return False
+        
+        # Create necessary directories
+        self.create_directories()
+        
+        # Stop any existing containers
+        self.stop_all_containers()
+        
+        # Start only Vista3D container
+        if not self.start_vista3d_container():
+            logger.error("❌ Failed to start Vista3D container")
+            logger.error("   Please check your NGC API key and GPU availability")
+            return False
+        
+        # Wait for Vista3D to be ready
+        logger.info("Waiting for Vista3D server to be ready...")
+        time.sleep(30)  # Give Vista3D time to start
+        
+        # Test Vista3D server
+        vista3d_port = self.env_vars['VISTA3D_PORT']
+        try:
+            response = requests.get(f"http://localhost:{vista3d_port}/health", timeout=10)
+            if response.status_code == 200:
+                logger.info(f"✅ Vista3D server health check: {response.status_code}")
+            else:
+                logger.warning(f"⚠️  Vista3D server health check returned: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"⚠️  Vista3D server health check failed: {e}")
+        
+        # Success message
+        logger.info("=" * 80)
+        logger.info("🎉 VISTA3D SERVER STARTED SUCCESSFULLY!")
+        logger.info("=" * 80)
+        
+        vista3d_port = self.env_vars['VISTA3D_PORT']
+        
+        logger.info(f"🧠 Vista3D Server: http://localhost:{vista3d_port}")
+        logger.info(f"🔍 Health Check: http://localhost:{vista3d_port}/health")
+        
+        logger.info("\n📝 Note: Only Vista3D server is running.")
+        logger.info("   Frontend services must be started separately on other machines.")
+        logger.info("   Configure frontend .env files to point to this server.")
+        
+        logger.info("\n🔧 Useful Commands:")
+        logger.info("  View Vista3D logs: docker logs -f vista3d-server-local")
+        logger.info("  Stop Vista3D: python start.py --stop")
+        logger.info("  Restart Vista3D: python start.py --restart")
+        
+        logger.info("=" * 80)
+        
+        return True
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
@@ -551,6 +617,7 @@ Prerequisites:
 Examples:
   python start.py                    # Start all services
   python start.py --frontend-only   # Start only frontend services (remote Vista3D)
+  python start.py --vista3d-only    # Start only Vista3D server (distributed deployment)
   python start.py --stop            # Stop all services
   python start.py --restart         # Restart all services
         """
@@ -574,6 +641,12 @@ Examples:
         help='Start only frontend services (Streamlit app and image server) - Vista3D server must be running remotely'
     )
     
+    parser.add_argument(
+        '--vista3d-only',
+        action='store_true',
+        help='Start only Vista3D server - for distributed deployments or GPU server farms'
+    )
+    
     args = parser.parse_args()
     
     manager = Vista3DUnifiedManager()
@@ -593,6 +666,10 @@ Examples:
         elif args.frontend_only:
             # Start only frontend services
             success = manager.run_frontend_only()
+            sys.exit(0 if success else 1)
+        elif args.vista3d_only:
+            # Start only Vista3D server
+            success = manager.run_vista3d_only()
             sys.exit(0 if success else 1)
         else:
             # Default behavior - start all services

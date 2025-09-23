@@ -11,6 +11,41 @@ The platform consists of three main components:
 
 ## 🎯 Deployment Modes
 
+### Mode 0: Vista3D Server Only
+
+**Best for**: Running Vista3D server as a standalone service, distributed deployments, GPU server farms
+
+**Architecture**:
+```
+┌─────────────────┐
+│  Vista3D Server │
+│  (Port 8000)    │
+│  Docker/Remote  │
+└─────────────────┘
+```
+
+**Setup**:
+```bash
+# 1. Configure environment
+cp dot_env_template .env
+nano .env  # Set NGC_API_KEY and other required variables
+
+# 2. Start Vista3D server only
+docker compose --profile local-vista3d up vista3d-server
+```
+
+**Access Points**:
+- Vista3D Server: http://localhost:8000
+- Health Check: http://localhost:8000/health
+
+**Use Cases**:
+- GPU server running only Vista3D
+- Frontend running on separate machines
+- Load balancing multiple Vista3D instances
+- Testing Vista3D server independently
+
+## 🎯 Full Deployment Modes
+
 ### Mode 1: Single GPU Host (Recommended)
 
 **Best for**: Single-user deployments, development, testing, local processing
@@ -132,13 +167,18 @@ sudo journalctl -u vista3d-gui -f
 
 ### Port Requirements
 
-| Port | Service | Mode 1 | Mode 2 | Description |
-|------|---------|--------|--------|-------------|
-| 8501 | Streamlit App | ✅ | ✅ | Web interface |
-| 8888 | Image Server | ✅ | ✅ | Medical image files |
-| 8000 | Vista3D Server | ❌ (Remote) | ✅ | AI segmentation |
+| Port | Service | Mode 0 | Mode 1 | Mode 2 | Description |
+|------|---------|--------|--------|--------|-------------|
+| 8501 | Streamlit App | ❌ | ✅ | ✅ | Web interface |
+| 8888 | Image Server | ❌ | ✅ | ✅ | Medical image files |
+| 8000 | Vista3D Server | ✅ | ❌ (Remote) | ✅ | AI segmentation |
 
 ### Network Requirements
+
+**Mode 0 (Vista3D Only)**:
+- Local port 8000
+- NVIDIA GPU with CUDA support
+- No frontend services
 
 **Mode 1 (Remote Vista3D)**:
 - Outbound HTTPS to remote Vista3D server
@@ -149,6 +189,12 @@ sudo journalctl -u vista3d-gui -f
 - NVIDIA GPU with CUDA support
 
 ## 🚀 Quick Start Commands
+
+### Mode 0: Vista3D Server Only
+```bash
+# Start Vista3D server only
+docker compose --profile local-vista3d up vista3d-server
+```
 
 ### Mode 1: Remote Vista3D
 ```bash
@@ -161,7 +207,11 @@ VISTA3D_SERVER=https://your-server:8000 VISTA3D_API_KEY=your_key python3 start.p
 
 ### Mode 2: Local Vista3D
 ```bash
-# Terminal 1: Start Vista3D
+# Terminal 1: Start Vista3D (choose one method)
+# Method A: Using Docker Compose (recommended)
+docker compose --profile local-vista3d up vista3d-server
+
+# Method B: Using Python script
 python3 utils/start_vista3d.py
 
 # Terminal 2: Start GUI

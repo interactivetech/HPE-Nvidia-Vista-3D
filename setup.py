@@ -363,10 +363,7 @@ class Vista3DUnifiedSetup:
         try:
             directories = [
                 Path(config['DICOM_FOLDER']),
-                Path(config['OUTPUT_FOLDER']),
-                Path(config['OUTPUT_FOLDER']) / "nifti",
-                Path(config['OUTPUT_FOLDER']) / "scans",
-                Path(config['OUTPUT_FOLDER']) / "voxels"
+                Path(config['OUTPUT_FOLDER'])
             ]
             
             for directory in directories:
