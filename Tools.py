@@ -265,11 +265,11 @@ def render_dicom_tools():
                 if success:
                     st.success("✅ DICOM conversion completed successfully!")
                     if stdout:
-                        st.text_area("Output:", stdout, height=200)
+                        st.text_area("Output:", stdout, height=200, key="dicom_output_stdout")
                 else:
                     st.error("❌ DICOM conversion failed!")
                     if stderr:
-                        st.text_area("Error:", stderr, height=200)
+                        st.text_area("Error:", stderr, height=200, key="dicom_output_stderr")
 
 
 def render_segmentation_tools():
@@ -443,7 +443,8 @@ def render_segmentation_tools():
                             "Segmentation Output:", 
                             value="\n".join(recent_output), 
                             height=300,
-                            disabled=True
+                            disabled=True,
+                            key="segmentation_output_realtime"
                         )
                         
                         # Update progress based on output keywords
@@ -475,7 +476,7 @@ def render_segmentation_tools():
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
-                    st.text_area("Final Output:", final_output, height=400, disabled=True)
+                    st.text_area("Final Output:", final_output, height=400, disabled=True, key="segmentation_output_final")
                     
                 else:
                     progress_bar.progress(0)
@@ -484,7 +485,7 @@ def render_segmentation_tools():
                     
                     # Show error output
                     error_output = "\n".join(output_lines)
-                    st.text_area("Error Output:", error_output, height=400, disabled=True)
+                    st.text_area("Error Output:", error_output, height=400, disabled=True, key="segmentation_error_output")
                     
             except Exception as e:
                 progress_bar.progress(0)
@@ -492,7 +493,7 @@ def render_segmentation_tools():
                 st.error(f"❌ Error running segmentation: {str(e)}")
                 
                 # Show error details
-                st.text_area("Error Details:", str(e), height=200, disabled=True)
+                st.text_area("Error Details:", str(e), height=200, disabled=True, key="segmentation_error_details")
     
 
 
@@ -620,7 +621,8 @@ def main():
                             "Conversion Output:", 
                             value="\n".join(recent_output), 
                             height=300,
-                            disabled=True
+                            disabled=True,
+                            key="dicom2nifti_output_realtime"
                         )
                         
                         # Update progress based on output keywords
@@ -650,7 +652,7 @@ def main():
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
-                    st.text_area("Final Output:", final_output, height=400, disabled=True)
+                    st.text_area("Final Output:", final_output, height=400, disabled=True, key="dicom2nifti_output_final")
                     
                 else:
                     progress_bar.progress(0)
@@ -659,15 +661,12 @@ def main():
                     
                     # Show error output
                     error_output = "\n".join(output_lines)
-                    st.text_area("Error Output:", error_output, height=400, disabled=True)
+                    st.text_area("Error Output:", error_output, height=400, disabled=True, key="dicom2nifti_error_output")
                     
             except Exception as e:
                 progress_bar.progress(0)
                 status_text.text("❌ Conversion error!")
-                st.error(f"❌ Error running conversion: {str(e)}")
-                
-                # Show error details
-                st.text_area("Error Details:", str(e), height=200, disabled=True)
+                st.text_area("Error Details:", str(e), height=200, disabled=True, key="dicom2nifti_error_details")
     
     st.markdown("---")
     
@@ -837,7 +836,8 @@ def main():
                             "Conversion Output:", 
                             value="\n".join(recent_output), 
                             height=300,
-                            disabled=True
+                            disabled=True,
+                            key="nifti2ply_output_realtime"
                         )
                         
                         # Update progress based on output keywords
@@ -869,7 +869,7 @@ def main():
                     
                     # Show final output
                     final_output = "\n".join(output_lines)
-                    st.text_area("Final Output:", final_output, height=400, disabled=True)
+                    st.text_area("Final Output:", final_output, height=400, disabled=True, key="nifti2ply_output_final")
                     
                 else:
                     progress_bar.progress(0)
@@ -878,7 +878,7 @@ def main():
                     
                     # Show error output
                     error_output = "\n".join(output_lines)
-                    st.text_area("Error Output:", error_output, height=400, disabled=True)
+                    st.text_area("Error Output:", error_output, height=400, disabled=True, key="nifti2ply_error_output")
                     
             except Exception as e:
                 progress_bar.progress(0)
@@ -886,7 +886,7 @@ def main():
                 st.error(f"❌ Error running PLY conversion: {str(e)}")
                 
                 # Show error details
-                st.text_area("Error Details:", str(e), height=200, disabled=True)
+                st.text_area("Error Details:", str(e), height=200, disabled=True, key="nifti2ply_error_details")
 
 if __name__ == "__main__":
     main()

@@ -10,7 +10,7 @@ class ColormapManager {
     }
 
     async loadColormapSets() {
-        const sets = ['basic_medical', 'scientific', 'medical_specific'];
+        const sets = ['basic_medical', 'scientific', 'medical_specific', 'ct_brain', 'linspecer'];
         
         for (const setName of sets) {
             try {
