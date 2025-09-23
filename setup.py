@@ -246,6 +246,37 @@ class Vista3DUnifiedSetup:
         # If not found, return None to prompt user
         return None
     
+    def get_ngc_org_id(self) -> Optional[str]:
+        """Get NGC Organization ID from environment variable, .env file, or prompt user"""
+        # First check environment variable
+        org_id = os.getenv('NGC_ORG_ID')
+        if org_id and org_id.strip():
+            print("✅ Found NGC Organization ID in environment variable")
+            return org_id.strip()
+        
+        # Then check .env file if it exists
+        if self.env_file.exists():
+            try:
+                with open(self.env_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('NGC_ORG_ID='):
+                            # Extract value, handling both quoted and unquoted values
+                            value = line.split('=', 1)[1].strip()
+                            if value.startswith('"') and value.endswith('"'):
+                                value = value[1:-1]
+                            elif value.startswith("'") and value.endswith("'"):
+                                value = value[1:-1]
+                            
+                            if value.strip():
+                                print("✅ Found NGC Organization ID in .env file")
+                                return value.strip()
+            except Exception as e:
+                logger.warning(f"Could not read .env file: {e}")
+        
+        # If not found, return None to prompt user
+        return None
+    
     def setup_python_environment(self) -> bool:
         """Set up Python environment"""
         print("\n" + "="*60)
@@ -351,7 +382,17 @@ class Vista3DUnifiedSetup:
         
         config['NGC_API_KEY'] = api_key
         
-        config['NGC_ORG_ID'] = input("Enter NGC Organization ID [nvidia]: ").strip() or "nvidia"
+        # Try to get Organization ID from environment or .env file first
+        org_id = self.get_ngc_org_id()
+        
+        if org_id is None:
+            # Prompt user for Organization ID if not found
+            print("   No Organization ID found in environment or .env file")
+            org_id = input("Enter NGC Organization ID [nvidia]: ").strip() or "nvidia"
+        else:
+            print(f"   Using Organization ID: {org_id}")
+        
+        config['NGC_ORG_ID'] = org_id
         config['LOCAL_NIM_CACHE'] = str(Path.home() / ".cache" / "nim")
         
         # Segmentation settings
