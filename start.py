@@ -178,9 +178,6 @@ class Vista3DUnifiedManager:
         """Create necessary directories if they don't exist"""
         directories = [
             self.project_root / "output",
-            self.project_root / "output" / "nifti",
-            self.project_root / "output" / "scans",
-            self.project_root / "output" / "voxels",
             self.project_root / "dicom"
         ]
         
@@ -231,6 +228,7 @@ class Vista3DUnifiedManager:
         # Build volume mounts
         output_folder = self.env_vars.get('OUTPUT_FOLDER', str(self.project_root / 'output'))
         volumes = f'-v "{output_folder}:/workspace/output"'
+        volumes += f' -v "{self.project_root / "dicom"}:/app/dicom"'
         volumes += f' -v "{self.project_root}:{self.project_root}:ro"'
         
         # Network configuration
