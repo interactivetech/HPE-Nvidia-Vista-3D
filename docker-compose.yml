@@ -82,8 +82,8 @@ services:
       - NGC_ORG_ID=${NGC_ORG_ID}
       - LOCAL_NIM_CACHE=/workspace/.cache/nim
       
-      # Server Configuration - Use host.docker.internal for Vista3D to access host services
-      - IMAGE_SERVER=http://host.docker.internal:8888
+      # Server Configuration - Use local machine IP for remote Vista3D to access local image server
+      - IMAGE_SERVER=http://192.168.10.248:8888
       - VISTA3D_SERVER=http://localhost:8000
       
       # Vista-3D Configuration
@@ -171,8 +171,8 @@ services:
       - CUDA_LAUNCH_BLOCKING=1
       - TORCH_USE_CUDA_DSA=1
       
-      # Domain Whitelist (comprehensive permissive list)
-      - DOMAIN_WHITELIST=["http://image-server:8888","image-server","image-server:8888","http://image-server","http://image-server:8888","https://image-server","https://image-server:8888","http://host.docker.internal:8888","host.docker.internal","host.docker.internal:8888","http://host.docker.internal","https://host.docker.internal","https://host.docker.internal:8888",".*","http://.*","https://.*","http://.*:.*","https://.*:.*","file:///.*","localhost","127\\.0\\.0\\.1","0\\.0\\.0\\.0","::1","10\\..*","172\\..*","192\\.168\\..*","/workspace/output/nifti/.*"]
+      # Domain Whitelist (completely permissive - accepts any IP/hostname)
+      - DOMAIN_WHITELIST=[".*","http://.*","https://.*","http://.*:.*","https://.*:.*","file:///.*","*"]
       
       # Supported Image Extensions
       - SUPPORTED_IMAGE_EXT=[".nrrd",".nii",".nii.gz",".dcm"]
