@@ -5,6 +5,7 @@ dicom
 output*
 dicom*
 .setup_state*
+pf.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
