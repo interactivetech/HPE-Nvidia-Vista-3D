@@ -444,7 +444,7 @@ def render_segmentation_tools():
                             value="\n".join(recent_output), 
                             height=300,
                             disabled=True,
-                            key="segmentation_output_realtime"
+                            key=f"segmentation_output_realtime_{len(output_lines)}"
                         )
                         
                         # Update progress based on output keywords
@@ -622,7 +622,7 @@ def main():
                             value="\n".join(recent_output), 
                             height=300,
                             disabled=True,
-                            key="dicom2nifti_output_realtime"
+                            key=f"dicom2nifti_output_realtime_{len(output_lines)}"
                         )
                         
                         # Update progress based on output keywords
@@ -837,7 +837,7 @@ def main():
                             value="\n".join(recent_output), 
                             height=300,
                             disabled=True,
-                            key="nifti2ply_output_realtime"
+                            key=f"nifti2ply_output_realtime_{len(output_lines)}"
                         )
                         
                         # Update progress based on output keywords
