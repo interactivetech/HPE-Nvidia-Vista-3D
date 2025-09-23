@@ -227,6 +227,86 @@ class Vista3DUnifiedManager:
         # Add required Vista3D environment variables
         env_vars_list.append("-e IMAGE_URI_HTTPS_ONLY=False")
         
+        # Add permissive domain whitelist settings from start_vista3d_server.py
+        domain_whitelist = [
+            # Specific image server from .env
+            self.env_vars.get('IMAGE_SERVER', 'http://localhost:8888'),
+            'localhost',
+            'localhost:8888',
+            'http://localhost',
+            'http://localhost:8888',
+            'https://localhost',
+            'https://localhost:8888',
+            
+            # General permissive patterns
+            r".*",
+            r"http://.*",
+            r"https://.*", 
+            r"http://.*:.*",
+            r"https://.*:.*",
+            r"file:///.*",
+            
+            # Local addresses
+            "localhost",
+            r"127\.0\.0\.1",
+            r"0\.0\.0\.0",
+            "::1",
+            
+            # Private network ranges
+            r"10\..*",
+            r"172\..*",
+            r"192\.168\..*",
+            
+            # Workspace paths
+            r"/workspace/output/nifti/.*",
+        ]
+        
+        # Add domain whitelist as JSON string
+        import json
+        domain_whitelist_str = json.dumps(domain_whitelist)
+        env_vars_list.append(f"-e DOMAIN_WHITELIST='{domain_whitelist_str}'")
+        
+        # Add all the permissive environment variables from start_vista3d_server.py
+        permissive_env_vars = [
+            'DISABLE_DOMAIN_WHITELIST=True',
+            'VISTA3D_DISABLE_URL_VALIDATION=True',
+            'VISTA3D_ALLOW_ANY_URL=True',
+            'VISTA3D_DISABLE_IMAGE_VALIDATION=True',
+            'VISTA3D_ALLOW_EXTERNAL_IMAGES=True',
+            'VISTA3D_ALLOW_REMOTE_FILES=True',
+            'VISTA3D_DISABLE_FILE_VALIDATION=True',
+            'VISTA3D_ENABLE_NETWORK_ACCESS=True',
+            'VISTA3D_ALLOW_HTTP_DOWNLOADS=True',
+            'VISTA3D_ALLOW_HTTPS_DOWNLOADS=True',
+            'VISTA3D_DISABLE_SSL_VERIFICATION=True',
+            'VISTA3D_ALLOW_INSECURE_CONNECTIONS=True',
+            'ALLOW_ANY_IMAGE_SERVER_HOST=True',
+            'ALLOW_EXTERNAL_NETWORK_ACCESS=True',
+            'DISABLE_HOST_VALIDATION=True',
+            'ALLOW_ANY_IP_ACCESS=True',
+            'ALLOW_HTTP_ACCESS=True',
+            'ALLOW_HTTPS_ACCESS=True',
+            'ALLOW_REMOTE_ACCESS=True',
+            'ALLOW_CROSS_ORIGIN=True',
+            'DISABLE_CORS=True',
+            'ALLOW_ANY_ORIGIN=True',
+            'ALLOW_ANY_HOST=True',
+            'DISABLE_ORIGIN_VALIDATION=True',
+            'ALLOW_WILDCARD_HOSTS=True',
+            'DISABLE_IP_VALIDATION=True',
+            'ALLOW_PRIVATE_IPS=True',
+            'ALLOW_PUBLIC_IPS=True',
+            'ALLOW_LOCALHOST=True',
+            'ALLOW_LOOPBACK=True',
+            'DISABLE_NETWORK_RESTRICTIONS=True',
+            'ENABLE_EXTERNAL_ACCESS=True',
+            'ALLOW_IMAGE_SERVER_ACCESS=True',
+            'DISABLE_IMAGE_SERVER_VALIDATION=True',
+        ]
+        
+        for env_var in permissive_env_vars:
+            env_vars_list.append(f"-e {env_var}")
+        
         env_vars = " ".join(env_vars_list)
 
         # Build volume mounts

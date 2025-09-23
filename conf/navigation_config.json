@@ -39,7 +39,7 @@
         "page_key": "ply_viewer",
         "icon": "🔺",
         "is_image": false,
-        "enabled": true,
+        "enabled": false,
         "order": 4,
         "description": "3D mesh and point cloud viewer"
       },
