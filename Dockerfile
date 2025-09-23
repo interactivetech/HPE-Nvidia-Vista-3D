@@ -85,11 +85,6 @@ RUN echo '#!/bin/bash\n\
 Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &\n\
 # Wait for display to be ready\n\
 sleep 2\n\
-# Test OpenGL setup (optional - can be disabled for production)\n\
-if [ "${TEST_OPENGL:-false}" = "true" ]; then\n\
-    echo "Testing OpenGL setup..."\n\
-    python test_opengl.py\n\
-fi\n\
 # Run the application\n\
 exec uv run streamlit run app.py --server.port=8501 --server.address=0.0.0.0' > /app/start.sh && \
     chmod +x /app/start.sh

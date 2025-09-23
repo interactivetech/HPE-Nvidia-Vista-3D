@@ -19,16 +19,12 @@ services:
       - DICOM_FOLDER=/app/dicom
       - VISTA3D_SERVER=http://host.docker.internal:8000
       - VISTA3D_API_KEY=${VISTA3D_API_KEY}
-      - HPE_CLUSTER_ENDPOINT=${HPE_CLUSTER_ENDPOINT}
-      - HPE_API_KEY=${HPE_API_KEY}
       - DOCKER_CONTAINER=true
       # OpenGL headless rendering support
       - DISPLAY=:99
       - LIBGL_ALWAYS_SOFTWARE=1
       - MESA_GL_VERSION_OVERRIDE=3.3
       - MESA_GLSL_VERSION_OVERRIDE=330
-      # Optional: Enable OpenGL testing
-      - TEST_OPENGL=${TEST_OPENGL:-false}
     volumes:
       - ${OUTPUT_FOLDER}:/app/output
       - ${DICOM_FOLDER}:/app/dicom

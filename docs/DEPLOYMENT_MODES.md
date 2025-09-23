@@ -64,7 +64,11 @@ python3 setup.py
 VISTA3D_SERVER=https://your-vista3d-server.com:8000
 VISTA3D_API_KEY=your_nvidia_api_key_here
 
-# 3. Start frontend services only
+# 3. Start frontend services only (choose one method)
+# Method A: Using Docker Compose (recommended)
+docker compose up vista3d-app image-server
+
+# Method B: Using start script
 python3 start.py --frontend-only
 ```
 
@@ -121,7 +125,7 @@ sudo journalctl -u vista3d-gui -f
 
 | Variable | Mode 1 (Remote) | Mode 2 (Local) | Description |
 |----------|----------------|----------------|-------------|
-| `VISTA3D_SERVER` | `https://remote-server:8001` | `http://vista3d-server:8001` | Vista3D server URL |
+| `VISTA3D_SERVER` | `https://remote-server:8000` | `http://vista3d-server:8000` | Vista3D server URL |
 | `VISTA3D_API_KEY` | `your_api_key` | `your_api_key` | NVIDIA API key |
 | `IMAGE_SERVER` | `http://image-server:8888` | `http://image-server:8888` | Internal image server URL |
 | `EXTERNAL_IMAGE_SERVER` | `http://localhost:8888` | `http://localhost:8888` | External image server URL |
@@ -132,7 +136,7 @@ sudo journalctl -u vista3d-gui -f
 |------|---------|--------|--------|-------------|
 | 8501 | Streamlit App | ✅ | ✅ | Web interface |
 | 8888 | Image Server | ✅ | ✅ | Medical image files |
-| 8001 | Vista3D Server | ❌ (Remote) | ✅ | AI segmentation |
+| 8000 | Vista3D Server | ❌ (Remote) | ✅ | AI segmentation |
 
 ### Network Requirements
 
@@ -141,15 +145,18 @@ sudo journalctl -u vista3d-gui -f
 - Local ports 8501, 8888
 
 **Mode 2 (Local Vista3D)**:
-- Local ports 8501, 8888, 8001
+- Local ports 8501, 8888, 8000
 - NVIDIA GPU with CUDA support
 
 ## 🚀 Quick Start Commands
 
 ### Mode 1: Remote Vista3D
 ```bash
-# One command to start everything
-VISTA3D_SERVER=https://your-server:8001 VISTA3D_API_KEY=your_key python3 utils/start_gui.py
+# Method A: Using Docker Compose (recommended)
+docker compose up vista3d-app image-server
+
+# Method B: Using start script
+VISTA3D_SERVER=https://your-server:8000 VISTA3D_API_KEY=your_key python3 start.py --frontend-only
 ```
 
 ### Mode 2: Local Vista3D
@@ -236,7 +243,7 @@ python3 utils/nifti2ply.py --batch
 curl -v $VISTA3D_SERVER/health
 
 # For local Vista3D
-curl -v http://localhost:8001/health
+curl -v http://localhost:8000/health
 
 # Check API key
 echo $VISTA3D_API_KEY
@@ -247,7 +254,7 @@ echo $VISTA3D_API_KEY
 # Check what's using the ports
 lsof -i :8501
 lsof -i :8888
-lsof -i :8001
+lsof -i :8000
 
 # Stop conflicting services
 sudo systemctl stop conflicting-service

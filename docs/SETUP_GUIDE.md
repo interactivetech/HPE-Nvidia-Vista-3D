@@ -111,7 +111,11 @@ If you want to use a remote Vista3D server instead of running it locally:
 VISTA3D_SERVER="https://your-remote-vista3d-server.com:8000"
 VISTA3D_API_KEY="your_nvidia_api_key"
 
-# Start only frontend services
+# Start only frontend services (choose one method)
+# Method A: Using Docker Compose (recommended)
+docker compose up vista3d-app image-server
+
+# Method B: Using start script
 python3 start.py --frontend-only
 ```
 

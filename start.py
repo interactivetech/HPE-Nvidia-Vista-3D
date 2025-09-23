@@ -467,6 +467,68 @@ class Vista3DUnifiedManager:
         
         return True
 
+    def run_frontend_only(self):
+        """Start only frontend services (Streamlit app and image server)"""
+        logger.info("Starting frontend services only (with remote Vista3D)...")
+        
+        # Check Docker availability
+        if not self.check_docker():
+            return False
+        
+        # Check Docker Compose availability
+        if not self.check_docker_compose():
+            return False
+        
+        # Create necessary directories
+        self.create_directories()
+        
+        # Stop any existing containers
+        self.stop_all_containers()
+        
+        # Build Docker images
+        if not self.build_docker_images():
+            return False
+        
+        # Start only frontend containers (not Vista3D)
+        if not self.start_frontend_containers():
+            logger.error("❌ Failed to start frontend containers")
+            return False
+        
+        # Wait for containers to be ready
+        self.wait_for_containers()
+        
+        # Show container logs
+        self.show_container_logs()
+        
+        # Test services
+        self.test_services()
+        
+        # Success message
+        logger.info("=" * 80)
+        logger.info("🎉 FRONTEND SERVICES STARTED SUCCESSFULLY!")
+        logger.info("=" * 80)
+        
+        app_port = self.env_vars['APP_PORT']
+        image_server_port = self.env_vars['IMAGE_SERVER_PORT']
+        
+        logger.info(f"🌐 Streamlit Web Interface: http://localhost:{app_port}")
+        logger.info(f"🖼️  Image Server: http://localhost:{image_server_port}")
+        logger.info(f"🧠 Vista3D Server: {self.env_vars['VISTA3D_SERVER']} (remote)")
+        
+        logger.info("\n📝 Note: Vista3D server is running remotely.")
+        logger.info("   Make sure your .env file is configured with the correct remote Vista3D URL.")
+        
+        logger.info("\n🔧 Useful Commands:")
+        logger.info("  View all logs: docker compose logs -f")
+        logger.info("  View frontend logs: docker logs -f hpe-nvidia-vista3d-app")
+        logger.info("  View image server logs: docker logs -f vista3d-image-server")
+        logger.info("  Stop all services: python start.py --stop")
+        logger.info("  Restart services: python start.py --restart")
+        
+        logger.info("=" * 80)
+        
+        return True
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
@@ -488,6 +550,7 @@ Prerequisites:
 
 Examples:
   python start.py                    # Start all services
+  python start.py --frontend-only   # Start only frontend services (remote Vista3D)
   python start.py --stop            # Stop all services
   python start.py --restart         # Restart all services
         """
@@ -505,6 +568,12 @@ Examples:
         help='Restart all Vista3D services'
     )
     
+    parser.add_argument(
+        '--frontend-only',
+        action='store_true',
+        help='Start only frontend services (Streamlit app and image server) - Vista3D server must be running remotely'
+    )
+    
     args = parser.parse_args()
     
     manager = Vista3DUnifiedManager()
@@ -520,6 +589,10 @@ Examples:
             manager.stop_all_containers()
             time.sleep(5)
             success = manager.run()
+            sys.exit(0 if success else 1)
+        elif args.frontend_only:
+            # Start only frontend services
+            success = manager.run_frontend_only()
             sys.exit(0 if success else 1)
         else:
             # Default behavior - start all services
