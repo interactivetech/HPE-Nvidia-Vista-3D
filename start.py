@@ -61,7 +61,6 @@ class Vista3DUnifiedManager:
             'VISTA3D_SERVER': os.getenv('VISTA3D_SERVER', 'http://localhost:8000'),
             
             # API Keys
-            'VISTA3D_API_KEY': os.getenv('VISTA3D_API_KEY'),
             'NGC_API_KEY': os.getenv('NGC_API_KEY'),
             'NGC_ORG_ID': os.getenv('NGC_ORG_ID', 'nvidia'),
             
@@ -84,7 +83,8 @@ class Vista3DUnifiedManager:
 
     def _register_signal_handlers(self):
         """Register signal handlers for graceful shutdown."""
-        atexit.register(self.cleanup)
+        # Only register atexit cleanup for main run mode, not for frontend-only or vista3d-only
+        # atexit.register(self.cleanup)
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
 
@@ -674,6 +674,17 @@ Examples:
         else:
             # Default behavior - start all services
             success = manager.run()
+            if success:
+                # For main run mode, register cleanup to stop containers on exit
+                atexit.register(manager.cleanup)
+                # Keep the script running to maintain containers
+                try:
+                    logger.info("Containers are running. Press Ctrl+C to stop all services.")
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    logger.info("Shutting down...")
+                    manager.cleanup()
             sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("Operation cancelled by user")

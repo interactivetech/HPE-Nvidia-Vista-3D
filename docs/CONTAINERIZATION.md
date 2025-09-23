@@ -49,7 +49,7 @@ python3 utils/start_gui.py
 ```bash
 # .env file for remote Vista3D
 VISTA3D_SERVER=https://your-vista3d-server.com:8001
-VISTA3D_API_KEY=your_nvidia_api_key_here
+NGC_API_KEY=your_nvidia_api_key_here
 IMAGE_SERVER=http://image-server:8888
 EXTERNAL_IMAGE_SERVER=http://localhost:8888
 ```
@@ -74,7 +74,7 @@ python3 utils/start_gui.py
 ```bash
 # .env file for local Vista3D
 VISTA3D_SERVER=http://vista3d-server:8001
-VISTA3D_API_KEY=your_nvidia_api_key_here
+NGC_API_KEY=your_nvidia_api_key_here
 IMAGE_SERVER=http://image-server:8888
 EXTERNAL_IMAGE_SERVER=http://localhost:8888
 ```
@@ -124,7 +124,7 @@ Copy `env.example` to `.env` and configure the following variables:
 ```bash
 # Remote Vista3D Server
 VISTA3D_SERVER=https://your-vista3d-server.com:8001
-VISTA3D_API_KEY=your_nvidia_api_key_here
+NGC_API_KEY=your_nvidia_api_key_here
 
 # Local services
 IMAGE_SERVER=http://image-server:8888
@@ -135,7 +135,7 @@ STREAMLIT_SERVER_PORT=8501
 ```bash
 # Local Vista3D Server
 VISTA3D_SERVER=http://vista3d-server:8001
-VISTA3D_API_KEY=your_nvidia_api_key_here
+NGC_API_KEY=your_nvidia_api_key_here
 
 # Local services
 IMAGE_SERVER=http://image-server:8888
@@ -370,7 +370,7 @@ curl -v $VISTA3D_SERVER/health
 curl -v http://localhost:8001/health
 
 # Check API key
-echo $VISTA3D_API_KEY
+echo $NGC_API_KEY
 ```
 
 #### 2. Port Already in Use

@@ -18,7 +18,6 @@ services:
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
       - VISTA3D_SERVER=http://host.docker.internal:8000
-      - VISTA3D_API_KEY=${VISTA3D_API_KEY}
       - DOCKER_CONTAINER=true
       # OpenGL headless rendering support
       - DISPLAY=:99
@@ -52,7 +51,6 @@ services:
     command: ["uv", "run", "python", "utils/image_server.py"]
     environment:
       - VISTA3D_SERVER=http://host.docker.internal:8000
-      - VISTA3D_API_KEY=${VISTA3D_API_KEY}
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
       - DOCKER_CONTAINER=true

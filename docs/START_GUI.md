@@ -51,7 +51,7 @@ The script supports the following environment variables:
 | `USE_HOST_NETWORKING` | `False` | Use host networking (allows all interfaces) |
 | `IMAGE_SERVER` | `http://image-server:8888` | Image server URL |
 | `VISTA3D_SERVER` | `http://vista3d-server:8001` | Vista3D server URL |
-| `VISTA3D_API_KEY` | - | API key for Vista3D server |
+| `NGC_API_KEY` | - | API key for Vista3D server |
 
 ## Container Details
 

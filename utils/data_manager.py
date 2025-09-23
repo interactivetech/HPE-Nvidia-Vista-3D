@@ -9,7 +9,7 @@ import requests
 from typing import List, Dict, Optional, Tuple, Set
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from .constants import SERVER_TIMEOUT
+from constants import SERVER_TIMEOUT
 
 # Load environment variables
 load_dotenv()
@@ -44,7 +44,41 @@ class DataManager:
                         continue
                     is_directory = text.startswith('📁') or text.endswith('/')
                     name = re.sub(r'^📁\s*|📄\s*', '', text).strip('/')
-                    items.append({'name': name, 'is_directory': is_directory})
+                    
+                    # Extract file size from the span element
+                    size_bytes = 0
+                    size_display = "N/A"
+                    if not is_directory:
+                        # Look for size span element after the link
+                        size_span = item.find('span')
+                        if size_span:
+                            size_text = size_span.get_text().strip()
+                            # Parse size text like "(39.2 MB)" or "(1,638 bytes)"
+                            size_match = re.search(r'\(([0-9,]+\.?[0-9]*)\s*(bytes|KB|MB|GB|TB)\)', size_text)
+                            if size_match:
+                                size_value = float(size_match.group(1).replace(',', ''))
+                                size_unit = size_match.group(2)
+                                
+                                # Convert to bytes
+                                if size_unit == 'bytes':
+                                    size_bytes = int(size_value)
+                                elif size_unit == 'KB':
+                                    size_bytes = int(size_value * 1024)
+                                elif size_unit == 'MB':
+                                    size_bytes = int(size_value * 1024 * 1024)
+                                elif size_unit == 'GB':
+                                    size_bytes = int(size_value * 1024 * 1024 * 1024)
+                                elif size_unit == 'TB':
+                                    size_bytes = int(size_value * 1024 * 1024 * 1024 * 1024)
+                                
+                                size_display = size_text.strip('()')
+                    
+                    items.append({
+                        'name': name, 
+                        'is_directory': is_directory,
+                        'size_bytes': size_bytes,
+                        'size_display': size_display
+                    })
         except Exception as e:
             print(f"Error parsing directory listing: {e}")
         return items

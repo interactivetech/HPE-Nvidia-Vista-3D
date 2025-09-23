@@ -190,7 +190,7 @@ If you want to use a remote Vista3D server instead of running it locally:
 ```bash
 # Edit .env file
 VISTA3D_SERVER="https://your-remote-vista3d-server.com:8000"
-VISTA3D_API_KEY="your_nvidia_api_key"
+NGC_API_KEY="your_nvidia_api_key"
 
 # Start only frontend services
 python3 start.py --frontend-only

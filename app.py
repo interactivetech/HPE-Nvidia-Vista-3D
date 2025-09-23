@@ -179,16 +179,19 @@ elif current_page == 'image_data':
 elif current_page == 'niivue':
     # Import and run NiiVue content
     sys.path.append(str(Path(__file__).parent))
-    exec(open('NiiVue_Viewer.py').read())
+    from NiiVue_Viewer import main as niivue_viewer_main
+    niivue_viewer_main()
 
 elif current_page == 'ply_viewer':
     # Import and run Open3D Viewer content
     sys.path.append(str(Path(__file__).parent))
-    exec(open('Open3d_Viewer.py').read())
+    from Open3d_Viewer import main as open3d_viewer_main
+    open3d_viewer_main()
 
 elif current_page == 'tools':
     # Import and run Tools content
     sys.path.append(str(Path(__file__).parent))
-    exec(open('Tools.py').read())
+    from Tools import main as tools_main
+    tools_main()
     
 

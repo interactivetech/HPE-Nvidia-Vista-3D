@@ -109,7 +109,7 @@ If you want to use a remote Vista3D server instead of running it locally:
 ```bash
 # Edit .env file
 VISTA3D_SERVER="https://your-remote-vista3d-server.com:8000"
-VISTA3D_API_KEY="your_nvidia_api_key"
+NGC_API_KEY="your_nvidia_api_key"
 
 # Start only frontend services (choose one method)
 # Method A: Using Docker Compose (recommended)
@@ -187,7 +187,7 @@ source .venv/bin/activate
 
 # 2. Configure for remote Vista3D
 echo "VISTA3D_SERVER=https://your-vista3d-server.com:8000" >> .env
-echo "VISTA3D_API_KEY=your_nvidia_api_key" >> .env
+echo "NGC_API_KEY=your_nvidia_api_key" >> .env
 
 # 3. Place your medical images
 cp your_scan.nii.gz output/nifti/
@@ -209,7 +209,7 @@ source .venv/bin/activate
 
 # 2. Configure for local Vista3D
 echo "VISTA3D_SERVER=http://vista3d-server:8000" >> .env
-echo "VISTA3D_API_KEY=your_nvidia_api_key" >> .env
+echo "NGC_API_KEY=your_nvidia_api_key" >> .env
 
 # 3. Place your medical images
 cp your_scan.nii.gz output/nifti/

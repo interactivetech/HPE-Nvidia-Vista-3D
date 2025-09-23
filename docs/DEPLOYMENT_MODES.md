@@ -97,7 +97,7 @@ python3 setup.py
 
 # 2. Edit .env file for remote Vista3D
 VISTA3D_SERVER=https://your-vista3d-server.com:8000
-VISTA3D_API_KEY=your_nvidia_api_key_here
+NGC_API_KEY=your_nvidia_api_key_here
 
 # 3. Start frontend services only (choose one method)
 # Method A: Using Docker Compose (recommended)
@@ -161,7 +161,7 @@ sudo journalctl -u vista3d-gui -f
 | Variable | Mode 1 (Remote) | Mode 2 (Local) | Description |
 |----------|----------------|----------------|-------------|
 | `VISTA3D_SERVER` | `https://remote-server:8000` | `http://vista3d-server:8000` | Vista3D server URL |
-| `VISTA3D_API_KEY` | `your_api_key` | `your_api_key` | NVIDIA API key |
+| `NGC_API_KEY` | `your_api_key` | `your_api_key` | NVIDIA API key |
 | `IMAGE_SERVER` | `http://image-server:8888` | `http://image-server:8888` | Internal image server URL |
 | `EXTERNAL_IMAGE_SERVER` | `http://localhost:8888` | `http://localhost:8888` | External image server URL |
 
@@ -202,7 +202,7 @@ docker compose --profile local-vista3d up vista3d-server
 docker compose up vista3d-app image-server
 
 # Method B: Using start script
-VISTA3D_SERVER=https://your-server:8000 VISTA3D_API_KEY=your_key python3 start.py --frontend-only
+VISTA3D_SERVER=https://your-server:8000 NGC_API_KEY=your_key python3 start.py --frontend-only
 ```
 
 ### Mode 2: Local Vista3D
@@ -296,7 +296,7 @@ curl -v $VISTA3D_SERVER/health
 curl -v http://localhost:8000/health
 
 # Check API key
-echo $VISTA3D_API_KEY
+echo $NGC_API_KEY
 ```
 
 #### Port Already in Use

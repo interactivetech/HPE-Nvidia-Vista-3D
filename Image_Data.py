@@ -148,17 +148,20 @@ def main():
             from utils.analyze_server_data import get_patient_cards_data, load_environment_config, get_patient_folders, format_file_size
             
             # Load configuration
-            output_folder = load_environment_config()
+            image_server_url = load_environment_config()
+            
+            # Initialize data manager
+            from utils.data_manager import DataManager
+            data_manager = DataManager(image_server_url)
             
             # Get patient folders
-            patient_folders = get_patient_folders(output_folder)
+            patient_folders = get_patient_folders(data_manager)
             
             if not patient_folders:
                 st.warning("❌ No patient folders found in output directory")
                 return
             
             # Display the analysis results in a clean format
-            st.info(f"📁 Output folder: {output_folder}")
             
             # Create a summary section
             total_size = sum(folder['size_bytes'] for folder in patient_folders)
