@@ -44,7 +44,7 @@ class Vista3DUnifiedManager:
         # Container names
         self.app_container_name = 'hpe-nvidia-vista3d-app'
         self.image_server_container_name = 'vista3d-image-server'
-        self.vista3d_container_name = 'vista3d'
+        self.vista3d_container_name = 'vista3d-server-local'
         
         self._setup_env_vars()
         self._register_signal_handlers()
@@ -161,13 +161,13 @@ class Vista3DUnifiedManager:
         
         containers = [self.app_container_name, self.image_server_container_name, self.vista3d_container_name]
         
-        for container in containers:
-            # Stop container
-            self.run_command(f"docker stop {container}", check=False)
-            
-            # Remove container
-            self.run_command(f"docker rm {container}", check=False)
-            self.run_command(f"docker rm -f {container}", check=False)
+        # Stop and remove containers started by docker run (old method)
+        self.run_command(f"docker stop vista3d", check=False)
+        self.run_command(f"docker rm -f vista3d", check=False)
+
+        # Stop and remove containers managed by docker compose
+        self.run_command(f"docker compose --profile local-vista3d down", cwd=str(self.project_root), check=False)
+        self.run_command(f"docker compose down", cwd=str(self.project_root), check=False)
         
         # Clean up any remaining container references
         self.run_command("docker container prune -f", check=False)
@@ -331,10 +331,9 @@ class Vista3DUnifiedManager:
         host_entries += " --add-host=localhost:host-gateway"
         host_entries += " --add-host=127.0.0.1:host-gateway"
         
-        docker_cmd = f"""docker run --gpus all -d --name {self.vista3d_container_name} --runtime=nvidia --shm-size=8G {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
-        
         try:
-            result = self.run_command(docker_cmd)
+            # Use docker compose to start the vista3d-server service with the local-vista3d profile
+            result = self.run_command(f"docker compose --profile local-vista3d up -d vista3d-server", cwd=str(self.project_root))
             if result.returncode == 0:
                 logger.info("✅ Vista3D AI container started successfully!")
                 
@@ -639,27 +638,34 @@ class Vista3DUnifiedManager:
             logger.error("   Please check your NGC API key and GPU availability")
             return False
         
-        # Wait for Vista3D to be ready
+        # Wait for Vista3D to be ready with retries
         logger.info("Waiting for Vista3D server to be ready...")
-        time.sleep(120)  # Give Vista3D time to start
-        
-        # Test Vista3D server
         vista3d_port = self.env_vars['VISTA3D_PORT']
-        try:
-            import urllib.request
-            with urllib.request.urlopen(f"http://127.0.0.1:{vista3d_port}/v1/health/ready", timeout=10) as response:
-                if response.status == 200:
-                    logger.info(f"✅ Vista3D server health check: {response.status}")
-                else:
-                    logger.warning(f"⚠️  Vista3D server health check returned: {response.status}")
-        except Exception as e:
-            logger.warning(f"⚠️  Vista3D server health check failed: {e}")
-            import traceback
-            logger.warning(traceback.format_exc())
+        max_retries = 30  # Total 30 * 5 = 150 seconds
+        retry_delay = 5   # seconds
+        vista3d_ready = False
         
-        # Success message
+        import urllib.request
+        for i in range(max_retries):
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{vista3d_port}/v1/health/ready", timeout=5) as response:
+                    if response.status == 200:
+                        logger.info(f"✅ Vista3D server health check successful after {i+1} attempts.")
+                        vista3d_ready = True
+                        break
+                    else:
+                        logger.warning(f"⚠️  Vista3D server health check returned: {response.status}. Retrying in {retry_delay} seconds...")
+            except Exception as e:
+                logger.warning(f"⚠️  Vista3D server health check failed (attempt {i+1}/{max_retries}): {e}. Retrying in {retry_delay} seconds...")
+            time.sleep(retry_delay)
+
         logger.info("=" * 80)
-        logger.info("🎉 VISTA3D SERVER STARTED SUCCESSFULLY!")
+        if vista3d_ready:
+            logger.info("🎉 VISTA3D SERVER STARTED SUCCESSFULLY!")
+        else:
+            logger.error("❌ VISTA3D SERVER FAILED TO START OR HEALTH CHECK FAILED AFTER MULTIPLE RETRIES.")
+            logger.error("   Please check Docker logs for 'vista3d' container for more details.")
+            return False # Indicate failure
         logger.info("=" * 80)
         
         vista3d_port = self.env_vars['VISTA3D_PORT']
