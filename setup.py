@@ -215,6 +215,37 @@ class Vista3DUnifiedSetup:
         except Exception:
             return False
     
+    def get_ngc_api_key(self) -> Optional[str]:
+        """Get NGC API key from environment variable, .env file, or prompt user"""
+        # First check environment variable
+        api_key = os.getenv('NGC_API_KEY')
+        if api_key and api_key.startswith('nvapi-') and len(api_key) > 10:
+            print("✅ Found NGC API key in environment variable")
+            return api_key
+        
+        # Then check .env file if it exists
+        if self.env_file.exists():
+            try:
+                with open(self.env_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('NGC_API_KEY='):
+                            # Extract value, handling both quoted and unquoted values
+                            value = line.split('=', 1)[1].strip()
+                            if value.startswith('"') and value.endswith('"'):
+                                value = value[1:-1]
+                            elif value.startswith("'") and value.endswith("'"):
+                                value = value[1:-1]
+                            
+                            if value.startswith('nvapi-') and len(value) > 10:
+                                print("✅ Found NGC API key in .env file")
+                                return value
+            except Exception as e:
+                logger.warning(f"Could not read .env file: {e}")
+        
+        # If not found, return None to prompt user
+        return None
+    
     def setup_python_environment(self) -> bool:
         """Set up Python environment"""
         print("\n" + "="*60)
@@ -305,13 +336,20 @@ class Vista3DUnifiedSetup:
         print("\n📍 NVIDIA NGC Configuration:")
         print("   Get your API key from: https://ngc.nvidia.com/")
         
-        while True:
-            api_key = input("Enter your NGC API Key (starts with 'nvapi-'): ").strip()
-            if api_key.startswith('nvapi-') and len(api_key) > 10:
-                config['NGC_API_KEY'] = api_key
-                print("✅ API key accepted")
-                break
-            print("❌ Invalid API key. Must start with 'nvapi-' and be longer than 10 characters.")
+        # Try to get API key from environment or .env file first
+        api_key = self.get_ngc_api_key()
+        
+        if api_key is None:
+            # Prompt user for API key if not found
+            print("   No valid API key found in environment or .env file")
+            while True:
+                api_key = input("Enter your NGC API Key (starts with 'nvapi-'): ").strip()
+                if api_key.startswith('nvapi-') and len(api_key) > 10:
+                    print("✅ API key accepted")
+                    break
+                print("❌ Invalid API key. Must start with 'nvapi-' and be longer than 10 characters.")
+        
+        config['NGC_API_KEY'] = api_key
         
         config['NGC_ORG_ID'] = input("Enter NGC Organization ID [nvidia]: ").strip() or "nvidia"
         config['LOCAL_NIM_CACHE'] = str(Path.home() / ".cache" / "nim")
