@@ -204,7 +204,7 @@ class Vista3DUnifiedManager:
             return False
     
     def start_vista3d_container(self) -> bool:
-        """Start the Vista3D AI container"""
+        """Start the Vista3D AI container using Docker Compose"""
         logger.info("Starting Vista3D AI container...")
         
         # Check if NGC API key is available
@@ -213,129 +213,13 @@ class Vista3DUnifiedManager:
             logger.error("   Please run 'python setup.py' first to configure your API key")
             return False
         
-        # Build environment variables string
-        env_vars_list = []
-        for k, v in self.env_vars.items():
-            if v is not None:
-                v_str = str(v)
-                if ' ' in v_str or '\'' in v_str or '"' in v_str:
-                    escaped_v = v_str.replace("'", "'\\''")
-                    env_vars_list.append(f"-e {k}='{escaped_v}'")
-                else:
-                    env_vars_list.append(f"-e {k}={v_str}")
-        
-        # Add required Vista3D environment variables
-        env_vars_list.append("-e IMAGE_URI_HTTPS_ONLY=False")
-        
-        # Add permissive domain whitelist settings from start_vista3d_server.py
-        domain_whitelist = [
-            # Specific image server from .env
-            self.env_vars.get('IMAGE_SERVER', 'http://localhost:8888'),
-            'localhost',
-            'localhost:8888',
-            'http://localhost',
-            'http://localhost:8888',
-            'https://localhost',
-            'https://localhost:8888',
-            
-            # General permissive patterns
-            r".*",
-            r"http://.*",
-            r"https://.*", 
-            r"http://.*:.*",
-            r"https://.*:.*",
-            r"file:///.*",
-            
-            # Local addresses
-            "localhost",
-            r"127\.0\.0\.1",
-            r"0\.0\.0\.0",
-            "::1",
-            
-            # Private network ranges
-            r"10\..*",
-            r"172\..*",
-            r"192\.168\..*",
-            
-            # Workspace paths
-            r"/workspace/output/nifti/.*",
-        ]
-        
-        # Add domain whitelist as JSON string
-        import json
-        domain_whitelist_str = json.dumps(domain_whitelist)
-        env_vars_list.append(f"-e DOMAIN_WHITELIST='{domain_whitelist_str}'")
-        
-        # Add all the permissive environment variables from start_vista3d_server.py
-        permissive_env_vars = [
-            'DISABLE_DOMAIN_WHITELIST=True',
-            'VISTA3D_DISABLE_URL_VALIDATION=True',
-            'VISTA3D_ALLOW_ANY_URL=True',
-            'VISTA3D_DISABLE_IMAGE_VALIDATION=True',
-            'VISTA3D_ALLOW_EXTERNAL_IMAGES=True',
-            'VISTA3D_ALLOW_REMOTE_FILES=True',
-            'VISTA3D_DISABLE_FILE_VALIDATION=True',
-            'VISTA3D_ENABLE_NETWORK_ACCESS=True',
-            'VISTA3D_ALLOW_HTTP_DOWNLOADS=True',
-            'VISTA3D_ALLOW_HTTPS_DOWNLOADS=True',
-            'VISTA3D_DISABLE_SSL_VERIFICATION=True',
-            'VISTA3D_ALLOW_INSECURE_CONNECTIONS=True',
-            'ALLOW_ANY_IMAGE_SERVER_HOST=True',
-            'ALLOW_EXTERNAL_NETWORK_ACCESS=True',
-            'DISABLE_HOST_VALIDATION=True',
-            'ALLOW_ANY_IP_ACCESS=True',
-            'ALLOW_HTTP_ACCESS=True',
-            'ALLOW_HTTPS_ACCESS=True',
-            'ALLOW_REMOTE_ACCESS=True',
-            'ALLOW_CROSS_ORIGIN=True',
-            'DISABLE_CORS=True',
-            'ALLOW_ANY_ORIGIN=True',
-            'ALLOW_ANY_HOST=True',
-            'DISABLE_ORIGIN_VALIDATION=True',
-            'ALLOW_WILDCARD_HOSTS=True',
-            'DISABLE_IP_VALIDATION=True',
-            'ALLOW_PRIVATE_IPS=True',
-            'ALLOW_PUBLIC_IPS=True',
-            'ALLOW_LOCALHOST=True',
-            'ALLOW_LOOPBACK=True',
-            'DISABLE_NETWORK_RESTRICTIONS=True',
-            'ENABLE_EXTERNAL_ACCESS=True',
-            'ALLOW_IMAGE_SERVER_ACCESS=True',
-            'DISABLE_IMAGE_SERVER_VALIDATION=True',
-        ]
-        
-        for env_var in permissive_env_vars:
-            env_vars_list.append(f"-e {env_var}")
-        
-        env_vars = " ".join(env_vars_list)
-
-        # Build volume mounts
-        output_folder = self.env_vars.get('OUTPUT_FOLDER', str(self.project_root / 'output'))
-        volumes = f'-v "{output_folder}:/workspace/output"'
-        volumes += f' -v "{self.project_root / "dicom"}:/app/dicom"'
-        volumes += f' -v "{self.project_root}:{self.project_root}:ro"'
-        
-        # Network configuration
-        vista3d_port = self.env_vars.get('VISTA3D_PORT', '8000')
-        use_host_networking = self.env_vars.get('USE_HOST_NETWORKING', 'False').lower() in ('true', '1', 'yes')
-        
-        if use_host_networking:
-            network_config = "--network=host"
-            logger.info("Using host networking mode")
-        else:
-            network_config = f"-p 0.0.0.0:{vista3d_port}:8000"
-            logger.info(f"Vista3D will be accessible on port {vista3d_port}")
-        
-        # Add host entries for external access
-        host_entries = "--add-host=host.docker.internal:host-gateway"
-        host_entries += " --add-host=localhost:host-gateway"
-        host_entries += " --add-host=127.0.0.1:host-gateway"
-        
         try:
             # Use docker compose to start the vista3d-server service with the local-vista3d profile
+            # All environment variables and domain whitelist are now configured in docker-compose.yml
             result = self.run_command(f"docker compose --profile local-vista3d up -d vista3d-server", cwd=str(self.project_root))
             if result.returncode == 0:
                 logger.info("✅ Vista3D AI container started successfully!")
+                logger.info("   Domain whitelist and permissive settings are configured in docker-compose.yml")
                 
                 # Wait for container to be ready
                 time.sleep(10)
