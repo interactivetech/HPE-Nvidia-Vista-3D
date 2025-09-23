@@ -126,22 +126,20 @@ class DataManager:
             return set(), {}
 
         try:
-            # Convert filename to folder name for voxels directory
-            ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
+            # Try to find the correct voxel directory
+            voxels_folder_url = self._find_voxel_directory(patient_id, filename)
+            
+            if not voxels_folder_url:
+                print(f"DEBUG: No suitable voxel directory found for patient {patient_id}, file {filename}")
+                return set(), {}
 
-            # Check the voxels directory for this CT scan
-            voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
-
-            if __debug__:
-                print(f"DEBUG: Checking voxels URL: {voxels_folder_url}")
+            print(f"DEBUG: Using voxel directory: {voxels_folder_url}")
 
             resp = requests.get(voxels_folder_url, timeout=SERVER_TIMEOUT)
-            if __debug__:
-                print(f"DEBUG: Response status: {resp.status_code}")
+            print(f"DEBUG: Response status: {resp.status_code}")
 
             if resp.status_code != 200:
-                if __debug__:
-                    print(f"DEBUG: Failed to access voxels directory. Status: {resp.status_code}")
+                print(f"DEBUG: Failed to access voxels directory. Status: {resp.status_code}")
                 return set(), {}
 
             # Parse directory listing to find individual voxel files
@@ -194,3 +192,90 @@ class DataManager:
     def get_file_url(self, patient_id: str, file_path: str) -> str:
         """Generate the full URL for a file within a patient's directory."""
         return f"{self.image_server_url}/output/{patient_id}/{file_path}"
+
+    def _find_voxel_directory(self, patient_id: str, filename: str) -> Optional[str]:
+        """
+        Find the correct voxel directory for a given patient and file.
+        Returns the full URL to the voxel directory, or None if not found.
+        """
+        # First try the filename-based approach
+        ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
+        voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
+        
+        print(f"DEBUG: Trying filename-based voxel directory: {voxels_folder_url}")
+        
+        try:
+            resp = requests.get(voxels_folder_url, timeout=SERVER_TIMEOUT)
+            if resp.status_code == 200:
+                # Check if this directory actually contains .nii.gz files
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                for link in soup.find_all('a'):
+                    href = link.get('href')
+                    if href and href.endswith('.nii.gz') and not href.startswith('..'):
+                        print(f"DEBUG: Found voxel files in filename-based directory")
+                        return voxels_folder_url
+        except Exception as e:
+            print(f"DEBUG: Error checking filename-based directory: {e}")
+        
+        # If filename-based approach fails, try to find available voxel directories
+        parent_voxels_url = f"{self.image_server_url}/output/{patient_id}/voxels/"
+        print(f"DEBUG: Checking parent voxels directory: {parent_voxels_url}")
+        
+        try:
+            parent_resp = requests.get(parent_voxels_url, timeout=SERVER_TIMEOUT)
+            if parent_resp.status_code == 200:
+                parent_soup = BeautifulSoup(parent_resp.text, 'html.parser')
+                available_dirs = []
+                for link in parent_soup.find_all('a'):
+                    href = link.get('href')
+                    if href and not href.startswith('..') and href.endswith('/'):
+                        available_dirs.append(href.rstrip('/'))
+                
+                print(f"DEBUG: Available voxel directories: {available_dirs}")
+                
+                if len(available_dirs) == 1:
+                    # If there's only one voxel directory, use it
+                    voxel_dir = available_dirs[0]
+                    voxel_url = f"{parent_voxels_url}{voxel_dir}/"
+                    print(f"DEBUG: Using single available voxel directory: {voxel_url}")
+                    
+                    # Verify it contains .nii.gz files
+                    dir_resp = requests.get(voxel_url, timeout=SERVER_TIMEOUT)
+                    if dir_resp.status_code == 200:
+                        dir_soup = BeautifulSoup(dir_resp.text, 'html.parser')
+                        for link in dir_soup.find_all('a'):
+                            href = link.get('href')
+                            if href and href.endswith('.nii.gz') and not href.startswith('..'):
+                                return voxel_url
+                
+                elif len(available_dirs) > 1:
+                    # Multiple directories - for now, try to find one that contains voxel files
+                    # This could be enhanced with better matching logic in the future
+                    for voxel_dir in available_dirs:
+                        voxel_url = f"{parent_voxels_url}{voxel_dir}/"
+                        try:
+                            dir_resp = requests.get(voxel_url, timeout=SERVER_TIMEOUT)
+                            if dir_resp.status_code == 200:
+                                dir_soup = BeautifulSoup(dir_resp.text, 'html.parser')
+                                voxel_count = 0
+                                for link in dir_soup.find_all('a'):
+                                    href = link.get('href')
+                                    if href and href.endswith('.nii.gz') and not href.startswith('..'):
+                                        voxel_count += 1
+                                
+                                if voxel_count > 0:
+                                    print(f"DEBUG: Found {voxel_count} voxel files in directory {voxel_dir}")
+                                    return voxel_url
+                        except Exception as e:
+                            print(f"DEBUG: Error checking directory {voxel_dir}: {e}")
+                            continue
+                
+                print(f"DEBUG: No suitable voxel directory found")
+                return None
+            else:
+                print(f"DEBUG: Failed to access parent voxels directory. Status: {parent_resp.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"DEBUG: Error accessing parent voxels directory: {e}")
+            return None
