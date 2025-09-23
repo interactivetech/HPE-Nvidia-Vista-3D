@@ -251,7 +251,7 @@ class Vista3DUnifiedManager:
         host_entries += " --add-host=localhost:host-gateway"
         host_entries += " --add-host=127.0.0.1:host-gateway"
         
-        docker_cmd = f"""docker run --gpus all --rm -d --name {self.vista3d_container_name} --runtime=nvidia --shm-size=8G {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
+        docker_cmd = f"""docker run --gpus all -d --name {self.vista3d_container_name} --runtime=nvidia --shm-size=8G {host_entries} {network_config} {volumes} {env_vars} nvcr.io/nim/nvidia/vista3d:1.0.0"""
         
         try:
             result = self.run_command(docker_cmd)
@@ -299,8 +299,9 @@ class Vista3DUnifiedManager:
     def check_container_health(self, container_name: str, port: int, health_path: str = "/health") -> bool:
         """Check if a container is healthy by making a request to its health endpoint"""
         try:
-            response = requests.get(f"http://localhost:{port}{health_path}", timeout=5)
-            return response.status_code == 200
+            import urllib.request
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}{health_path}", timeout=5) as response:
+                return response.status == 200
         except Exception as e:
             logger.debug(f"Health check failed for {container_name}: {e}")
             return False
@@ -337,7 +338,7 @@ class Vista3DUnifiedManager:
             
             # Check Vista3D server
             if not vista3d_ready:
-                if self.check_container_health(self.vista3d_container_name, vista3d_port, "/health"):
+                if self.check_container_health(self.vista3d_container_name, vista3d_port, "/v1/health/ready"):
                     logger.info("✅ Vista3D AI server is ready")
                     vista3d_ready = True
                 else:
@@ -394,8 +395,9 @@ class Vista3DUnifiedManager:
         # Test Vista3D server
         logger.info("Test 3: Testing Vista3D AI server...")
         try:
-            response = requests.get(f"http://localhost:{vista3d_port}/health", timeout=10)
-            logger.info(f"✅ Vista3D AI server health check: {response.status_code}")
+            import urllib.request
+            with urllib.request.urlopen(f"http://127.0.0.1:{vista3d_port}/v1/health/ready", timeout=10) as response:
+                logger.info(f"✅ Vista3D AI server health check: {response.status}")
         except Exception as e:
             logger.warning(f"⚠️  Vista3D AI server health check failed: {e}")
     
@@ -559,18 +561,21 @@ class Vista3DUnifiedManager:
         
         # Wait for Vista3D to be ready
         logger.info("Waiting for Vista3D server to be ready...")
-        time.sleep(30)  # Give Vista3D time to start
+        time.sleep(120)  # Give Vista3D time to start
         
         # Test Vista3D server
         vista3d_port = self.env_vars['VISTA3D_PORT']
         try:
-            response = requests.get(f"http://localhost:{vista3d_port}/health", timeout=10)
-            if response.status_code == 200:
-                logger.info(f"✅ Vista3D server health check: {response.status_code}")
-            else:
-                logger.warning(f"⚠️  Vista3D server health check returned: {response.status_code}")
+            import urllib.request
+            with urllib.request.urlopen(f"http://127.0.0.1:{vista3d_port}/v1/health/ready", timeout=10) as response:
+                if response.status == 200:
+                    logger.info(f"✅ Vista3D server health check: {response.status}")
+                else:
+                    logger.warning(f"⚠️  Vista3D server health check returned: {response.status}")
         except Exception as e:
             logger.warning(f"⚠️  Vista3D server health check failed: {e}")
+            import traceback
+            logger.warning(traceback.format_exc())
         
         # Success message
         logger.info("=" * 80)
