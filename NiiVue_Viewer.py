@@ -20,8 +20,15 @@ from utils.constants import (
 
 # --- Initial Setup ---
 load_dotenv()
-IMAGE_SERVER_URL = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
-EXTERNAL_IMAGE_SERVER_URL = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
+initial_image_server_url = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
+initial_external_image_server_url = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
+
+# Initialize a temporary DataManager to resolve the URLs
+temp_data_manager = DataManager(initial_image_server_url)
+IMAGE_SERVER_URL = temp_data_manager.image_server_url
+
+temp_external_data_manager = DataManager(initial_external_image_server_url)
+EXTERNAL_IMAGE_SERVER_URL = temp_external_data_manager.image_server_url
 
 # Get output folder from environment - must be absolute path
 OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
@@ -30,13 +37,16 @@ if not OUTPUT_FOLDER:
 if not os.path.isabs(OUTPUT_FOLDER):
     raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
 
-# Initialize our managers
+# Initialize our managers with the resolved URLs
 config_manager = ConfigManager()
 data_manager = DataManager(IMAGE_SERVER_URL)
 external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL)
 voxel_manager = VoxelManager(config_manager, external_data_manager)
 viewer_config = ViewerConfig()
 template_renderer = TemplateRenderer()
+
+print(f"DEBUG (NiiVue_Viewer): Final IMAGE_SERVER_URL: {IMAGE_SERVER_URL}")
+print(f"DEBUG (NiiVue_Viewer): Final EXTERNAL_IMAGE_SERVER_URL: {EXTERNAL_IMAGE_SERVER_URL}")
 
 
 # --- Sidebar UI ---
@@ -342,6 +352,8 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
     volume_list_js = json.dumps(volume_list_entries)
     overlay_colors_js = json.dumps(overlays)
     custom_colormap_js = voxel_manager.create_custom_colormap_js()
+
+    print(f"DEBUG (NiiVue_Viewer): Prepared volume_list_js: {volume_list_js}")
 
 
     # Get viewer settings
