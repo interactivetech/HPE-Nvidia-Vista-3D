@@ -170,8 +170,6 @@ if current_page == 'home':
     # Add definitions section
     st.markdown("---")
     
-    st.info("📚 **Key Terms**: For definitions of DICOM, NIfTI, NiiVue Viewer, Voxels, and PLY format, see [docs/KEY_TERMS.md](docs/KEY_TERMS.md)")
-    
 
 elif current_page == 'image_data':
     # Import and run Image Data content

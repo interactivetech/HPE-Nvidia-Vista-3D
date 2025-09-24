@@ -29,7 +29,7 @@ This comprehensive guide explains how to containerize and run the HPE NVIDIA Vis
 
 The project includes Python-based startup scripts in the `utils/` folder:
 
-- `utils/start_vista3d.py` - Start Vista3D server container (requires GPU)
+- `start_backend.py` - Start Vista3D server container (requires GPU)
 - `utils/start_gui.py` - Start GUI containers (Streamlit app + image server)
 
 ### Mode 1: Local GUI + Remote Vista3D (Recommended)
@@ -64,7 +64,7 @@ cp env.example .env
 nano .env  # Edit for local Vista3D
 
 # 2. Start Vista3D server (requires GPU)
-python3 utils/start_vista3d.py
+python3 start_backend.py
 
 # 3. Start GUI containers (in separate terminal)
 python3 utils/start_gui.py
@@ -85,7 +85,7 @@ EXTERNAL_IMAGE_SERVER=http://localhost:8888
 
 ```bash
 # Create systemd services for automatic startup
-sudo python3 utils/start_vista3d.py --create-service
+sudo python3 start_backend.py --create-service
 sudo python3 utils/start_gui.py --create-service
 
 # Enable services

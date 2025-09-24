@@ -117,11 +117,15 @@ class ViewerConfig:
         """Update Streamlit session state with current settings."""
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
+        st.session_state.slice_type = self._settings.get('slice_type', 'Multiplanar')
+        st.session_state.orientation = self._settings.get('orientation', 'Axial')
 
     def from_session_state(self):
         """Load settings from Streamlit session state."""
         self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         self._selected_individual_voxels = getattr(st.session_state, 'selected_individual_voxels', [])
+        self._settings['slice_type'] = getattr(st.session_state, 'slice_type', 'Multiplanar')
+        self._settings['orientation'] = getattr(st.session_state, 'orientation', 'Axial')
 
     def render_sidebar_settings(self, min_value: float = None, max_value: float = None, mean_value: float = None, has_voxels: bool = False):
         """Render the viewer settings in the sidebar."""
@@ -226,6 +230,9 @@ class ViewerConfig:
         else:
             # If no voxels available, ensure show_overlay is False
             self._settings['show_overlay'] = False
+        
+        # Save settings to session state
+        self.to_session_state()
 
     def render_voxel_image_settings(self):
         """Render the voxel image settings in an expander."""

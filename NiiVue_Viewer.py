@@ -49,6 +49,7 @@ external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL, force_external_ur
 # Use internal data manager for voxel detection (health checks), external for URL display
 voxel_manager = VoxelManager(config_manager, data_manager)
 viewer_config = ViewerConfig()
+viewer_config.from_session_state()  # Load settings from session state
 template_renderer = TemplateRenderer()
 
 print(f"DEBUG (NiiVue_Viewer): Final IMAGE_SERVER_URL: {IMAGE_SERVER_URL}")
@@ -279,6 +280,12 @@ def render_viewer(selected_patient: str, selected_file: str):
     actual_slice_type = viewer_config.get_slice_type_index()
     segment_opacity = settings.get('segment_opacity', 0.5)
     segment_gamma = settings.get('segment_gamma', 1.0)
+    
+    # Load the Niivue JavaScript library content
+    from pathlib import Path
+    niivue_lib_path = Path(__file__).parent / 'assets' / 'niivue.umd.js'
+    with open(niivue_lib_path, 'r') as f:
+        niivue_lib_content = f.read()
     
     # Render the viewer using our template
     html_content = template_renderer.render_template(

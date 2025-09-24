@@ -55,14 +55,11 @@ RUN apt-get update && apt-get install -y \
 # Install UV package manager for faster dependency installation
 RUN pip install uv
 
-# Copy dependency files
+# Copy unified dependency files
 COPY pyproject.toml ./
 
-# Install Python dependencies using UV
+# Install Python dependencies using UV (unified - includes both frontend and backend)
 RUN uv sync
-
-# Copy application code
-COPY . .
 
 # Create necessary directories
 RUN mkdir -p output dicom
@@ -79,15 +76,8 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# Create startup script for virtual display and application
-RUN echo '#!/bin/bash\n\
-# Start virtual display for OpenGL\n\
-Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &\n\
-# Wait for display to be ready\n\
-sleep 2\n\
-# Run the application\n\
-exec uv run streamlit run app.py --server.port=8501 --server.address=0.0.0.0' > /app/start.sh && \
-    chmod +x /app/start.sh
+# Note: Application code will be mounted as a volume in docker-compose.yml
+# The startup script will be created at runtime since the code is mounted
 
 # Run the application with virtual display
-CMD ["/app/start.sh"]
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset & sleep 2 && exec uv run streamlit run app.py --server.port=8501 --server.address=0.0.0.0"]

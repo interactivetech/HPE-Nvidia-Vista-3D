@@ -3,7 +3,9 @@ version: '3.8'
 services:
   # Main Streamlit Application
   vista3d-app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: hpe-nvidia-vista3d-app
     ports:
       - "8501:8501"
@@ -28,6 +30,7 @@ services:
       - MESA_GL_VERSION_OVERRIDE=3.3
       - MESA_GLSL_VERSION_OVERRIDE=330
     volumes:
+      - .:/app
       - ${OUTPUT_FOLDER:-./output}:/app/output
       - ${DICOM_FOLDER:-./dicom}:/app/dicom
     networks:
@@ -46,7 +49,9 @@ services:
 
   # Local Image Server
   image-server:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: vista3d-image-server
     ports:
       - "8888:8888"
@@ -59,6 +64,7 @@ services:
       - DOCKER_CONTAINER=true
       - IMAGE_SERVER=http://image-server:8888
     volumes:
+      - .:/app
       - ${OUTPUT_FOLDER:-./output}:/app/output
       - ${DICOM_FOLDER:-./dicom}:/app/dicom
     networks:

@@ -48,27 +48,48 @@
 
             nv.loadVolumes(volumeList).then(() => {
                 console.log('Volumes loaded successfully');
+                console.log('Number of volumes loaded:', nv.volumes.length);
+                nv.volumes.forEach((vol, idx) => {
+                    console.log(`Volume ${idx}:`, {
+                        id: vol.id,
+                        url: vol.url,
+                        name: vol.name || 'Unnamed',
+                        cal_min: vol.cal_min,
+                        cal_max: vol.cal_max,
+                        colormap: vol.colormap
+                    });
+                });
                 const hasVolumes = nv.volumes.length > 0;
                 const mainVol = hasVolumes ? nv.volumes[0] : null;
 
                 {% if main_is_nifti and main_vol %}
                 if ({{ main_is_nifti|lower }} && mainVol) {
                     // MAIN VOLUME COLORMAP APPLICATION - DO NOT MODIFY WITHOUT CAREFUL TESTING
-                    nv.setColormap(mainVol.id, {{ color_map_js|safe }});
-                    nv.setGamma({{ nifti_gamma }});
-                    mainVol.opacity = {{ nifti_opacity }};
+                    // Only apply grayscale colormap to actual NIFTI files, not voxel overlays
+                    if (mainVol.url && !mainVol.url.includes('/voxels/')) {
+                        nv.setColormap(mainVol.id, {{ color_map_js|safe }});
+                        nv.setGamma({{ nifti_gamma }});
+                        mainVol.opacity = {{ nifti_opacity }};
 
-                    // Apply CT windowing settings
-                    const windowCenter = {{ window_center }};
-                    const windowWidth = {{ window_width }};
-                    const windowMin = windowCenter - windowWidth / 2;
-                    const windowMax = windowCenter + windowWidth / 2;
+                        // Apply CT windowing settings
+                        const windowCenter = {{ window_center }};
+                        const windowWidth = {{ window_width }};
+                        const windowMin = windowCenter - windowWidth / 2;
+                        const windowMax = windowCenter + windowWidth / 2;
 
-                    // Set the volume's display range for proper CT windowing
-                    mainVol.cal_min = windowMin;
-                    mainVol.cal_max = windowMax;
+                        // Set the volume's display range for proper CT windowing
+                        mainVol.cal_min = windowMin;
+                        mainVol.cal_max = windowMax;
 
-                    console.log('Applied CT windowing - Center:', windowCenter, 'Width:', windowWidth, 'Range:', windowMin, 'to', windowMax);
+                        console.log('Applied CT windowing - Center:', windowCenter, 'Width:', windowWidth, 'Range:', windowMin, 'to', windowMax);
+                    } else {
+                        console.log('Skipping grayscale colormap for voxel file:', mainVol.url);
+                        // Apply custom segmentation colormap to voxel files
+                        if (typeof customSegmentationColormap !== 'undefined') {
+                            nv.setColormap(mainVol.id, 'custom_segmentation');
+                            console.log('Applied custom_segmentation colormap to main voxel volume');
+                        }
+                    }
                 }
                 {% endif %}
 
@@ -90,7 +111,13 @@
                             // Use the same colormap as individual voxels for consistency
                             if (typeof customSegmentationColormap !== 'undefined') {
                                 nv.setColormap(overlayVol.id, 'custom_segmentation');
+                                
+                                // Set the volume range to encompass all possible label IDs (0-255)
+                                overlayVol.cal_min = 0;
+                                overlayVol.cal_max = 255;
+                                
                                 console.log('Applied custom_segmentation colormap to all segmentation overlay');
+                                console.log(`Set volume range: ${overlayVol.cal_min} to ${overlayVol.cal_max}`);
                             }
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
                             const color = overlayColors[overlayIndex].color;
@@ -125,7 +152,15 @@
                             const colormapName = `custom_${overlayIndex}`;
                             nv.addColormap(colormapName, customColormap);
                             nv.setColormap(overlayVol.id, colormapName);
+                            
+                            // Set the volume range to encompass all possible label IDs (0-255)
+                            overlayVol.cal_min = 0;
+                            overlayVol.cal_max = 255;
+                            
                             console.log(`Applied custom color to overlay ${overlayIndex}: ${labelName} (ID: ${labelId})`, color);
+                            console.log(`Set volume range: ${overlayVol.cal_min} to ${overlayVol.cal_max}`);
+                            console.log(`Custom colormap for ${labelName}:`, customColormap);
+                            console.log(`Volume data range check - min: ${Math.min(...overlayVol.img.slice())}, max: ${Math.max(...overlayVol.img.slice())}`);
                         } else {
                             // Fallback to generic segmentation colormap
                             if (typeof customSegmentationColormap !== 'undefined') {

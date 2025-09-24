@@ -18,6 +18,21 @@ class TemplateRenderer:
         self.template_dir = Path(template_dir)
         self.env = Environment(loader=FileSystemLoader(template_dir))
 
+    def render_template(
+        self,
+        template_name: str,
+        **kwargs
+    ) -> str:
+        """
+        Render a template with provided data.
+        """
+        try:
+            template = self.env.get_template(template_name)
+            return template.render(**kwargs)
+        except Exception as e:
+            print(f"Error rendering template {template_name}: {e}")
+            return self._render_fallback_html()
+
     def render_viewer(
         self,
         volume_list_js: str,

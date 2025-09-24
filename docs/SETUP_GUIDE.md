@@ -31,7 +31,7 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 
 ## 🚀 Quick Start
 
-**Get up and running with our new three-script architecture!**
+**Get up and running with our three-script architecture!**
 
 ### Step 1: Initial Setup
 ```bash
@@ -45,7 +45,7 @@ python3 setup.py
 
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
-- ✅ Sets up Python environment with all dependencies
+- ✅ Sets up separate Python environments for frontend and backend
 - ✅ Configures environment variables and Docker settings
 - ✅ Prompts for your NVIDIA NGC API key
 - ✅ Creates all necessary directories and files
@@ -53,7 +53,7 @@ python3 setup.py
 ### Step 2: Start Vista3D Server (GPU-Enabled Machine)
 ```bash
 # On your GPU-enabled machine (local or remote)
-python3 start_vista3d.py
+python3 start_backend.py
 ```
 
 **This starts:**
@@ -92,6 +92,46 @@ mkdir -p output/nifti
 ```
 
 **🎉 You're ready!** You now have a fully functional medical AI platform with distributed architecture.
+
+## 🐍 Virtual Environment Management
+
+The project uses **separate virtual environments** for frontend and backend services to avoid dependency conflicts.
+
+### Environment Structure
+- **`.venv-frontend/`** - Frontend environment (Streamlit, FastAPI, web frameworks)
+- **`.venv-backend/`** - Backend environment (MONAI, PyTorch, AI/ML libraries)
+- **`.venv/`** - Shared environment (legacy, contains common dependencies)
+
+### Activating Environments
+
+#### Frontend Environment
+```bash
+# Activate frontend environment
+source .venv-frontend/bin/activate
+
+# Or use uv to run frontend commands directly
+uv run --python .venv-frontend/bin/python your_frontend_script.py
+```
+
+#### Backend Environment
+```bash
+# Activate backend environment
+source .venv-backend/bin/activate
+
+# Or use uv to run backend commands directly
+uv run --python .venv-backend/bin/python your_backend_script.py
+```
+
+### Environment Verification
+```bash
+# Test frontend environment
+source .venv-frontend/bin/activate
+python -c "import streamlit, fastapi, nibabel; print('✅ Frontend environment working!')"
+
+# Test backend environment
+source .venv-backend/bin/activate
+python -c "import monai, torch, nibabel; print('✅ Backend environment working!')"
+```
 
 ## 🌐 Remote Server Setup
 
@@ -141,39 +181,12 @@ DICOM_FOLDER="/path/to/your/dicom"
 OUTPUT_FOLDER="/path/to/your/output"
 ```
 
-### Remote Vista3D Server
-If you want to use a remote Vista3D server instead of running it locally:
-
-```bash
-# Edit .env file
-VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
-NGC_API_KEY="your_nvidia_api_key"
-
-# Set up SSH port forwarding
-ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
-
-# Start only frontend services
-python3 start_frontend.py
-```
-
-### Vista3D Server Only
-If you want to run only the Vista3D server (for distributed deployments):
-
-```bash
-# Edit .env file
-NGC_API_KEY="your_nvidia_api_key"
-NGC_ORG_ID="nvidia"
-
-# Start only Vista3D server
-python3 start_vista3d.py
-```
-
 ## 📁 Project Structure
 
 ```
 HPE-Nvidia-Vista-3D/
 ├── setup.py              # Unified setup script
-├── start_vista3d.py      # Vista3D server startup script
+├── start_backend.py      # Vista3D server startup script
 ├── start_frontend.py     # Frontend services startup script
 ├── app.py                # Main Streamlit web application
 ├── .env                  # Environment configuration (created by setup)
@@ -186,7 +199,7 @@ HPE-Nvidia-Vista-3D/
 │   ├── dicom2nifti.py   # DICOM to NIFTI conversion
 │   ├── segment.py       # Vista3D segmentation processing
 │   ├── image_server.py  # HTTP image server
-│   └── start_vista3d.py # Vista3D Docker container manager
+│   └── start_backend.py # Vista3D Docker container manager
 ├── conf/                # Configuration files
 │   ├── vista3d_label_sets.json    # Predefined label sets
 │   ├── vista3d_label_dict.json    # Label dictionary
@@ -220,8 +233,8 @@ HPE-Nvidia-Vista-3D/
 
 #### For Remote Vista3D (Recommended)
 ```bash
-# 1. Activate virtual environment
-source .venv/bin/activate
+# 1. Activate frontend environment
+source .venv-frontend/bin/activate
 
 # 2. Configure for remote Vista3D
 echo "VISTA3D_SERVER=http://localhost:8000" >> .env  # Uses SSH tunnel
@@ -245,8 +258,8 @@ python3 utils/segment.py
 
 #### For Local Vista3D (Development)
 ```bash
-# 1. Activate virtual environment
-source .venv/bin/activate
+# 1. Activate frontend environment
+source .venv-frontend/bin/activate
 
 # 2. Configure for local Vista3D
 echo "VISTA3D_SERVER=http://localhost:8000" >> .env
@@ -259,7 +272,7 @@ cp your_scan.nii.gz output/nifti/
 python3 utils/dicom2nifti.py
 
 # 5. Start Vista3D server (requires GPU)
-python3 start_vista3d.py
+python3 start_backend.py
 
 # 6. Start frontend services (in separate terminal)
 python3 start_frontend.py
@@ -394,35 +407,6 @@ docker login nvcr.io -u '$oauthtoken' -p 'your-api-key'
 - **Network**: Vista3D runs on localhost by default
 - **File Access**: Container has access to project output directory
 
-## 🌐 Remote Setup Configuration
-
-For running Vista3D on a separate server:
-
-### Server Setup (GPU Machine)
-```bash
-# On the GPU server
-python3 utils/start_vista3d.py
-```
-
-### Client Setup (Your Machine)
-```bash
-# Edit .env file to point to remote server
-VISTA3D_SERVER="http://your-gpu-server:8000"
-IMAGE_SERVER="http://your-public-ip:8888"
-```
-
-### External Access Configuration
-```bash
-# Find your public IP
-curl ifconfig.me
-
-# Update .env file
-IMAGE_SERVER="http://your-public-ip:8888"
-
-# Ensure firewall allows port 8888
-sudo ufw allow 8888
-```
-
 ## 🎯 Next Steps
 
 1. **Explore the Web Interface**: Navigate through different sections
@@ -433,13 +417,13 @@ sudo ufw allow 8888
 
 ## 📚 Additional Resources
 
-- **Full Documentation**: See `README.md` for comprehensive details
-- **Setup Guide**: See `docs/VISTA3D_SETUP.md` for detailed setup
+- **Backend Guide**: See `docs/BACKEND_GUIDE.md` for Vista3D server details
+- **Frontend Guide**: See `docs/FRONTEND_GUIDE.md` for web interface details
 - **API Reference**: Check `utils/` directory for script documentation
 - **HPE GreenLake**: Learn about HPE infrastructure integration
 
 ---
 
-**Need Help?** Check the troubleshooting section or refer to the full documentation in `README.md`.
+**Need Help?** Check the troubleshooting section or refer to the specific guides for backend and frontend services.
 
 **Ready to Go?** Follow the Quick Start steps above and you'll be up and running in 15 minutes! 🚀

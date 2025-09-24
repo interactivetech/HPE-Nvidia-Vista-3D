@@ -41,7 +41,7 @@ class Vista3DManager:
 
     def __init__(self):
         self.script_dir = Path(__file__).parent
-        self.project_root = self.script_dir  # Since start_vista3d.py is in the project root
+        self.project_root = self.script_dir  # Since start_backend.py is in the project root
         self.container_name = os.getenv('VISTA3D_CONTAINER_NAME', 'vista3d')
 
         self._setup_env_vars()
@@ -391,7 +391,7 @@ class Vista3DManager:
         logger.info(f"✅ Output directory created: {self.local_outputs_path}")
     
     
-    def start_vista3d_container(self) -> bool:
+    def start_backend_container(self) -> bool:
         """Start the Vista-3D Docker container with retry logic"""
         logger.info("Starting Vista-3D container...")
         
@@ -690,7 +690,7 @@ class Vista3DManager:
         self.stop_existing_container()
         
         # Start Vista-3D container
-        if not self.start_vista3d_container():
+        if not self.start_backend_container():
             return False
         
         # Test configuration
@@ -761,7 +761,7 @@ Quick Setup on fresh Linux server:
   sudo docker run --rm --gpus all nvidia/cuda:11.0-base-ubuntu20.04 nvidia-smi
 
 Usage Examples:
-  python3 start_vista3d.py                 # Start Vista-3D container
+  python3 start_backend.py                 # Start Vista-3D container
 
 Configuration (.env file):
   Required:

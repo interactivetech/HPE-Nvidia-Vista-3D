@@ -2,7 +2,7 @@
 """
 Vista-3D Frontend Docker Startup Script
 Starts ONLY the Streamlit app and image server containers for the Vista-3D GUI.
-Does NOT start the Vista3D server container - use start_vista3d.py for that.
+Does NOT start the Vista3D server container - use start_backend.py for that.
 """
 
 import os
@@ -390,7 +390,7 @@ Container Configuration:
   - Image server (port 8888 by default)
   
   Note: This script does NOT start the Vista3D server container.
-  The Vista3D server should be started separately using start_vista3d.py
+  The Vista3D server should be started separately using start_backend.py
   
   Key Environment Variables:
     STREAMLIT_SERVER_PORT=8501        # Port for Streamlit app

@@ -75,7 +75,7 @@ cp dot_env_template .env
 
 ```bash
 # Start Vista3D Docker container
-python utils/start_vista3d.py
+python start_backend.py
 
 # Watch logs (in separate terminal)
 docker logs vista3d -f

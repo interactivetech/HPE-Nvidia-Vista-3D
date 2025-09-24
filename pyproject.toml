@@ -1,31 +1,45 @@
 [project]
-name = "nv"
+name = "vista3d"
 version = "0.1.0"
-description = "HPE NVIDA Vista3D Segmentation"
+description = "HPE NVIDIA Vista3D - Complete medical imaging and AI processing platform"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    # Core Python utilities
     "python-dotenv>=1.0.0",
-    "nibabel>=5.3.2",
     "numpy>=2.0.0",
     "tqdm>=4.67.1",
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.3",
     "bs4>=0.0.2",
+    
+    # Web framework
     "streamlit>=1.32.0",
     "fastapi>=0.111.0",
     "uvicorn>=0.30.1",
+    "streamlit-mermaid>=0.3.0",
+    "extra-streamlit-components>=0.1.81",
+    
+    # Data handling
     "pandas>=2.0.0",
     "plotly>=5.0.0",
-    "streamlit-mermaid>=0.3.0",
+    
+    # Medical imaging
+    "nibabel>=5.3.2",
     "dcm2niix>=1.0.20250506",
+    
+    # AI/ML framework (includes PyTorch and Triton)
+    "monai>=1.5.1",
+    
+    # 3D visualization and mesh processing
     "vtk>=9.5.1",
     "trimesh>=4.8.1",
     "pymeshfix>=0.17.1",
     "open3d>=0.19.0",
     "stl>=0.0.3",
-    "extra-streamlit-components>=0.1.81",
-    "scikit-image>=0.25.2",
     "plyfile>=1.1.2",
-    "monai>=1.5.1",
+    "scikit-image>=0.25.2",
 ]
+
+# This project is a monolithic application, not a package
+# Dependencies are managed via uv but no build system is needed

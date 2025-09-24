@@ -61,7 +61,7 @@ The setup script will:
 ### Step 2: Start Vista3D Server (GPU-Enabled Machine)
 ```bash
 # On your GPU-enabled machine (local or remote)
-python3 start_vista3d.py
+python3 start_backend.py
 ```
 
 This starts:
@@ -100,6 +100,27 @@ mkdir -p output/nifti
 ```
 
 **🎉 That's it!** You now have a fully functional medical AI platform with distributed architecture.
+
+## 💻 Development Environments
+
+For development work, you can use separate virtual environments to avoid downloading heavy ML dependencies when working on the frontend:
+
+### Quick Development Setup
+```bash
+# Frontend environment (lightweight, no Triton/PyTorch)
+uv venv .venv-frontend
+source .venv-frontend/bin/activate
+uv pip install python-dotenv nibabel numpy tqdm requests beautifulsoup4 bs4 streamlit fastapi uvicorn pandas plotly streamlit-mermaid dcm2niix vtk trimesh pymeshfix open3d stl extra-streamlit-components scikit-image plyfile
+streamlit run app.py
+
+# Backend environment (full AI stack)
+uv venv .venv-backend
+source .venv-backend/bin/activate
+uv pip install python-dotenv numpy tqdm requests beautifulsoup4 bs4 nibabel dcm2niix vtk trimesh pymeshfix open3d stl scikit-image plyfile monai
+python start_backend.py
+```
+
+See [DEVELOPMENT_ENVIRONMENTS.md](DEVELOPMENT_ENVIRONMENTS.md) for detailed documentation.
 
 ## 🌐 Remote Server Setup
 
@@ -155,7 +176,7 @@ After running the setup and start scripts, you'll have:
 ### Vista3D Server Management
 ```bash
 # Start Vista3D server
-python3 start_vista3d.py
+python3 start_backend.py
 
 # Stop Vista3D server
 docker stop vista3d
@@ -186,7 +207,7 @@ docker logs -f vista3d-image-server
 ### Systemd Service Management (Production)
 ```bash
 # Create systemd services for auto-startup
-sudo python3 start_vista3d.py --create-service
+sudo python3 start_backend.py --create-service
 sudo python3 start_frontend.py --create-service
 
 # Start services
@@ -216,7 +237,7 @@ python3 utils/nifti2ply.py      # NIFTI to PLY conversion
 ```
 HPE-Nvidia-Vista-3D/
 ├── setup.py              # Unified setup script
-├── start_vista3d.py      # Vista3D server startup script
+├── start_backend.py      # Vista3D server startup script
 ├── start_frontend.py     # Frontend services startup script
 ├── app.py                # Main Streamlit web application
 ├── .env                  # Environment configuration (created by setup)

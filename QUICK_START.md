@@ -32,7 +32,7 @@ python3 setup.py
 
 ```bash
 # On your GPU-enabled machine (local or remote)
-python3 start_vista3d.py
+python3 start_backend.py
 ```
 
 **This starts:**
@@ -119,7 +119,7 @@ The web interface includes a powerful **Tools page** where you can:
 ### Vista3D Server Management
 ```bash
 # Start Vista3D server
-python3 start_vista3d.py
+python3 start_backend.py
 
 # Stop Vista3D server
 docker stop vista3d
@@ -150,7 +150,7 @@ docker logs -f vista3d-image-server
 ### Systemd Service Management (Production)
 ```bash
 # Create systemd services for auto-startup
-sudo python3 start_vista3d.py --create-service
+sudo python3 start_backend.py --create-service
 sudo python3 start_frontend.py --create-service
 
 # Start services

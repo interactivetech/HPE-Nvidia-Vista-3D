@@ -19,7 +19,7 @@ The platform now uses three separate startup scripts for better flexibility:
    - Configures environment variables
    - Creates necessary directories
 
-2. **`start_vista3d.py`** - Vista3D server startup (GPU-enabled machine)
+2. **`start_backend.py`** - Vista3D server startup (GPU-enabled machine)
    - Starts Vista3D Docker container
    - Configures GPU access
    - Sets up networking for remote access
@@ -96,7 +96,7 @@ cd HPE-Nvidia-Vista-3D
 python3 setup.py
 
 # 2. Start Vista3D server
-python3 start_vista3d.py
+python3 start_backend.py
 
 # 3. Start frontend services (in separate terminal)
 python3 start_frontend.py
@@ -150,7 +150,7 @@ python3 start_frontend.py
 **Setup**:
 ```bash
 # 1. Create systemd services for automatic startup
-sudo python3 start_vista3d.py --create-service
+sudo python3 start_backend.py --create-service
 sudo python3 start_frontend.py --create-service
 
 # 2. Enable services
@@ -243,7 +243,7 @@ python3 start_frontend.py
 ### Mode 2: Local Vista3D
 ```bash
 # Terminal 1: Start Vista3D server
-python3 start_vista3d.py
+python3 start_backend.py
 
 # Terminal 2: Start frontend services
 python3 start_frontend.py
@@ -252,7 +252,7 @@ python3 start_frontend.py
 ### Mode 3: Production
 ```bash
 # Create services
-sudo python3 start_vista3d.py --create-service
+sudo python3 start_backend.py --create-service
 sudo python3 start_frontend.py --create-service
 
 # Start everything
@@ -299,7 +299,7 @@ python3 utils/segment.py
 ### Complete Workflow Example
 ```bash
 # 1. Start Vista3D server (GPU machine)
-python3 start_vista3d.py
+python3 start_backend.py
 
 # 2. Start frontend services (any machine)
 python3 start_frontend.py
