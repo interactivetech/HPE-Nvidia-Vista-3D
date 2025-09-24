@@ -277,25 +277,28 @@ def render_viewer(selected_patient: str, selected_file: str):
     settings = viewer_config.settings
     window_center, window_width = viewer_config.get_window_settings()
     actual_slice_type = viewer_config.get_slice_type_index()
-
-# Removed unused debug checkbox
-
+    segment_opacity = settings.get('segment_opacity', 0.5)
+    segment_gamma = settings.get('segment_gamma', 1.0)
+    
     # Render the viewer using our template
-    html_content = template_renderer.render_viewer(
+    html_content = template_renderer.render_template(
+        'niivue_viewer.html',
+        niivue_lib_content=niivue_lib_content,
         volume_list_js=volume_list_js,
         overlay_colors_js=overlay_colors_js,
         custom_colormap_js=custom_colormap_js,
         image_server_url=EXTERNAL_IMAGE_SERVER_URL,
-        main_is_nifti=settings.get('show_nifti', True),
-        main_vol=settings.get('show_nifti', True),
-        color_map_js=json.dumps(settings.get('color_map', 'gray')),
+        main_is_nifti=True,
+        main_vol=True,
+        color_map_js=json.dumps(settings.get('color_map', 'grayscale')),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
         nifti_opacity=settings.get('nifti_opacity', 1.0),
         window_center=window_center,
         window_width=window_width,
-        overlay_start_index=1 if settings.get('show_nifti', True) else 0,
         actual_slice_type=actual_slice_type,
-        segment_opacity=settings.get('segment_opacity', 0.5)
+        overlay_start_index=1 if settings.get('show_nifti', True) else 0,
+        segment_opacity=segment_opacity,
+        segment_gamma=segment_gamma
     )
 
     # Display the viewer

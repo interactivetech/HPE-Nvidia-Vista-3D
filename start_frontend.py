@@ -44,7 +44,7 @@ class Vista3DGUIManager:
 
     def __init__(self):
         self.script_dir = Path(__file__).parent
-        self.project_root = self.script_dir.parent
+        self.project_root = self.script_dir  # Since start_frontend.py is in the project root
         
         # Container names
         self.app_container_name = os.getenv('APP_CONTAINER_NAME', 'hpe-nvidia-vista3d-app')

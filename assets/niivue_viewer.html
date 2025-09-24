@@ -79,6 +79,8 @@
                         // Set opacity to 50% for Single View mode, otherwise use slider value
                         const isSingleView = {{ actual_slice_type }} !== 3 && {{ actual_slice_type }} !== 4;
                         overlayVol.opacity = isSingleView ? 0.5 : {{ segment_opacity }};
+                        // Apply gamma to voxel overlays
+                        nv.setGamma({{ segment_gamma }}, overlayVol.id);
 
                         // Get the corresponding overlay color info
                         const overlayIndex = i - {{ overlay_start_index }};
@@ -93,20 +95,37 @@
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
                             const color = overlayColors[overlayIndex].color;
                             const labelName = overlayColors[overlayIndex].label_name;
+                            const labelId = overlayColors[overlayIndex].label_id;
 
-                            // Create a custom colormap for this specific overlay
+                            // For individual voxel files, create a colormap that maps the label ID to the correct color
+                            // Individual voxel files contain the label ID as the non-zero value
+                            // We need to create a colormap that maps the specific label ID to the color
+                            const maxId = Math.max(labelId, 255);
+                            const rValues = new Array(maxId + 1).fill(0);
+                            const gValues = new Array(maxId + 1).fill(0);
+                            const bValues = new Array(maxId + 1).fill(0);
+                            const aValues = new Array(maxId + 1).fill(0);
+                            const labels = new Array(maxId + 1).fill('Background');
+                            
+                            // Set the specific label ID to the correct color
+                            rValues[labelId] = color[0];
+                            gValues[labelId] = color[1];
+                            bValues[labelId] = color[2];
+                            aValues[labelId] = 255;
+                            labels[labelId] = labelName;
+                            
                             const customColormap = {
-                                R: [0, color[0]],
-                                G: [0, color[1]],
-                                B: [0, color[2]],
-                                A: [0, 255],
-                                labels: ['Background', labelName]
+                                R: rValues,
+                                G: gValues,
+                                B: bValues,
+                                A: aValues,
+                                labels: labels
                             };
 
                             const colormapName = `custom_${overlayIndex}`;
                             nv.addColormap(colormapName, customColormap);
                             nv.setColormap(overlayVol.id, colormapName);
-                            console.log(`Applied custom color to overlay ${overlayIndex}: ${labelName}`, color);
+                            console.log(`Applied custom color to overlay ${overlayIndex}: ${labelName} (ID: ${labelId})`, color);
                         } else {
                             // Fallback to generic segmentation colormap
                             if (typeof customSegmentationColormap !== 'undefined') {

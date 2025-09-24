@@ -82,8 +82,23 @@ def process_patient_folder(patient_folder, sigma=1.0, overwrite=False, target_ct
                 # Load the data
                 data, affine = load_nifti_file(input_path)
 
-                # Apply smoothing
-                processed_data = apply_smoothing(data, sigma=sigma)
+                # For individual voxel files, we need to preserve the label IDs
+                # Apply smoothing but then threshold back to discrete values
+                if file_name.endswith('.nii.gz'):
+                    # Check if this is an individual voxel file (contains discrete label IDs)
+                    unique_vals = np.unique(data)
+                    if len(unique_vals) <= 2 and np.all(unique_vals == unique_vals.astype(int)):
+                        # This is likely an individual voxel file with discrete label IDs
+                        # Apply smoothing but preserve the label structure
+                        processed_data = apply_smoothing(data, sigma=sigma)
+                        # Threshold back to discrete values to preserve label IDs
+                        processed_data = np.where(processed_data > 0.5, data, 0).astype(data.dtype)
+                    else:
+                        # This is a continuous volume, apply normal smoothing
+                        processed_data = apply_smoothing(data, sigma=sigma)
+                else:
+                    # Apply normal smoothing for non-NIfTI files
+                    processed_data = apply_smoothing(data, sigma=sigma)
 
                 # Save the processed data
                 save_nifti_file(processed_data, affine, output_path)

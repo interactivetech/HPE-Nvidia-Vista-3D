@@ -41,7 +41,7 @@ class Vista3DManager:
 
     def __init__(self):
         self.script_dir = Path(__file__).parent
-        self.project_root = self.script_dir.parent
+        self.project_root = self.script_dir  # Since start_vista3d.py is in the project root
         self.container_name = os.getenv('VISTA3D_CONTAINER_NAME', 'vista3d')
 
         self._setup_env_vars()
