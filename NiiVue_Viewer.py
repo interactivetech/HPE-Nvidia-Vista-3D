@@ -101,7 +101,6 @@ def render_sidebar():
         selected_patient = st.selectbox("Select Patient", patient_options, index=0)
 
         selected_file = None
-        is_uploaded_file = False
         
         if selected_patient:
             # Regular patient folder
@@ -169,8 +168,6 @@ def render_sidebar():
             # Voxel legend
             viewer_config.render_voxel_legend()
 
-        # File upload section at the bottom of sidebar
-        render_file_upload()
 
     return selected_patient, selected_file
 
@@ -229,109 +226,22 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
         st.info(status_message)
 
 
-def render_file_upload():
-    """Render the file upload interface at the bottom of the sidebar."""
-    st.divider()
-    st.subheader("📁 Upload NIfTI File")
-    
-    # File upload widget
-    uploaded_file = st.file_uploader(
-        "Choose a .nii.gz file",
-        type=['nii.gz', 'nii'],
-        help="Upload a NIfTI file to view it in the 3D viewer"
-    )
-    
-    if uploaded_file is not None:
-        # Initialize session state for uploaded files if not exists
-        if 'uploaded_files' not in st.session_state:
-            st.session_state.uploaded_files = {}
-        
-        # Create a unique key for this upload
-        file_key = f"uploaded_{uploaded_file.name}_{uploaded_file.size}"
-        
-        # Check if this is a new upload
-        if file_key not in st.session_state.uploaded_files:
-            # Save uploaded file to a location accessible by the image server
-            import tempfile
-            import shutil
-            
-            # Create uploads directory in the output folder (accessible by image server)
-            uploads_dir = os.path.join(OUTPUT_FOLDER, 'uploads')
-            os.makedirs(uploads_dir, exist_ok=True)
-            
-            # Save file to uploads directory within output folder
-            upload_file_path = os.path.join(uploads_dir, uploaded_file.name)
-            with open(upload_file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # Store file info in session state
-            st.session_state.uploaded_files[file_key] = {
-                'name': uploaded_file.name,
-                'path': upload_file_path,
-                'size': uploaded_file.size
-            }
-            
-            st.success(f"✅ Uploaded: {uploaded_file.name}")
-            st.info("File automatically loaded into the viewer.")
-        
-        # Display current uploaded file status
-        if st.session_state.uploaded_files:
-            st.write("**Currently Viewing:**")
-            for key, file_info in st.session_state.uploaded_files.items():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"📄 {file_info['name']}")
-                with col2:
-                    if st.button("🗑️", key=f"delete_{key}", help="Remove this file"):
-                        # Clean up file
-                        try:
-                            os.remove(file_info['path'])
-                        except FileNotFoundError:
-                            pass
-                        # Remove from session state
-                        del st.session_state.uploaded_files[key]
-                        st.rerun()
-    
-    # Cleanup old uploaded files on app start (optional - keep files for persistence)
-    # Note: We keep uploaded files in the uploads directory for persistence
-    # Users can manually delete them using the delete button
 
 
 # --- Main Application ---
-def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: bool = False):
+def render_viewer(selected_patient: str, selected_file: str):
     """Render the main NiiVue viewer."""
     if not selected_file:
         st.info(MESSAGES['select_patient_file'])
         return
 
     # Prepare volume URLs and overlays
-    # Check if this is an uploaded file
-    if is_uploaded_file:
-        # For uploaded files, use the temporary file path
-        uploaded_filename = selected_file
-        # Find the file in session state
-        uploaded_file_path = None
-        if 'uploaded_files' in st.session_state:
-            for key, file_info in st.session_state.uploaded_files.items():
-                if file_info['name'] == uploaded_filename:
-                    uploaded_file_path = file_info['path']
-                    break
-        
-        if uploaded_file_path and os.path.exists(uploaded_file_path):
-            # For uploaded files, serve them through the image server
-            # The file is in the output/uploads directory, so we can access it via HTTP
-            # Use the correct URL path with /output/ prefix
-            base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/uploads/{uploaded_filename}"
-        else:
-            st.error("Uploaded file not found. Please re-upload the file.")
-            return
-    else:
-        # Regular patient file
-        base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
+    # Regular patient file
+    base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
 
-    # Create overlays based on voxel mode (only for regular patient files, not uploaded files)
+    # Create overlays based on voxel mode
     overlays = []
-    if not is_uploaded_file and selected_patient:
+    if selected_patient:
         overlays = voxel_manager.create_overlays(
             selected_patient,
             selected_file,
@@ -370,10 +280,6 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
 
 # Removed unused debug checkbox
 
-    # Show uploaded file indicator if applicable
-    if is_uploaded_file:
-        st.info(f"📄 Viewing uploaded file: **{selected_file}**")
-
     # Render the viewer using our template
     html_content = template_renderer.render_viewer(
         volume_list_js=volume_list_js,
@@ -402,25 +308,11 @@ def main():
     # Set page title
     st.header("🩻 NiiVue Viewer")
     
-    # Check if there's an uploaded file to auto-load
-    uploaded_file_info = None
-    if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
-        # Get the most recent uploaded file
-        uploaded_file_info = list(st.session_state.uploaded_files.values())[-1]
-    
     # Render sidebar and get selections
     selected_patient, selected_file = render_sidebar()
 
-    # If we have an uploaded file, use it directly - no patient selection needed
-    if uploaded_file_info:
-        selected_patient = None  # No patient selection for uploaded files
-        selected_file = uploaded_file_info['name']
-        is_uploaded_file = True
-    else:
-        is_uploaded_file = False
-
     # Render main viewer
-    render_viewer(selected_patient, selected_file, is_uploaded_file)
+    render_viewer(selected_patient, selected_file)
 
 
 if __name__ == "__main__":
