@@ -21,9 +21,14 @@ class DataManager:
     Provides methods for fetching directory listings, files, and voxel information.
     """
 
-    def __init__(self, image_server_url: str):
+    def __init__(self, image_server_url: str, force_external_url: bool = False):
         self.initial_image_server_url = image_server_url.rstrip('/')
-        self.image_server_url = self._find_working_image_server_url(self.initial_image_server_url)
+        
+        # If this is for external access (browser), don't try to find working URLs
+        if force_external_url:
+            self.image_server_url = self.initial_image_server_url
+        else:
+            self.image_server_url = self._find_working_image_server_url(self.initial_image_server_url)
         
         # Get output folder from environment - must be absolute path
         self.output_folder = os.getenv('OUTPUT_FOLDER')

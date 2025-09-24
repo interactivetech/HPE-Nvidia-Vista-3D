@@ -18,11 +18,14 @@ DICOM_EXTENSIONS = ('.dcm',)
 IMAGE_EXTENSIONS = NIFTI_EXTENSIONS + DICOM_EXTENSIONS
 
 # Directory structure - get from environment variables
-OUTPUT_DIR = os.getenv('OUTPUT_FOLDER')
-if not OUTPUT_DIR:
+OUTPUT_FOLDER_ABS = os.getenv('OUTPUT_FOLDER')
+if not OUTPUT_FOLDER_ABS:
     raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
-if not os.path.isabs(OUTPUT_DIR):
+if not os.path.isabs(OUTPUT_FOLDER_ABS):
     raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
+
+# URL paths for HTTP access (relative to server root)
+OUTPUT_DIR = "output"
 VOXELS_DIR = "voxels"
 NIFTI_DIR = "nifti"
 

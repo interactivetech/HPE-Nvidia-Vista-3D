@@ -37,18 +37,19 @@ def check_image_server_status():
     
     # If running in Docker container, try multiple approaches
     if os.getenv("DOCKER_CONTAINER") == "true":
-        # List of URLs to try in order
+        # List of URLs to try in order of preference for health checks
         urls_to_try = [
-            image_server_url,  # Configured URL (likely host.docker.internal:8888)
+            "http://image-server:8888",  # Container name (primary for Docker Compose)
+            image_server_url,  # Configured URL
             "http://localhost:8888",  # localhost fallback
             "http://127.0.0.1:8888",  # IP fallback
-            "http://image-server:8888",  # Container name (if image server is in same compose)
         ]
         
         for url in urls_to_try:
             try:
                 response = requests.head(url, timeout=2)
                 if response.status_code == 200:
+                    # Keep the external URL for browser access, don't change IMAGE_SERVER
                     return True
             except (requests.exceptions.RequestException, requests.exceptions.Timeout):
                 continue
@@ -68,9 +69,10 @@ def check_vista3d_server_status():
     
     # If running in Docker container, try multiple approaches
     if os.getenv("DOCKER_CONTAINER") == "true":
-        # List of URLs to try in order
+        # List of URLs to try in order of preference
         urls_to_try = [
             vista3d_server_url,  # Configured URL (likely host.docker.internal:8000)
+            "http://vista3d-server:8000",  # Container name (if Vista3D is in same compose)
             "http://localhost:8000",  # localhost fallback
             "http://127.0.0.1:8000",  # IP fallback
         ]
@@ -79,6 +81,7 @@ def check_vista3d_server_status():
             try:
                 response = requests.get(f"{base_url}/v1/vista3d/info", timeout=3)
                 if response.status_code == 200:
+                    # Keep the configured URL for browser access, don't change VISTA3D_SERVER
                     return True
                 # Log the specific error for debugging
                 print(f"Vista3D status check - {base_url}: HTTP {response.status_code}")

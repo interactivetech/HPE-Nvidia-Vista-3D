@@ -23,12 +23,16 @@ load_dotenv()
 initial_image_server_url = os.getenv('IMAGE_SERVER', 'http://localhost:8888')
 initial_external_image_server_url = os.getenv('EXTERNAL_IMAGE_SERVER', 'http://localhost:8888')
 
-# Initialize a temporary DataManager to resolve the URLs
-temp_data_manager = DataManager(initial_image_server_url)
-IMAGE_SERVER_URL = temp_data_manager.image_server_url
+# Initialize a temporary DataManager to resolve the internal URL for health checks
+# In Docker containers, use the internal hostname directly for container-to-container communication
+if os.getenv("DOCKER_CONTAINER") == "true":
+    IMAGE_SERVER_URL = "http://image-server:8888"
+else:
+    temp_data_manager = DataManager(initial_image_server_url)
+    IMAGE_SERVER_URL = temp_data_manager.image_server_url
 
-temp_external_data_manager = DataManager(initial_external_image_server_url)
-EXTERNAL_IMAGE_SERVER_URL = temp_external_data_manager.image_server_url
+# For external URL, use the environment variable directly (don't let DataManager override it)
+EXTERNAL_IMAGE_SERVER_URL = initial_external_image_server_url
 
 # Get output folder from environment - must be absolute path
 OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER')
@@ -40,8 +44,10 @@ if not os.path.isabs(OUTPUT_FOLDER):
 # Initialize our managers with the resolved URLs
 config_manager = ConfigManager()
 data_manager = DataManager(IMAGE_SERVER_URL)
-external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL)
-voxel_manager = VoxelManager(config_manager, external_data_manager)
+# For external data manager, force it to use the external URL without trying to find working URLs
+external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL, force_external_url=True)
+# Use internal data manager for voxel detection (health checks), external for URL display
+voxel_manager = VoxelManager(config_manager, data_manager)
 viewer_config = ViewerConfig()
 template_renderer = TemplateRenderer()
 
@@ -194,7 +200,7 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
         elif voxel_mode == "Individual Voxels":
             if not available_ids:
                 # Show warning if no voxels available
-                voxels_url = data_manager.get_voxel_directory_url(selected_patient, selected_file)
+                voxels_url = external_data_manager.get_voxel_directory_url(selected_patient, selected_file)
                 st.warning("No voxels available for this patient/file.")
                 st.caption(f"Voxels directory: {voxels_url}")
                 st.caption("Individual voxel files should be located in this directory.")
@@ -330,7 +336,8 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
             selected_patient,
             selected_file,
             viewer_config.voxel_mode,
-            viewer_config.selected_individual_voxels
+            viewer_config.selected_individual_voxels,
+            external_url=EXTERNAL_IMAGE_SERVER_URL
         )
 
     # Build volume list for NiiVue

@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 from .config_manager import ConfigManager
 from .data_manager import DataManager
-from .constants import OUTPUT_DIR, VOXELS_DIR
+from .constants import OUTPUT_FOLDER_ABS, OUTPUT_DIR, VOXELS_DIR
 
 
 class VoxelManager:
@@ -59,8 +59,7 @@ class VoxelManager:
         
         # Fallback: Check local filesystem
         try:
-            from .constants import OUTPUT_DIR
-            voxels_folder_path = os.path.join(OUTPUT_DIR, patient_id, 'voxels')
+            voxels_folder_path = os.path.join(OUTPUT_FOLDER_ABS, patient_id, 'voxels')
             
             if not os.path.exists(voxels_folder_path):
                 return False
@@ -125,19 +124,23 @@ class VoxelManager:
         patient_id: str,
         filename: str,
         voxel_mode: str,
-        selected_voxels: Optional[List[str]] = None
+        selected_voxels: Optional[List[str]] = None,
+        external_url: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Create overlay configuration based on voxel mode and selection.
         """
         overlays = []
+        
+        # Use external URL for browser access if provided, otherwise use internal URL
+        base_url = external_url if external_url else self.data.image_server_url
 
         if voxel_mode == "all":
             # Show complete base segmentation file
             overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{filename}",
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{filename}",
                 'is_all_segmentation': True
             }]
 
@@ -158,7 +161,7 @@ class VoxelManager:
                     overlays.append({
                         'label_id': label_id,
                         'label_name': voxel_name,
-                        'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
+                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
                         'color': label_color
                     })
 
@@ -167,7 +170,7 @@ class VoxelManager:
             overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{self.data.image_server_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{filename}",
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{filename}",
                 'is_all_segmentation': True
             }]
 

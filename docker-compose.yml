@@ -13,7 +13,8 @@ services:
       - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
       - STREAMLIT_SERVER_HEADLESS=true
       - STREAMLIT_THEME_BASE=dark
-      - IMAGE_SERVER=http://image-server:8888
+      - IMAGE_SERVER=http://localhost:8888
+      - INTERNAL_IMAGE_SERVER=http://image-server:8888
       - EXTERNAL_IMAGE_SERVER=http://localhost:8888
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
@@ -25,9 +26,8 @@ services:
       - MESA_GL_VERSION_OVERRIDE=3.3
       - MESA_GLSL_VERSION_OVERRIDE=330
     volumes:
-      - ${OUTPUT_FOLDER}:/app/output
-      - ${DICOM_FOLDER}:/app/dicom
-      - ./.env:/app/.env
+      - ${OUTPUT_FOLDER:-./output}:/app/output
+      - ${DICOM_FOLDER:-./dicom}:/app/dicom
     networks:
       - local-network
     extra_hosts:
@@ -54,10 +54,10 @@ services:
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
       - DOCKER_CONTAINER=true
+      - IMAGE_SERVER=http://image-server:8888
     volumes:
-      - ${OUTPUT_FOLDER}:/app/output
-      - ${DICOM_FOLDER}:/app/dicom
-      - ./.env:/app/.env
+      - ${OUTPUT_FOLDER:-./output}:/app/output
+      - ${DICOM_FOLDER:-./dicom}:/app/dicom
     networks:
       - local-network
     extra_hosts:

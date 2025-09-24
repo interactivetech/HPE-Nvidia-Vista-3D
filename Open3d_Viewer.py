@@ -240,7 +240,7 @@ def main():
         raise ValueError("OUTPUT_FOLDER must be set in .env file with absolute path")
     
     data_manager = DataManager(IMAGE_SERVER_URL)
-    external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL)
+    external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL, force_external_url=True)
     mesh_processor = MeshProcessor()
     mesh_visualizer = MeshVisualizer()
     
