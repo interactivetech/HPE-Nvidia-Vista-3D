@@ -653,68 +653,6 @@ class Vista3DManager:
         except Exception as e:
             logger.warning(f"Performance test failed: {e}")
     
-    def create_systemd_service(self):
-        """Create systemd service for automatic startup"""
-        if os.geteuid() != 0:
-            logger.error("⚠️  This function requires root privileges to create systemd service")
-            logger.error("   Run with: sudo python3 start_vista.py --create-service")
-            return False
-        
-        service_name = "vista3d"
-        service_file = f"/etc/systemd/system/{service_name}.service"
-        script_path = str(Path(__file__).absolute())
-        
-        logger.info("Creating systemd service for automatic startup...")
-        
-        service_content = f"""[Unit]
-Description=Vista-3D Docker Container for Remote Image Server Access
-After=docker.service
-Requires=docker.service
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-User=root
-Group=root
-WorkingDirectory={self.script_dir}
-ExecStart={sys.executable} {script_path}
-ExecStop=/usr/bin/docker stop vista3d
-ExecStop=/usr/bin/docker rm vista3d
-TimeoutStartSec=300
-TimeoutStopSec=60
-Restart=on-failure
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-"""
-        
-        try:
-            with open(service_file, 'w') as f:
-                f.write(service_content)
-            
-            # Set proper permissions
-            os.chmod(service_file, 0o644)
-            
-            # Reload systemd and enable service
-            self.run_command("systemctl daemon-reload")
-            self.run_command(f"systemctl enable {service_name}")
-            
-            logger.info(f"✅ Systemd service created: {service_file}")
-            logger.info("✅ Service enabled for automatic startup")
-            
-            logger.info("\nUseful commands:")
-            logger.info(f"  Start service: sudo systemctl start {service_name}")
-            logger.info(f"  Stop service: sudo systemctl stop {service_name}")
-            logger.info(f"  Check status: sudo systemctl status {service_name}")
-            logger.info(f"  View logs: sudo journalctl -u {service_name} -f")
-            logger.info(f"  Disable service: sudo systemctl disable {service_name}")
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error creating systemd service: {e}")
-            return False
     
     def run(self):
         """Main execution logic"""
@@ -824,12 +762,6 @@ Quick Setup on fresh Linux server:
 
 Usage Examples:
   python3 start_vista3d.py                 # Start Vista-3D container
-  sudo python3 start_vista3d.py --create-service  # Create systemd service for auto-startup
-
-For automatic startup on boot:
-  1. Run: sudo python3 start_vista3d.py --create-service
-  2. The service will start automatically on boot
-  3. Check status: sudo systemctl status vista3d
 
 Configuration (.env file):
   Required:
@@ -869,11 +801,6 @@ Troubleshooting:
         """
     )
     
-    parser.add_argument(
-        '--create-service',
-        action='store_true',
-        help='Create systemd service for automatic startup (requires root)'
-    )
     
     parser.add_argument(
         '--performance-test',
@@ -896,13 +823,9 @@ Troubleshooting:
     manager.run_performance_test_flag = args.performance_test or True  # Default to True
     
     try:
-        if args.create_service:
-            success = manager.create_systemd_service()
-            sys.exit(0 if success else 1)
-        else:
-            # Default behavior - start the container
-            success = manager.run()
-            sys.exit(0 if success else 1)
+        # Start the Vista3D container
+        success = manager.run()
+        sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("Operation cancelled by user")
         sys.exit(1)

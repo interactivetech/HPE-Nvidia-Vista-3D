@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Vista-3D GUI Docker Startup Script
-Starts the Streamlit app and image server containers for the Vista-3D GUI
+Vista-3D Frontend Docker Startup Script
+Starts ONLY the Streamlit app and image server containers for the Vista-3D GUI.
+Does NOT start the Vista3D server container - use start_vista3d.py for that.
 """
 
 import os
@@ -40,7 +41,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class Vista3DGUIManager:
-    """Manages Vista-3D GUI Docker containers (Streamlit app and image server)"""
+    """Manages Vista-3D Frontend Docker containers (Streamlit app and image server only)"""
 
     def __init__(self):
         self.script_dir = Path(__file__).parent
@@ -161,8 +162,8 @@ class Vista3DGUIManager:
             return False
     
     def stop_existing_containers(self):
-        """Stop and remove any existing GUI containers"""
-        logger.info("Stopping any existing GUI containers...")
+        """Stop and remove any existing GUI containers (Streamlit app and image server only)"""
+        logger.info("Stopping any existing GUI containers (Streamlit app and image server only)...")
         
         containers = [self.app_container_name, self.image_server_container_name]
         
@@ -174,10 +175,10 @@ class Vista3DGUIManager:
             self.run_command(f"docker rm {container}", check=False)
             self.run_command(f"docker rm -f {container}", check=False)
         
-        # Clean up any remaining container references
+        # Clean up any remaining container references (but don't prune all containers)
         self.run_command("docker container prune -f", check=False)
         
-        logger.info("✅ Existing containers cleaned up")
+        logger.info("✅ Existing GUI containers cleaned up")
     
     def create_directories(self):
         """Create necessary directories if they don't exist"""
@@ -205,12 +206,12 @@ class Vista3DGUIManager:
             return False
     
     def start_containers(self) -> bool:
-        """Start the GUI containers using docker compose"""
-        logger.info("Starting GUI containers...")
+        """Start the GUI containers using docker compose (only Streamlit app and image server)"""
+        logger.info("Starting GUI containers (Streamlit app and image server only)...")
         
         try:
-            # Start containers using docker compose
-            result = self.run_command(f"docker compose up -d", cwd=str(self.project_root))
+            # Start only the specific services (exclude vista3d-server)
+            result = self.run_command(f"docker compose up -d vista3d-app image-server", cwd=str(self.project_root))
             if result.returncode == 0:
                 logger.info("✅ GUI containers started successfully")
                 
@@ -315,67 +316,6 @@ class Vista3DGUIManager:
         logger.info("✅ Image server is accessible on all interfaces")
         logger.info("✅ CORS is enabled for cross-origin requests")
     
-    def create_systemd_service(self):
-        """Create systemd service for automatic startup"""
-        if os.geteuid() != 0:
-            logger.error("⚠️  This function requires root privileges to create systemd service")
-            logger.error("   Run with: sudo python3 start_gui.py --create-service")
-            return False
-        
-        service_name = "vista3d-gui"
-        service_file = f"/etc/systemd/system/{service_name}.service"
-        script_path = str(Path(__file__).absolute())
-        
-        logger.info("Creating systemd service for automatic startup...")
-        
-        service_content = f"""[Unit]
-Description=Vista-3D GUI Docker Containers (Streamlit App and Image Server)
-After=docker.service
-Requires=docker.service
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-User=root
-Group=root
-WorkingDirectory={self.project_root}
-ExecStart={sys.executable} {script_path}
-ExecStop=/usr/bin/docker compose down
-TimeoutStartSec=300
-TimeoutStopSec=60
-Restart=on-failure
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-"""
-        
-        try:
-            with open(service_file, 'w') as f:
-                f.write(service_content)
-            
-            # Set proper permissions
-            os.chmod(service_file, 0o644)
-            
-            # Reload systemd and enable service
-            self.run_command("systemctl daemon-reload")
-            self.run_command(f"systemctl enable {service_name}")
-            
-            logger.info(f"✅ Systemd service created: {service_file}")
-            logger.info("✅ Service enabled for automatic startup")
-            
-            logger.info("\nUseful commands:")
-            logger.info(f"  Start service: sudo systemctl start {service_name}")
-            logger.info(f"  Stop service: sudo systemctl stop {service_name}")
-            logger.info(f"  Check status: sudo systemctl status {service_name}")
-            logger.info(f"  View logs: sudo journalctl -u {service_name} -f")
-            logger.info(f"  Disable service: sudo systemctl disable {service_name}")
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error creating systemd service: {e}")
-            return False
     
     def run(self):
         """Main execution logic"""
@@ -425,11 +365,11 @@ WantedBy=multi-user.target
         logger.info("==========================================")
         
         logger.info("\nUseful commands:")
-        logger.info("  View all logs: docker compose logs -f")
+        logger.info("  View all logs: docker compose logs -f vista3d-app image-server")
         logger.info("  View app logs: docker logs -f hpe-nvidia-vista3d-app")
         logger.info("  View image server logs: docker logs -f vista3d-image-server")
-        logger.info("  Stop containers: docker compose down")
-        logger.info("  Restart containers: docker compose restart")
+        logger.info("  Stop containers: docker compose down vista3d-app image-server")
+        logger.info("  Restart containers: docker compose restart vista3d-app image-server")
         logger.info(f"  Access Streamlit app: http://localhost:{app_port}")
         logger.info(f"  Access image server: http://localhost:{image_server_port}")
         
@@ -438,22 +378,19 @@ WantedBy=multi-user.target
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description="Vista-3D GUI Docker Startup Script",
+        description="Vista-3D Frontend Docker Startup Script (Streamlit app and image server only)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python3 start_gui.py                 # Start GUI containers
-  sudo python3 start_gui.py --create-service  # Create systemd service for auto-startup
-
-For automatic startup on boot:
-  1. Run: sudo python3 start_gui.py --create-service
-  2. The service will start automatically on boot
-  3. Check status: sudo systemctl status vista3d-gui
+  python3 start_frontend.py                 # Start frontend containers (Streamlit app and image server)
 
 Container Configuration:
-  The script starts two containers:
+  The script starts ONLY the frontend containers:
   - Streamlit app (port 8501 by default)
   - Image server (port 8888 by default)
+  
+  Note: This script does NOT start the Vista3D server container.
+  The Vista3D server should be started separately using start_vista3d.py
   
   Key Environment Variables:
     STREAMLIT_SERVER_PORT=8501        # Port for Streamlit app
@@ -464,31 +401,22 @@ Container Configuration:
   
   Examples:
     # Use default ports
-    python3 start_gui.py
+    python3 start_frontend.py
     
     # Use custom ports
-    STREAMLIT_SERVER_PORT=8502 IMAGE_SERVER_PORT=8889 python3 start_gui.py
+    STREAMLIT_SERVER_PORT=8502 IMAGE_SERVER_PORT=8889 python3 start_frontend.py
         """
     )
     
-    parser.add_argument(
-        '--create-service',
-        action='store_true',
-        help='Create systemd service for automatic startup (requires root)'
-    )
     
     args = parser.parse_args()
     
     manager = Vista3DGUIManager()
     
     try:
-        if args.create_service:
-            success = manager.create_systemd_service()
-            sys.exit(0 if success else 1)
-        else:
-            # Default behavior - start the containers
-            success = manager.run()
-            sys.exit(0 if success else 1)
+        # Start the containers
+        success = manager.run()
+        sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         logger.info("Operation cancelled by user")
         sys.exit(1)
