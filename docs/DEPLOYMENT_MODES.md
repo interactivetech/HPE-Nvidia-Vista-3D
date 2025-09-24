@@ -9,6 +9,35 @@ The platform consists of three main components:
 - **Image Server** (Port 8888) - HTTP server for medical image files
 - **Vista3D Server** (Port 8000) - AI segmentation service (requires GPU)
 
+## 🏗️ **New Three-Script Architecture**
+
+The platform now uses three separate startup scripts for better flexibility:
+
+1. **`setup.py`** - Initial setup and configuration
+   - Checks system requirements
+   - Sets up Python environment
+   - Configures environment variables
+   - Creates necessary directories
+
+2. **`start_vista3d.py`** - Vista3D server startup (GPU-enabled machine)
+   - Starts Vista3D Docker container
+   - Configures GPU access
+   - Sets up networking for remote access
+   - Enables auto-restart capabilities
+
+3. **`start_frontend.py`** - Frontend services startup (any machine)
+   - Starts Streamlit app container
+   - Starts image server container
+   - Configures networking and CORS
+   - Provides health monitoring
+
+### **Benefits of New Architecture:**
+- **Distributed Deployments**: Vista3D on GPU server, frontend on client machines
+- **Scalability**: Multiple frontend instances can connect to one Vista3D server
+- **Flexibility**: Mix and match local/remote components as needed
+- **Easier Maintenance**: Independent updates and restarts of components
+- **Better Resource Management**: Separate resource allocation for GPU vs. frontend workloads
+
 ## 🎯 Deployment Modes
 
 ### Mode 0: Vista3D Server Only
@@ -66,8 +95,11 @@ git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
 python3 setup.py
 
-# 2. Start all services
-python3 start.py
+# 2. Start Vista3D server
+python3 start_vista3d.py
+
+# 3. Start frontend services (in separate terminal)
+python3 start_frontend.py
 ```
 
 **Access Points**:
@@ -95,22 +127,21 @@ git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
 python3 setup.py
 
-# 2. Edit .env file for remote Vista3D
-VISTA3D_SERVER=https://your-vista3d-server.com:8000
+# 2. Set up SSH port forwarding to remote Vista3D server
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# 3. Edit .env file for remote Vista3D
+VISTA3D_SERVER=http://localhost:8000  # Uses SSH tunnel
 NGC_API_KEY=your_nvidia_api_key_here
 
-# 3. Start frontend services only (choose one method)
-# Method A: Using Docker Compose (recommended)
-docker compose up vista3d-app image-server
-
-# Method B: Using start script
-python3 start.py --frontend-only
+# 4. Start frontend services only
+python3 start_frontend.py
 ```
 
 **Access Points**:
 - Streamlit App: http://localhost:8501
 - Image Server: http://localhost:8888
-- Vista3D Server: https://your-vista3d-server.com:8000 (remote)
+- Vista3D Server: http://localhost:8000 (via SSH tunnel to remote server)
 
 ### Mode 3: Production with Auto-Startup
 
@@ -119,8 +150,8 @@ python3 start.py --frontend-only
 **Setup**:
 ```bash
 # 1. Create systemd services for automatic startup
-sudo python3 utils/start_vista3d.py --create-service
-sudo python3 utils/start_gui.py --create-service
+sudo python3 start_vista3d.py --create-service
+sudo python3 start_frontend.py --create-service
 
 # 2. Enable services
 sudo systemctl enable vista3d
@@ -198,31 +229,31 @@ docker compose --profile local-vista3d up vista3d-server
 
 ### Mode 1: Remote Vista3D
 ```bash
-# Method A: Using Docker Compose (recommended)
-docker compose up vista3d-app image-server
+# Set up SSH port forwarding
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
 
-# Method B: Using start script
-VISTA3D_SERVER=https://your-server:8000 NGC_API_KEY=your_key python3 start.py --frontend-only
+# Configure .env file
+VISTA3D_SERVER=http://localhost:8000  # Uses SSH tunnel
+NGC_API_KEY=your_key
+
+# Start frontend services
+python3 start_frontend.py
 ```
 
 ### Mode 2: Local Vista3D
 ```bash
-# Terminal 1: Start Vista3D (choose one method)
-# Method A: Using Docker Compose (recommended)
-docker compose --profile local-vista3d up vista3d-server
+# Terminal 1: Start Vista3D server
+python3 start_vista3d.py
 
-# Method B: Using Python script
-python3 utils/start_vista3d.py
-
-# Terminal 2: Start GUI
-python3 utils/start_gui.py
+# Terminal 2: Start frontend services
+python3 start_frontend.py
 ```
 
 ### Mode 3: Production
 ```bash
 # Create services
-sudo python3 utils/start_vista3d.py --create-service
-sudo python3 utils/start_gui.py --create-service
+sudo python3 start_vista3d.py --create-service
+sudo python3 start_frontend.py --create-service
 
 # Start everything
 sudo systemctl start vista3d vista3d-gui
@@ -267,19 +298,22 @@ python3 utils/segment.py
 
 ### Complete Workflow Example
 ```bash
-# 1. Start containers
-python3 utils/start_gui.py
+# 1. Start Vista3D server (GPU machine)
+python3 start_vista3d.py
 
-# 2. Convert DICOM to NIFTI (from host)
+# 2. Start frontend services (any machine)
+python3 start_frontend.py
+
+# 3. Convert DICOM to NIFTI (from host)
 python3 utils/dicom2nifti.py
 
-# 3. Run segmentation (from host)
+# 4. Run segmentation (from host)
 python3 utils/segment.py
 
-# 4. Convert to PLY files (from host)
+# 5. Convert to PLY files (from host)
 python3 utils/nifti2ply.py --batch
 
-# 5. Access web interface
+# 6. Access web interface
 # Open http://localhost:8501 in browser
 ```
 

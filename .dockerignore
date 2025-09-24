@@ -22,7 +22,7 @@ wheels/
 MANIFEST
 
 # Virtual environments
-.env
+# .env  # Commented out - needed for Docker build
 .venv
 env/
 venv/

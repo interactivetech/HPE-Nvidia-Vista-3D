@@ -37,11 +37,11 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 - **Docker**: Docker and NVIDIA Container Toolkit (required)
 - **NVIDIA NGC**: Account for Vista3D access
 
-## 🚀 Quick Start (Single GPU Host)
+## 🚀 Quick Start
 
-**Get up and running in 3 simple steps!**
+**Get up and running with our new three-script architecture!**
 
-### Step 1: Setup
+### Step 1: Initial Setup
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -54,22 +54,34 @@ python3 setup.py
 The setup script will:
 - ✅ Check system requirements (Ubuntu/macOS, Python 3.11+, GPU, Docker)
 - ✅ Set up Python environment with all dependencies
-- ✅ Configure Docker containers for all services
+- ✅ Configure environment variables and Docker settings
 - ✅ Guide you through configuration (NVIDIA NGC API key)
 - ✅ Create all necessary directories and files
 
-### Step 2: Start All Services
+### Step 2: Start Vista3D Server (GPU-Enabled Machine)
 ```bash
-# Start all services (web interface, image server, and Vista3D AI)
-python3 start.py
+# On your GPU-enabled machine (local or remote)
+python3 start_vista3d.py
+```
+
+This starts:
+- 🧠 **Vista3D AI Server** (http://localhost:8000)
+- ⚡ **GPU-accelerated processing** for medical image segmentation
+- 🔄 **Auto-restart capability** for production deployments
+
+**Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
+
+### Step 3: Start Frontend Services
+```bash
+# On any machine (can be same as Vista3D or different)
+python3 start_frontend.py
 ```
 
 This starts:
 - 🌐 **Streamlit Web Interface** (http://localhost:8501)
 - 🖼️ **Image Server** (http://localhost:8888)
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
 
-### Step 3: Process Your Images
+### Step 4: Process Your Images
 ```bash
 # Add your medical images
 # Option A: Place DICOM files in dicom/ folder
@@ -87,7 +99,33 @@ mkdir -p output/nifti
 # - View 3D visualizations
 ```
 
-**🎉 That's it!** You now have a fully functional medical AI platform running on your GPU-enabled host.
+**🎉 That's it!** You now have a fully functional medical AI platform with distributed architecture.
+
+## 🌐 Remote Server Setup
+
+For remote Vista3D server deployments, you'll need to set up port forwarding:
+
+### SSH Port Forwarding
+```bash
+# Forward local ports to remote Vista3D server
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# This forwards:
+# - Local port 8000 → Remote Vista3D server port 8000
+# - Remote port 8888 → Local image server port 8888
+```
+
+### Configuration for Remote Vista3D
+```bash
+# Edit .env file to point to remote server
+VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
+IMAGE_SERVER="http://localhost:8888"    # Local image server
+```
+
+### Deployment Options
+- **Same Machine**: Run both Vista3D and frontend on the same GPU-enabled machine
+- **Remote Vista3D**: Run Vista3D on remote GPU server, frontend locally
+- **Distributed**: Run Vista3D and frontend on different machines with proper networking
 
 ## 🛠️ Using the Tools Page
 
@@ -114,23 +152,50 @@ After running the setup and start scripts, you'll have:
 
 ## 🔧 Management Commands
 
+### Vista3D Server Management
 ```bash
-# Start all services
-python3 start.py
+# Start Vista3D server
+python3 start_vista3d.py
 
-# Stop all services
-python3 start.py --stop
+# Stop Vista3D server
+docker stop vista3d
 
-# Restart all services
-python3 start.py --restart
+# View Vista3D logs
+docker logs -f vista3d
 
-# View logs
+# Restart Vista3D server
+docker restart vista3d
+```
+
+### Frontend Services Management
+```bash
+# Start frontend services
+python3 start_frontend.py
+
+# Stop frontend services
+docker compose down
+
+# View frontend logs
 docker compose logs -f
 
 # View specific service logs
-docker logs -f vista3d
 docker logs -f hpe-nvidia-vista3d-app
 docker logs -f vista3d-image-server
+```
+
+### Systemd Service Management (Production)
+```bash
+# Create systemd services for auto-startup
+sudo python3 start_vista3d.py --create-service
+sudo python3 start_frontend.py --create-service
+
+# Start services
+sudo systemctl start vista3d
+sudo systemctl start vista3d-gui
+
+# Check service status
+sudo systemctl status vista3d
+sudo systemctl status vista3d-gui
 ```
 
 ## ⚠️ Command Line Utilities (Advanced Users Only)
@@ -151,7 +216,8 @@ python3 utils/nifti2ply.py      # NIFTI to PLY conversion
 ```
 HPE-Nvidia-Vista-3D/
 ├── setup.py              # Unified setup script
-├── start.py              # Unified start script
+├── start_vista3d.py      # Vista3D server startup script
+├── start_frontend.py     # Frontend services startup script
 ├── app.py                # Main Streamlit web application
 ├── .env                  # Environment configuration (created by setup)
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
@@ -189,11 +255,14 @@ If you want to use a remote Vista3D server instead of running it locally:
 
 ```bash
 # Edit .env file
-VISTA3D_SERVER="https://your-remote-vista3d-server.com:8000"
+VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
 NGC_API_KEY="your_nvidia_api_key"
 
+# Set up SSH port forwarding
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
 # Start only frontend services
-python3 start.py --frontend-only
+python3 start_frontend.py
 ```
 
 ## 🔍 Troubleshooting

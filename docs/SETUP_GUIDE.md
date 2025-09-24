@@ -29,11 +29,11 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 - **Anatomical Scope**: Supports segmentation of organs, vessels, bones, and soft tissue structures
 - **Important Note**: Does not segment the entire brain (optimized for body structures and lesions)
 
-## 🚀 Quick Start (Single GPU Host)
+## 🚀 Quick Start
 
-**Get up and running in 3 simple steps!**
+**Get up and running with our new three-script architecture!**
 
-### Step 1: Clone and Setup
+### Step 1: Initial Setup
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -46,22 +46,34 @@ python3 setup.py
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
 - ✅ Sets up Python environment with all dependencies
-- ✅ Configures Docker containers for all services
+- ✅ Configures environment variables and Docker settings
 - ✅ Prompts for your NVIDIA NGC API key
 - ✅ Creates all necessary directories and files
 
-### Step 2: Start All Services
+### Step 2: Start Vista3D Server (GPU-Enabled Machine)
 ```bash
-# Start all services (web interface, image server, and Vista3D AI)
-python3 start.py
+# On your GPU-enabled machine (local or remote)
+python3 start_vista3d.py
+```
+
+**This starts:**
+- 🧠 **Vista3D AI Server** (http://localhost:8000)
+- ⚡ **GPU-accelerated processing** for medical image segmentation
+- 🔄 **Auto-restart capability** for production deployments
+
+**Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
+
+### Step 3: Start Frontend Services
+```bash
+# On any machine (can be same as Vista3D or different)
+python3 start_frontend.py
 ```
 
 **This starts:**
 - 🌐 **Streamlit Web Interface** (http://localhost:8501)
 - 🖼️ **Image Server** (http://localhost:8888)
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
 
-### Step 3: Process Your Images
+### Step 4: Process Your Images
 ```bash
 # Add your medical images
 # Option A: Place DICOM files in dicom/ folder
@@ -79,7 +91,33 @@ mkdir -p output/nifti
 # - View 3D visualizations
 ```
 
-**🎉 You're ready!** You now have a fully functional medical AI platform running on your GPU-enabled host.
+**🎉 You're ready!** You now have a fully functional medical AI platform with distributed architecture.
+
+## 🌐 Remote Server Setup
+
+For remote Vista3D server deployments, you'll need to set up port forwarding:
+
+### SSH Port Forwarding
+```bash
+# Forward local ports to remote Vista3D server
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# This forwards:
+# - Local port 8000 → Remote Vista3D server port 8000
+# - Remote port 8888 → Local image server port 8888
+```
+
+### Configuration for Remote Vista3D
+```bash
+# Edit .env file to point to remote server
+VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
+IMAGE_SERVER="http://localhost:8888"    # Local image server
+```
+
+### Deployment Options
+- **Same Machine**: Run both Vista3D and frontend on the same GPU-enabled machine
+- **Remote Vista3D**: Run Vista3D on remote GPU server, frontend locally
+- **Distributed**: Run Vista3D and frontend on different machines with proper networking
 
 ## 🔧 Advanced Configuration
 
@@ -108,15 +146,14 @@ If you want to use a remote Vista3D server instead of running it locally:
 
 ```bash
 # Edit .env file
-VISTA3D_SERVER="https://your-remote-vista3d-server.com:8000"
+VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
 NGC_API_KEY="your_nvidia_api_key"
 
-# Start only frontend services (choose one method)
-# Method A: Using Docker Compose (recommended)
-docker compose up vista3d-app image-server
+# Set up SSH port forwarding
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
 
-# Method B: Using start script
-python3 start.py --frontend-only
+# Start only frontend services
+python3 start_frontend.py
 ```
 
 ### Vista3D Server Only
@@ -128,21 +165,22 @@ NGC_API_KEY="your_nvidia_api_key"
 NGC_ORG_ID="nvidia"
 
 # Start only Vista3D server
-docker compose --profile local-vista3d up vista3d-server
+python3 start_vista3d.py
 ```
 
 ## 📁 Project Structure
 
 ```
-Nvidia-Vista3d-segmenation/
-├── app.py                 # Main Streamlit web application
-├── setup_vista3d_server.py    # Server setup script
-├── setup_vista3d_frontend.py  # Frontend setup script
-├── dot_env_template       # Environment configuration template
+HPE-Nvidia-Vista-3D/
+├── setup.py              # Unified setup script
+├── start_vista3d.py      # Vista3D server startup script
+├── start_frontend.py     # Frontend services startup script
+├── app.py                # Main Streamlit web application
+├── .env                  # Environment configuration (created by setup)
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
 ├── output/               # Generated files
 │   ├── nifti/           # Converted NIFTI files
-│   ├── scans/        # Scan results
+│   ├── scans/           # Scan results
 │   └── voxels/          # Voxel data
 ├── utils/               # Utility scripts
 │   ├── dicom2nifti.py   # DICOM to NIFTI conversion
@@ -186,19 +224,22 @@ Nvidia-Vista3d-segmenation/
 source .venv/bin/activate
 
 # 2. Configure for remote Vista3D
-echo "VISTA3D_SERVER=https://your-vista3d-server.com:8000" >> .env
+echo "VISTA3D_SERVER=http://localhost:8000" >> .env  # Uses SSH tunnel
 echo "NGC_API_KEY=your_nvidia_api_key" >> .env
 
-# 3. Place your medical images
+# 3. Set up SSH port forwarding
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# 4. Place your medical images
 cp your_scan.nii.gz output/nifti/
 
-# 4. Convert DICOM to NIFTI (if needed)
+# 5. Convert DICOM to NIFTI (if needed)
 python3 utils/dicom2nifti.py
 
-# 5. Start GUI containers (Streamlit + Image Server)
-python3 utils/start_gui.py
+# 6. Start frontend services (Streamlit + Image Server)
+python3 start_frontend.py
 
-# 6. Run segmentation
+# 7. Run segmentation
 python3 utils/segment.py
 ```
 
@@ -208,7 +249,7 @@ python3 utils/segment.py
 source .venv/bin/activate
 
 # 2. Configure for local Vista3D
-echo "VISTA3D_SERVER=http://vista3d-server:8000" >> .env
+echo "VISTA3D_SERVER=http://localhost:8000" >> .env
 echo "NGC_API_KEY=your_nvidia_api_key" >> .env
 
 # 3. Place your medical images
@@ -218,10 +259,10 @@ cp your_scan.nii.gz output/nifti/
 python3 utils/dicom2nifti.py
 
 # 5. Start Vista3D server (requires GPU)
-python3 utils/start_vista3d.py
+python3 start_vista3d.py
 
-# 6. Start GUI containers (in separate terminal)
-python3 utils/start_gui.py
+# 6. Start frontend services (in separate terminal)
+python3 start_frontend.py
 
 # 7. Run segmentation
 python3 utils/segment.py

@@ -19,6 +19,8 @@ services:
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
       - VISTA3D_SERVER=http://host.docker.internal:8000
+      - VISTA3D_IMAGE_SERVER_URL=${VISTA3D_IMAGE_SERVER_URL:-http://host.docker.internal:8888}
+      - VESSELS_OF_INTEREST=${VESSELS_OF_INTEREST:-all}
       - DOCKER_CONTAINER=true
       # OpenGL headless rendering support
       - DISPLAY=:99
@@ -53,6 +55,7 @@ services:
       - VISTA3D_SERVER=http://host.docker.internal:8000
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
+      - VESSELS_OF_INTEREST=${VESSELS_OF_INTEREST:-all}
       - DOCKER_CONTAINER=true
       - IMAGE_SERVER=http://image-server:8888
     volumes:

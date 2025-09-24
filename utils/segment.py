@@ -39,10 +39,11 @@ VISTA3D_INFERENCE_URL = f"{VISTA3D_SERVER.rstrip('/')}/v1/vista3d/inference"
 # Check if we're running in Docker by looking for container environment
 if os.getenv('DOCKER_CONTAINER') == 'true' or os.path.exists('/.dockerenv'):
     # We're in Docker, but Vista3D server needs to access host machine
-    DEFAULT_IMAGE_SERVER_URL = 'http://host.docker.internal:8888'
+    # Use environment variable or fallback to host.docker.internal
+    DEFAULT_IMAGE_SERVER_URL = os.getenv('VISTA3D_IMAGE_SERVER_URL', 'http://host.docker.internal:8888')
 else:
     # We're running locally, both servers are local - use localhost
-    DEFAULT_IMAGE_SERVER_URL = 'http://localhost:8888'
+    DEFAULT_IMAGE_SERVER_URL = os.getenv('VISTA3D_IMAGE_SERVER_URL', 'http://localhost:8888')
 
 VISTA3D_IMAGE_SERVER_URL = os.getenv('VISTA3D_IMAGE_SERVER_URL', DEFAULT_IMAGE_SERVER_URL)
 # Use full paths from .env - no more PROJECT_ROOT needed

@@ -1,6 +1,6 @@
-# Vista-3D GUI Startup Script
+# Vista-3D Frontend Services Startup Script
 
-The `start_gui.py` script provides an easy way to start the Vista-3D GUI containers (Streamlit app and image server) using Docker Compose.
+The `start_frontend.py` script provides an easy way to start the Vista-3D frontend containers (Streamlit app and image server) using Docker Compose.
 
 ## Features
 
@@ -16,19 +16,19 @@ The `start_gui.py` script provides an easy way to start the Vista-3D GUI contain
 ### Basic Usage
 
 ```bash
-# Start the GUI containers
-python3 utils/start_gui.py
+# Start the frontend containers
+python3 start_frontend.py
 
 # Or make it executable and run directly
-chmod +x utils/start_gui.py
-./utils/start_gui.py
+chmod +x start_frontend.py
+./start_frontend.py
 ```
 
 ### Create Systemd Service (Auto-startup)
 
 ```bash
 # Create systemd service for automatic startup on boot
-sudo python3 utils/start_gui.py --create-service
+sudo python3 start_frontend.py --create-service
 
 # Then start the service
 sudo systemctl start vista3d-gui
@@ -125,6 +125,22 @@ Logs are written to:
 
 This script is designed to work alongside the Vista3D server. To run the complete system:
 
-1. Start Vista3D server: `python3 utils/start_vista3d.py`
-2. Start GUI containers: `python3 utils/start_gui.py`
+1. Start Vista3D server: `python3 start_vista3d.py`
+2. Start frontend containers: `python3 start_frontend.py`
 3. Access the GUI at: `http://localhost:8501`
+
+### Remote Vista3D Server Setup
+
+For remote Vista3D server deployments:
+
+```bash
+# Set up SSH port forwarding
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# Configure .env file
+VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
+IMAGE_SERVER="http://localhost:8888"    # Local image server
+
+# Start frontend services
+python3 start_frontend.py
+```

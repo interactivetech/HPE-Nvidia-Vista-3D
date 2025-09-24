@@ -45,7 +45,7 @@ The setup script will prompt you for:
 
 ```bash
 # Start the Vista3D server container
-python3 utils/start_vista3d_server.py
+python3 start_vista3d.py
 ```
 
 This will:
@@ -115,7 +115,7 @@ For automatic startup on boot:
 
 ```bash
 # Create systemd service
-sudo python3 utils/start_vista3d_server.py --create-service
+sudo python3 start_vista3d.py --create-service
 
 # Enable and start service
 sudo systemctl enable vista3d
@@ -207,7 +207,7 @@ netstat -tlnp | grep 8000
 ### **Server Management:**
 ```bash
 # Start server
-python3 utils/start_vista3d_server.py
+python3 start_vista3d.py
 
 # Stop server
 docker stop vista3d
@@ -293,5 +293,51 @@ sudo apt install fail2ban
 - Configure appropriate firewall rules
 - Monitor network bandwidth usage
 - Consider load balancing for multiple clients
+
+## 🌐 **Remote Client Setup**
+
+For clients connecting to a remote Vista3D server:
+
+### **SSH Port Forwarding Setup**
+```bash
+# Forward local ports to remote Vista3D server
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# This forwards:
+# - Local port 8000 → Remote Vista3D server port 8000
+# - Remote port 8888 → Local image server port 8888
+```
+
+### **Client Configuration**
+```bash
+# Edit .env file on client machine
+VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
+IMAGE_SERVER="http://localhost:8888"    # Local image server
+NGC_API_KEY="your_nvidia_api_key"
+```
+
+### **Complete Client Workflow**
+```bash
+# 1. Set up SSH tunnel (keep running)
+ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# 2. Start frontend services on client
+python3 start_frontend.py
+
+# 3. Access GUI at http://localhost:8501
+```
+
+## 🏗️ **Three-Script Architecture**
+
+The new architecture uses three separate scripts for better flexibility:
+
+1. **`setup.py`** - Initial setup and configuration
+2. **`start_vista3d.py`** - Vista3D server startup (GPU machine)
+3. **`start_frontend.py`** - Frontend services startup (any machine)
+
+This allows for:
+- **Distributed deployments**: Vista3D on GPU server, frontend on client machines
+- **Scalability**: Multiple frontend instances connecting to one Vista3D server
+- **Flexibility**: Mix and match local/remote components as needed
 
 This setup will give you a fully functional Vista3D server that can process medical imaging data and serve multiple clients remotely.
