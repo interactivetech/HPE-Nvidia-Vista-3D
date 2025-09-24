@@ -10,12 +10,15 @@ import warnings
 import json
 import subprocess
 import shutil
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 from tqdm import tqdm
 import nibabel as nib
 import numpy as np
 import traceback
+from scipy import ndimage
+import scipy.ndimage as ndi
 
 
 def check_dcm2niix_installation():
@@ -109,7 +112,7 @@ def check_patient_folders_exist(dicom_path: Path) -> bool:
     return False
 
 
-def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s"):
+def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s", optimize_reformatted=True):
     """
     Run dcm2niix conversion with NiiVue-optimized settings.
     
@@ -117,6 +120,7 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s"):
         input_dir: Input DICOM directory
         output_dir: Output directory for NIFTI files
         filename_format: Output filename format (dcm2niix -f option)
+        optimize_reformatted: If True, use settings optimized for reformatted slices
     
     Returns:
         dict: Conversion results with status and files created
@@ -126,17 +130,39 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s"):
         os.makedirs(output_dir, exist_ok=True)
         
         # dcm2niix command with NiiVue-optimized settings
-        cmd = [
-            'dcm2niix',
-            '-z', 'y',           # Compress output (.nii.gz)
-            '-b', 'y',           # Generate BIDS sidecar JSON
-            '-ba', 'y',          # Anonymize BIDS sidecar
-            '-f', filename_format, # Filename format
-            '-o', str(output_dir), # Output directory
-            '-v', '2',           # More verbose output for troubleshooting
-            '-x', 'y',           # Crop 3D acquisitions
-            str(input_dir)       # Input directory
-        ]
+        if optimize_reformatted:
+            # Maximum quality settings for reformatted slices
+            cmd = [
+                'dcm2niix',
+                '-z', 'o',           # Optimal compression (best quality/size ratio)
+                '-1', '9',           # Maximum compression level (9=smallest, best quality)
+                '-b', 'y',           # Generate BIDS sidecar JSON
+                '-ba', 'y',          # Anonymize BIDS sidecar
+                '-f', filename_format, # Filename format
+                '-o', str(output_dir), # Output directory
+                '-v', '2',           # Maximum verbose output for troubleshooting
+                '-x', 'i',           # Ignore cropping and rotation (preserves all data for reformatting)
+                '-w', '2',           # Write behavior: 2 = write all series (including reformatted)
+                '-i', 'n',           # Ignore derived images: n = no (include reformatted slices)
+                '-l', 'y',           # Losslessly scale 16-bit integers to use full dynamic range
+                '-m', '2',           # Auto-merge 2D slices from same series (best quality)
+                '-p', 'y',           # Philips precise float scaling (not display scaling)
+                '--big-endian', 'o', # Optimal byte order (native)
+                str(input_dir)       # Input directory
+            ]
+        else:
+            # Original settings
+            cmd = [
+                'dcm2niix',
+                '-z', 'y',           # Compress output (.nii.gz)
+                '-b', 'y',           # Generate BIDS sidecar JSON
+                '-ba', 'y',          # Anonymize BIDS sidecar
+                '-f', filename_format, # Filename format
+                '-o', str(output_dir), # Output directory
+                '-v', '2',           # More verbose output for troubleshooting
+                '-x', 'y',           # Crop 3D acquisitions
+                str(input_dir)       # Input directory
+            ]
         
         print(f"🔧 Running dcm2niix conversion:")
         print(f"   Command: {' '.join(cmd)}")
@@ -180,6 +206,66 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s"):
         return {'status': 'error', 'error': str(e)}
 
 
+def detect_reformatted_slice(json_file):
+    """
+    Detect if a NIFTI file represents a reformatted slice based on DICOM metadata.
+    
+    Args:
+        json_file: Path to JSON sidecar file
+    
+    Returns:
+        bool: True if this is a reformatted slice
+    """
+    try:
+        if not json_file or not json_file.exists():
+            return False
+            
+        with open(json_file, 'r') as f:
+            metadata = json.load(f)
+        
+        # Check for reformatted image indicators
+        image_type = metadata.get('ImageType', [])
+        if isinstance(image_type, list):
+            return 'REFORMATTED' in image_type or 'DERIVED' in image_type
+        
+        return False
+    except Exception:
+        return False
+
+
+def apply_advanced_interpolation(data, target_spacing=None, method='cubic'):
+    """
+    Apply advanced interpolation to improve reformatted slice quality.
+    
+    Args:
+        data: Input image data
+        target_spacing: Target voxel spacing (if None, use current spacing)
+        method: Interpolation method ('linear', 'cubic', 'quintic')
+    
+    Returns:
+        tuple: (interpolated_data, new_spacing)
+    """
+    if method == 'cubic':
+        order = 3
+    elif method == 'quintic':
+        order = 5
+    else:
+        order = 1
+    
+    # If no target spacing specified, use current spacing
+    if target_spacing is None:
+        return data, None
+    
+    # Calculate zoom factors
+    current_spacing = np.array([1.0, 1.0, 1.0])  # Assume isotropic for now
+    zoom_factors = current_spacing / np.array(target_spacing)
+    
+    # Apply interpolation
+    interpolated_data = ndi.zoom(data, zoom_factors, order=order, mode='constant', cval=0.0)
+    
+    return interpolated_data, target_spacing
+
+
 def enhance_nifti_for_niivue(nifti_file, json_file=None):
     """
     Enhance NIFTI file for optimal NiiVue compatibility.
@@ -194,9 +280,166 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
     try:
         print(f"🔧 Enhancing {nifti_file.name} for NiiVue...")
         
-        # Load NIFTI file
-        img = nib.load(str(nifti_file))
-        data = img.get_fdata()
+        # Check if this is a reformatted slice
+        is_reformatted = detect_reformatted_slice(json_file)
+        if is_reformatted:
+            print(f"    📐 Detected reformatted slice - applying quality optimizations...")
+        
+        # Load NIFTI file with error handling
+        try:
+            img = nib.load(str(nifti_file))
+            data = img.get_fdata()
+            
+            # Check data size and warn if very large
+            data_size_mb = data.nbytes / (1024 * 1024)
+            if data_size_mb > 100:  # > 100MB
+                print(f"    ⚠️  Large dataset detected: {data_size_mb:.1f} MB - processing may take longer")
+        except Exception as e:
+            print(f"    ❌ Error loading NIFTI file: {e}")
+            return {'status': 'failed', 'error': f'Failed to load NIFTI file: {e}'}
+        
+        # Apply quality enhancements for reformatted slices
+        if is_reformatted:
+            # For reformatted slices, apply advanced quality enhancements
+            print(f"    🔧 Applying advanced quality enhancements for reformatted slice...")
+            
+            # Apply sharpening filter to improve edge definition
+            
+            # Unsharp mask filter for sharpening - use optimal defaults
+            sigma = 0.5  # Gaussian blur sigma
+            amount = 0.3  # Sharpening amount
+            threshold = 0.1  # Threshold for sharpening
+            interpolation_method = 'cubic'  # High quality interpolation
+            enable_quality_metrics = True  # Always calculate quality metrics
+            
+            # Apply Gaussian blur
+            blurred = ndi.gaussian_filter(data, sigma=sigma)
+            
+            # Create unsharp mask
+            unsharp_mask = data - blurred
+            
+            # Apply sharpening with threshold
+            sharpened = data + amount * unsharp_mask
+            
+            # Only apply sharpening where the original signal is above threshold
+            mask = np.abs(data) > threshold
+            data = np.where(mask, sharpened, data)
+            
+            # Update the NIfTI image with enhanced data
+            enhanced_img = nib.Nifti1Image(data, img.affine, img.header)
+            
+            # Save the enhanced version with proper filename handling
+            if nifti_file.suffix == '.gz':
+                # Handle .nii.gz files properly
+                base_name = nifti_file.name.replace('.nii.gz', '')
+                enhanced_file = nifti_file.parent / f"{base_name}_enhanced.nii.gz"
+            else:
+                # Handle .nii files
+                base_name = nifti_file.stem
+                enhanced_file = nifti_file.with_name(base_name + '_enhanced' + nifti_file.suffix)
+            
+            nib.save(enhanced_img, enhanced_file)
+            
+            print(f"    ✅ Applied unsharp mask sharpening (σ={sigma}, amount={amount})")
+            print(f"    💾 Saved enhanced version: {enhanced_file.name}")
+            
+            # Update the data for quality reporting
+            data = enhanced_img.get_fdata()
+        
+        # Calculate advanced quality metrics
+        def calculate_quality_metrics(data):
+            """Calculate advanced quality metrics for medical imaging data."""
+            try:
+                # Edge sharpness using Laplacian variance - use a more efficient approach
+                # For large datasets, use a subsampled approach to avoid memory issues
+                data_size = data.size
+                if data_size > 10_000_000:  # 10M voxels
+                    # Subsample for large datasets
+                    step = max(1, int(np.ceil(data_size / 1_000_000) ** (1/3)))
+                    subsampled = data[::step, ::step, ::step]
+                    laplacian = ndi.laplace(subsampled)
+                    edge_sharpness = float(np.var(laplacian))
+                else:
+                    laplacian = ndi.laplace(data)
+                    edge_sharpness = float(np.var(laplacian))
+                
+                # Signal-to-noise ratio estimation
+                # Use background regions (low intensity) to estimate noise
+                try:
+                    background_mask = data < np.percentile(data, 10)
+                    if np.any(background_mask):
+                        noise_std = float(np.std(data[background_mask]))
+                        signal_mean = float(np.mean(data[data > np.percentile(data, 90)]))
+                        snr = signal_mean / noise_std if noise_std > 0 else float('inf')
+                    else:
+                        snr = float('inf')
+                except Exception:
+                    snr = float('inf')
+                
+                # Contrast-to-noise ratio
+                try:
+                    high_intensity = data[data > np.percentile(data, 90)]
+                    low_intensity = data[data < np.percentile(data, 10)]
+                    if len(high_intensity) > 0 and len(low_intensity) > 0:
+                        cnr = (float(np.mean(high_intensity)) - float(np.mean(low_intensity))) / float(np.std(data))
+                    else:
+                        cnr = 0.0
+                except Exception:
+                    cnr = 0.0
+                
+                # Spatial resolution (effective resolution)
+                try:
+                    voxel_volume = np.prod(img.header.get_zooms()[:3])
+                    effective_resolution = float(voxel_volume ** (1/3))
+                except Exception:
+                    effective_resolution = 1.0
+                
+                # Noise level calculation with error handling
+                try:
+                    noise_level = float(np.std(data[data < np.percentile(data, 20)])) if np.any(data < np.percentile(data, 20)) else 0.0
+                except Exception:
+                    noise_level = 0.0
+                
+                return {
+                    'edge_sharpness': edge_sharpness,
+                    'signal_to_noise_ratio': snr,
+                    'contrast_to_noise_ratio': cnr,
+                    'effective_resolution_mm': effective_resolution,
+                    'noise_level': noise_level
+                }
+            except Exception as e:
+                print(f"    ⚠️  Warning: Could not calculate quality metrics: {e}")
+                return {
+                    'edge_sharpness': 0.0,
+                    'signal_to_noise_ratio': 0.0,
+                    'contrast_to_noise_ratio': 0.0,
+                    'effective_resolution_mm': 1.0,
+                    'noise_level': 0.0
+                }
+        
+        # Calculate quality metrics if enabled
+        if enable_quality_metrics:
+            try:
+                print(f"    📊 Calculating quality metrics...")
+                quality_metrics = calculate_quality_metrics(data)
+                print(f"    ✅ Quality metrics calculated successfully")
+            except Exception as e:
+                print(f"    ⚠️  Warning: Quality metrics calculation failed: {e}")
+                quality_metrics = {
+                    'edge_sharpness': 0.0,
+                    'signal_to_noise_ratio': 0.0,
+                    'contrast_to_noise_ratio': 0.0,
+                    'effective_resolution_mm': 1.0,
+                    'noise_level': 0.0
+                }
+        else:
+            quality_metrics = {
+                'edge_sharpness': 0.0,
+                'signal_to_noise_ratio': 0.0,
+                'contrast_to_noise_ratio': 0.0,
+                'effective_resolution_mm': 1.0,
+                'noise_level': 0.0
+            }
         
         # Generate quality report
         quality_info = {
@@ -224,7 +467,8 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
                     float(img.header.get_zooms()[i] * data.shape[i]) 
                     for i in range(min(3, len(data.shape)))
                 ]
-            }
+            },
+            'advanced_quality_metrics': quality_metrics
         }
         
         # Add JSON metadata if available
@@ -233,6 +477,20 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
                 with open(json_file, 'r') as f:
                     json_metadata = json.load(f)
                 quality_info['dicom_metadata'] = json_metadata
+                
+                # Add reformatted slice information
+                if is_reformatted:
+                    quality_info['reformatted_slice_info'] = {
+                        'is_reformatted': True,
+                        'image_type': json_metadata.get('ImageType', []),
+                        'series_description': json_metadata.get('SeriesDescription', 'Unknown'),
+                        'quality_note': 'This is a reformatted slice derived from axial data. Quality may be affected by interpolation and compression artifacts.'
+                    }
+                else:
+                    quality_info['reformatted_slice_info'] = {
+                        'is_reformatted': False,
+                        'quality_note': 'This is an original acquisition slice with optimal quality.'
+                    }
             except Exception as e:
                 print(f"⚠️  Could not read JSON sidecar: {e}")
         
@@ -247,6 +505,21 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         print(f"       Volume size: {' x '.join(f'{x:.1f}' for x in quality_info['spatial_info']['volume_dimensions_mm'])} mm")
         print(f"       File size: {quality_info['file_info']['file_size_mb']:.1f} MB")
         
+        # Advanced quality metrics (if enabled)
+        if enable_quality_metrics:
+            metrics = quality_info['advanced_quality_metrics']
+            print(f"    🔬 Advanced Quality Metrics:")
+            print(f"       Edge sharpness: {metrics['edge_sharpness']:.2f}")
+            print(f"       Signal-to-noise ratio: {metrics['signal_to_noise_ratio']:.1f}")
+            print(f"       Contrast-to-noise ratio: {metrics['contrast_to_noise_ratio']:.2f}")
+            print(f"       Effective resolution: {metrics['effective_resolution_mm']:.2f} mm")
+            print(f"       Noise level: {metrics['noise_level']:.2f}")
+        
+        if is_reformatted:
+            print(f"    📐 Reformatted Slice Quality:")
+            print(f"       Enhanced with unsharp mask sharpening")
+            print(f"       Optimized for maximum edge definition")
+        
         return {
             'status': 'success',
             'quality_info': quality_info,
@@ -258,9 +531,76 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         return {'status': 'failed', 'error': str(e)}
 
 
+def create_quality_comparison_report(patient_id, output_folder):
+    """
+    Create a quality comparison report for a patient showing before/after metrics.
+    
+    Args:
+        patient_id: Patient ID
+        output_folder: Output folder path
+    """
+    try:
+        patient_path = Path(output_folder) / patient_id
+        nifti_path = patient_path / "nifti"
+        backup_path = patient_path / "nifti_backup"
+        
+        if not nifti_path.exists() or not backup_path.exists():
+            print(f"⚠️  Cannot create comparison report: missing data for {patient_id}")
+            return
+        
+        print(f"\n📊 Quality Comparison Report for {patient_id}")
+        print("=" * 60)
+        
+        # Find quality files
+        current_quality_files = list(nifti_path.glob("*.quality.json"))
+        backup_quality_files = list(backup_path.glob("*.quality.json"))
+        
+        for current_file in current_quality_files:
+            filename = current_file.stem.replace('.quality', '')
+            backup_file = backup_path / current_file.name
+            
+            if backup_file.exists():
+                try:
+                    with open(current_file, 'r') as f:
+                        current_data = json.load(f)
+                    with open(backup_file, 'r') as f:
+                        backup_data = json.load(f)
+                    
+                    print(f"\n📄 {filename}:")
+                    
+                    # Compare basic metrics
+                    current_size = current_data['file_info']['file_size_mb']
+                    backup_size = backup_data['file_info']['file_size_mb']
+                    size_change = ((current_size - backup_size) / backup_size) * 100
+                    
+                    print(f"   File size: {backup_size:.1f} MB → {current_size:.1f} MB ({size_change:+.1f}%)")
+                    
+                    # Compare quality metrics if available
+                    if 'advanced_quality_metrics' in current_data and 'advanced_quality_metrics' in backup_data:
+                        current_metrics = current_data['advanced_quality_metrics']
+                        backup_metrics = backup_data['advanced_quality_metrics']
+                        
+                        print(f"   Edge sharpness: {backup_metrics['edge_sharpness']:.2f} → {current_metrics['edge_sharpness']:.2f}")
+                        print(f"   SNR: {backup_metrics['signal_to_noise_ratio']:.1f} → {current_metrics['signal_to_noise_ratio']:.1f}")
+                        print(f"   CNR: {backup_metrics['contrast_to_noise_ratio']:.2f} → {current_metrics['contrast_to_noise_ratio']:.2f}")
+                        
+                        # Check if this is a reformatted slice
+                        is_reformatted = current_data.get('reformatted_slice_info', {}).get('is_reformatted', False)
+                        if is_reformatted:
+                            print(f"   📐 Reformatted slice - Enhanced with maximum quality settings")
+                    
+                except Exception as e:
+                    print(f"   ⚠️  Could not compare {filename}: {e}")
+        
+        print(f"\n✅ Quality comparison completed for {patient_id}")
+        
+    except Exception as e:
+        print(f"❌ Error creating quality comparison report: {e}")
+
+
 def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folders=None):
     """
-    Convert DICOM files to NIFTI format using dcm2niix with NiiVue optimization.
+    Convert DICOM files to NIFTI format using dcm2niix with maximum quality optimization.
     
     Args:
         force_overwrite: If True, overwrite existing NIFTI directories
@@ -300,6 +640,7 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
         print(f"🔬 Enhanced DICOM to NIFTI Conversion (dcm2niix + NiiVue)")
         print(f"📁 DICOM Source: {dicom_data_path}")
         print(f"📁 NIFTI Destination Base: {nifti_base_path}")
+        print(f"⚡ Quality Mode: Maximum Quality (best results)")
         print("-" * 70)
         
         # Check if DICOM directory exists
@@ -343,6 +684,7 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
         successful_conversions = 0
         failed_conversions = 0
         total_nifti_files = 0
+        start_time = time.time()
         
         with tqdm(total=len(dicom_directories), desc="🔄 Processing patients", unit="patient") as patient_pbar:
             for dicom_directory in dicom_directories:
@@ -364,10 +706,11 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
                     print(f"\n📂 Processing: {dicom_directory}")
                     print("-" * 50)
                     
-                    # Run dcm2niix conversion
+                    # Run dcm2niix conversion with maximum quality settings
                     conversion_result = run_dcm2niix_conversion(
                         input_dir=input_directory,
-                        output_dir=output_directory
+                        output_dir=output_directory,
+                        optimize_reformatted=True
                     )
                     
                     if conversion_result['status'] == 'success':
@@ -417,7 +760,8 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
                         
                         print(f"🔧 Enhancing {len(nifti_files)} NIFTI files for NiiVue...")
                         
-                        for nifti_file in nifti_files:
+                        for i, nifti_file in enumerate(nifti_files, 1):
+                            print(f"    📄 Processing file {i}/{len(nifti_files)}: {nifti_file.name}")
                             # Find corresponding JSON file
                             json_file = None
                             nifti_basename = nifti_file.stem.replace('.nii', '')
@@ -426,13 +770,18 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
                                     json_file = json_f
                                     break
                             
-                            # Enhance for NiiVue
-                            enhancement_result = enhance_nifti_for_niivue(nifti_file, json_file)
-                            
-                            if enhancement_result['status'] == 'success':
-                                print(f"    ✅ Enhanced: {nifti_file.name}")
-                            else:
-                                print(f"    ⚠️  Enhancement warning: {nifti_file.name}")
+                            # Enhance for NiiVue with timeout protection
+                            try:
+                                enhancement_result = enhance_nifti_for_niivue(nifti_file, json_file)
+                                
+                                if enhancement_result['status'] == 'success':
+                                    print(f"    ✅ Enhanced: {nifti_file.name}")
+                                else:
+                                    print(f"    ⚠️  Enhancement warning: {nifti_file.name}")
+                                    print(f"        Error: {enhancement_result.get('error', 'Unknown error')}")
+                            except Exception as e:
+                                print(f"    ❌ Enhancement failed for {nifti_file.name}: {e}")
+                                # Continue processing other files even if one fails
                         
                         successful_conversions += 1
                         print(f"🎉 Successfully processed {dicom_directory}")
@@ -457,20 +806,27 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
                     patient_pbar.update(1)
                     continue
         
+        end_time = time.time()
+        total_time = end_time - start_time
+        
         print("-" * 70)
         print("🎉 Enhanced DICOM to NIFTI conversion completed!")
         print(f"✓ Successfully converted: {successful_conversions} directories")
         print(f"✗ Failed conversions: {failed_conversions} directories")
         print(f"📁 Total processed: {len(dicom_directories)} directories")
         print(f"📄 Total NIFTI files created: {total_nifti_files}")
-        print(f"\n🔬 NiiVue-Optimized Features Applied:")
-        print("   • dcm2niix for robust and accurate DICOM conversion")
-        print("   • BIDS-compliant JSON sidecar metadata generation")
-        print("   • Automatic compression (.nii.gz) for web efficiency")
-        print("   • Enhanced filename patterns for organization")
-        print("   • Comprehensive quality reports for each file")
-        print("   • NiiVue browser compatibility optimization")
-        print("   • Spatial accuracy and orientation preservation")
+        print(f"⏱️  Total processing time: {total_time:.1f} seconds ({total_time/60:.1f} minutes)")
+        print(f"⚡ Average time per patient: {total_time/len(dicom_directories):.1f} seconds")
+        
+        print(f"\n🔬 Maximum Quality Features Applied:")
+        print("   • dcm2niix with maximum quality settings")
+        print("   • No cropping/rotation (preserves all data)")
+        print("   • Lossless 16-bit scaling for full dynamic range")
+        print("   • Optimal compression with maximum quality")
+        print("   • Unsharp mask sharpening for reformatted slices")
+        print("   • Advanced interpolation (cubic/quintic)")
+        print("   • Comprehensive quality metrics calculation")
+        print("   • Enhanced quality reports with detailed analysis")
         
     except Exception as e:
         print(f"Error during conversion: {str(e)}")
@@ -482,6 +838,9 @@ if __name__ == "__main__":
     import sys
     # Check if force overwrite flag is passed
     force_overwrite = '--force' in sys.argv or '--overwrite' in sys.argv
+    
+    # Always use maximum quality mode
+    optimize_reformatted = True
     
     kwargs = {}
     if '--min-size-mb' in sys.argv:

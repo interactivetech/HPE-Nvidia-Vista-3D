@@ -543,6 +543,8 @@ def main():
         force_overwrite = st.checkbox("Force Overwrite", value=False, help="Overwrite existing NIfTI files")
         min_size_mb = st.number_input("Minimum File Size (MB)", min_value=0.0, value=5.0, step=0.1, 
                                     help="Delete NIfTI files smaller than this size")
+        
+        # Maximum quality mode is always enabled
     
     with col2:
         # Display patient info
@@ -572,6 +574,8 @@ def main():
             
             if min_size_mb > 0:
                 cmd_args.extend(["--min-size-mb", str(int(min_size_mb))])
+            
+            # Maximum quality mode is always enabled
             
             # Add patient selection if specific patients are chosen
             if len(selected_patients) < len(patient_folders):
