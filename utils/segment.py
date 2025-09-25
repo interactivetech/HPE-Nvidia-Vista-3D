@@ -186,7 +186,8 @@ def main():
         patient_nifti_path = patient_base_path / "nifti"
         print(f"\nProcessing patient folder: {patient_base_path}")
 
-        vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower()
+        # Treat missing/empty VESSELS_OF_INTEREST as "all" by default
+        vessels_of_interest_env = os.getenv('VESSELS_OF_INTEREST', '').strip().lower() or 'all'
         label_set_name = os.getenv('LABEL_SET', '').strip()
         target_vessels = []
         if label_set_name:
@@ -199,7 +200,8 @@ def main():
             target_vessels = [v.strip() for v in vessels_of_interest_env.split(',') if v.strip()] if vessels_of_interest_env != "all" else list(NAME_TO_ID_MAP.keys())
         
         if not target_vessels:
-            print("No VESSELS_OF_INTEREST specified in .env. Skipping patient.")
+            # If parsing produced no targets even after defaulting to 'all', skip with clear notice
+            print("No valid target vessels resolved (check VESSELS_OF_INTEREST/LABEL_SET). Skipping patient.")
             continue
 
         target_vessel_ids = []

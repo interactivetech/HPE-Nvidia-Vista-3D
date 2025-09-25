@@ -415,8 +415,8 @@ def render_segmentation_tools():
             try:
                 # Set environment variables if specified
                 env = os.environ.copy()
-                if vessels_of_interest:
-                    env['VESSELS_OF_INTEREST'] = vessels_of_interest
+                # Default to 'all' if left blank, matching segment.py behavior
+                env['VESSELS_OF_INTEREST'] = vessels_of_interest.strip() if vessels_of_interest.strip() else 'all'
                 if label_set:
                     env['LABEL_SET'] = label_set
                 if selected_scans:

@@ -236,24 +236,37 @@
             
             function proceedWithColormap() {
                 if (customSegmentationColormap) {
-                    // Create a normalized colormap for NiiVue (values 0-1)
+                    // Create a normalized variant (0..1) but prefer registering ORIGINAL (0..255) for current NiiVue builds
                     const normalizedColormap = createNormalizedColormap(customSegmentationColormap);
                     
-                    if (normalizedColormap) {
-                        nv.addColormap('custom_segmentation', normalizedColormap);
-                        console.log('Custom segmentation colormap added (normalized):', normalizedColormap);
-                        console.log('First 10 normalized colors:', {
-                            R: normalizedColormap.R.slice(0, 10),
-                            G: normalizedColormap.G.slice(0, 10),
-                            B: normalizedColormap.B.slice(0, 10)
-                        });
-                        
-                        // Also add the original format as backup
-                        nv.addColormap('vista3d_original', customSegmentationColormap);
-                        console.log('Original format colormap added as backup');
-                    } else {
-                        console.error('Failed to create normalized colormap');
+                    // Prefer original as primary entries
+                    try {
+                        nv.addColormap('vista3d_anatomical', customSegmentationColormap);
+                        nv.addColormap('custom_segmentation', customSegmentationColormap);
+                        console.log('Vista3D colormaps added (original 0..255)');
+                    } catch (e) {
+                        console.warn('Failed to add original-format colormaps:', e);
                     }
+
+                    // Also register normalized variants as fallbacks
+                    if (normalizedColormap) {
+                        try { nv.addColormap('vista3d_anatomical_norm', normalizedColormap); } catch (e) { }
+                        try { nv.addColormap('custom_segmentation_norm', normalizedColormap); } catch (e) { }
+                    }
+
+                    // Store colormap globally for direct access
+                    window.vista3dColormap = normalizedColormap || null;
+                    window.vista3dOriginalColormap = customSegmentationColormap;
+                    
+                    // Verify colormaps are registered
+                    setTimeout(() => {
+                        const availableColormaps = Object.keys(nv.colormaps || {});
+                        console.log('Colormaps registered in NiiVue:', availableColormaps);
+                        console.log('Global colormaps stored:', {
+                            vista3d: !!window.vista3dColormap,
+                            vista3dOriginal: !!window.vista3dOriginalColormap
+                        });
+                    }, 100);
                 } else {
                     console.error('Custom segmentation colormap is undefined!');
                 }
@@ -305,29 +318,158 @@
                             console.log('Overlay URL:', overlayColors[overlayIndex].url);
                             
                             // Apply the normalized custom segmentation colormap (not the original)
-                            // Add a longer delay to ensure volume is fully loaded and colormap is registered
-                            setTimeout(() => {
-                                // Check if the colormap is available in NiiVue
-                                const availableColormaps = Object.keys(nv.colormaps || {});
-                                console.log('Available colormaps:', availableColormaps);
+                            // Ensure colormap is registered before applying
+                            function applyColormapToOverlay() {
+                                console.log('🎯 ALL VOXELS MODE: Applying colormap to overlay:', overlayVol.id);
+                                console.log('🎯 ALL VOXELS MODE: Overlay URL:', overlayColors[overlayIndex].url);
                                 
+                                // Try multiple approaches to apply the colormap
+                                let colormapApplied = false;
+                                
+                                // Approach 1: Try using registered colormaps (prefer original 0..255 versions)
                                 try {
-                                    if (availableColormaps.includes('custom_segmentation')) {
+                                    const availableColormaps = Object.keys(nv.colormaps || {});
+                                    console.log('Available colormaps:', availableColormaps);
+                                    
+                                    if (availableColormaps.includes('vista3d_anatomical')) {
+                                        nv.setColormap(overlayVol.id, 'vista3d_anatomical');
+                                        console.log('✅ Applied vista3d_anatomical colormap via registry');
+                                        colormapApplied = true;
+                                    } else if (availableColormaps.includes('custom_segmentation')) {
                                         nv.setColormap(overlayVol.id, 'custom_segmentation');
-                                        console.log('Applied custom_segmentation colormap to all segmentation overlay');
-                                    } else if (availableColormaps.includes('vista3d_original')) {
-                                        nv.setColormap(overlayVol.id, 'vista3d_original');
-                                        console.log('Applied vista3d_original colormap to all segmentation overlay');
-                                    } else {
-                                        console.warn('Neither custom_segmentation nor vista3d_original colormap found, using gray');
-                                        nv.setColormap(overlayVol.id, 'gray');
+                                        console.log('✅ Applied custom_segmentation colormap via registry');
+                                        colormapApplied = true;
+                                    } else if (availableColormaps.includes('vista3d_anatomical_norm')) {
+                                        nv.setColormap(overlayVol.id, 'vista3d_anatomical_norm');
+                                        console.log('✅ Applied vista3d_anatomical_norm colormap via registry');
+                                        colormapApplied = true;
                                     }
-                                    // Force a redraw to ensure the colormap is applied
-                                    nv.drawScene();
                                 } catch (e) {
-                                    console.error('Failed to apply any colormap to overlay:', e);
+                                    console.warn('Failed to apply colormap via registry:', e);
                                 }
-                            }, 200);
+                                
+                                // Approach 2: Try re-registering and applying
+                                if (!colormapApplied) {
+                                    try {
+                                        if (window.vista3dOriginalColormap) {
+                                            nv.addColormap('vista3d_anatomical_direct', window.vista3dOriginalColormap);
+                                            nv.setColormap(overlayVol.id, 'vista3d_anatomical_direct');
+                                            console.log('✅ ALL VOXELS: Applied vista3d_anatomical_direct (original)');
+                                            colormapApplied = true;
+                                        } else if (window.vista3dColormap) {
+                                            nv.addColormap('vista3d_anatomical_norm_direct', window.vista3dColormap);
+                                            nv.setColormap(overlayVol.id, 'vista3d_anatomical_norm_direct');
+                                            console.log('✅ ALL VOXELS: Applied vista3d_anatomical_norm_direct');
+                                            colormapApplied = true;
+                                        }
+                                    } catch (e) {
+                                        console.warn('ALL VOXELS: Failed to apply colormap via direct registration:', e);
+                                    }
+                                }
+                                
+                                // Approach 3: Try direct volume property setting
+                                if (!colormapApplied) {
+                                    try {
+                                        if (window.vista3dColormap && overlayVol.colormap !== undefined) {
+                                            overlayVol.colormap = window.vista3dColormap;
+                                            console.log('✅ Applied colormap via direct volume property');
+                                            colormapApplied = true;
+                                        }
+                                    } catch (e) {
+                                        console.warn('Failed to apply colormap via direct property:', e);
+                                    }
+                                }
+                                
+                                // Gentle fallback: try known segmentation LUTs only, never demote to gray
+                                if (!colormapApplied) {
+                                    try {
+                                        if (nv.colormaps && nv.colormaps['custom_segmentation']) {
+                                            nv.setColormap(overlayVol.id, 'custom_segmentation');
+                                            console.log('✅ Fallback to custom_segmentation');
+                                            colormapApplied = true;
+                                        } else if (nv.colormaps && nv.colormaps['vista3d_anatomical_norm']) {
+                                            nv.setColormap(overlayVol.id, 'vista3d_anatomical_norm');
+                                            console.log('✅ Fallback to vista3d_anatomical_norm');
+                                            colormapApplied = true;
+                                        }
+                                    } catch (e) {
+                                        console.warn('Fallback colormap failed:', e);
+                                    }
+                                }
+                                
+                                // Ensure label value range spans available labels for LUT mapping
+                                try {
+                                    const lblMax = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1;
+                                    overlayVol.cal_min = 0;
+                                    overlayVol.cal_max = lblMax;
+                                    console.log('🎯 ALL VOXELS: Set cal_min/max for label LUT', overlayVol.cal_min, overlayVol.cal_max);
+                                } catch (e) { console.warn('Unable to set cal range for labels', e); }
+
+                                // ALL VOXELS MODE: Ensure overlay is visible after colormap application
+                                overlayVol.opacity = segmentOpacity; // Force opacity for All Voxels mode
+                                console.log('🎯 ALL VOXELS: Set opacity to', segmentOpacity, 'for overlay:', overlayVol.id);
+                                
+                                // ALL VOXELS MODE: Ensure the volume is marked as visible for all view modes
+                                overlayVol.visible = true;
+                                overlayVol.visible3D = true;
+                                overlayVol.visibleMultiplanar = true;
+                                overlayVol.visibleAxial = true;
+                                overlayVol.visibleCoronal = true;
+                                overlayVol.visibleSagittal = true;
+                                console.log('🎯 ALL VOXELS: Set visibility flags for overlay:', overlayVol.id, 'All view modes enabled');
+                                
+                                // Force a redraw to ensure the colormap is applied
+                                setTimeout(() => {
+                                    // Double-check visibility before redraw - ensure ALL view modes are enabled
+                                    try {
+                                        const lblMax2 = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1;
+                                        overlayVol.cal_min = 0;
+                                        overlayVol.cal_max = lblMax2;
+                                    } catch {}
+                                    overlayVol.opacity = segmentOpacity;
+                                    overlayVol.visible = true;
+                                    overlayVol.visible3D = true;
+                                    overlayVol.visibleMultiplanar = true;
+                                    overlayVol.visibleAxial = true;
+                                    overlayVol.visibleCoronal = true;
+                                    overlayVol.visibleSagittal = true;
+                                    nv.drawScene();
+                                    console.log('🎯 ALL VOXELS: Colormap applied and scene redrawn for overlay:', overlayVol.id, 'Opacity:', overlayVol.opacity, 'All view modes enabled');
+                                }, 100);
+                            }
+                            
+                            // Call the function with a delay to ensure volume is loaded
+                            setTimeout(applyColormapToOverlay, 300);
+                            
+                            // ALL VOXELS MODE: Continuous monitoring to ensure visibility
+                            function monitorAllVoxelsVisibility() {
+                                if (overlayVol && overlayVol.id) {
+                                    // Force all visibility properties
+                                    try {
+                                        const lblMax3 = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1;
+                                        overlayVol.cal_min = 0;
+                                        overlayVol.cal_max = lblMax3;
+                                    } catch {}
+                                    overlayVol.opacity = segmentOpacity;
+                                    overlayVol.visible = true;
+                                    overlayVol.visible3D = true;
+                                    overlayVol.visibleMultiplanar = true;
+                                    overlayVol.visibleAxial = true;
+                                    overlayVol.visibleCoronal = true;
+                                    overlayVol.visibleSagittal = true;
+                                    
+                                    console.log('🎯 ALL VOXELS: Continuous monitoring - ensuring visibility for:', overlayVol.id);
+                                }
+                            }
+                            
+                            // Start continuous monitoring every 500ms
+                            const monitorInterval = setInterval(monitorAllVoxelsVisibility, 500);
+                            
+                            // Stop monitoring after 10 seconds
+                            setTimeout(() => {
+                                clearInterval(monitorInterval);
+                                console.log('🎯 ALL VOXELS: Stopped continuous monitoring');
+                            }, 10000);
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
                             const color = overlayColors[overlayIndex].color;
                             const labelName = overlayColors[overlayIndex].label_name;
@@ -344,6 +486,7 @@
                             const colormapName = `custom_${overlayIndex}`;
                             nv.addColormap(colormapName, customColormap);
                             nv.setColormap(overlayVol.id, colormapName);
+                            try { overlayVol.cal_min = 0; overlayVol.cal_max = 1; } catch {}
                             console.log(`Applied custom color to overlay ${overlayIndex}: ${labelName}`, color);
                         } else {
                             // Fallback to generic segmentation colormap
@@ -352,6 +495,7 @@
                                 console.log('Applied custom_segmentation colormap to overlay volume (fallback):', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
                                 // Force a redraw to ensure the colormap is applied
                                 setTimeout(() => {
+                                    try { overlayVol.cal_min = 0; overlayVol.cal_max = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1; } catch {}
                                     nv.drawScene();
                                 }, 100);
                             } else {
@@ -367,6 +511,32 @@
                     if (mainVol.id !== nv.volumes[overlayStartIndex]?.id) {
                         try { nv.setColormap(mainVol.id, colorMapJs); } catch (e) { try { nv.setColormap(mainVol.id, 'gray'); } catch (_) {} }
                         console.log('Re-applied main volume colormap after overlay processing');
+                        
+                        // Ensure overlays remain visible after main volume processing
+                        setTimeout(() => {
+                            for (let i = overlayStartIndex; i < nv.volumes.length; i++) {
+                                const vol = nv.volumes[i];
+                                if (vol && vol.id !== mainVol.id) {
+                                    // Force overlay opacity and visibility - especially for All Voxels
+                                    try { vol.cal_min = 0; vol.cal_max = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1; } catch {}
+                                    vol.opacity = segmentOpacity;
+                                    vol.visible = true;
+                                    vol.visible3D = true;
+                                    vol.visibleMultiplanar = true;
+                                    vol.visibleAxial = true;
+                                    vol.visibleCoronal = true;
+                                    vol.visibleSagittal = true;
+                                    
+                                    // Check if this is an All Voxels overlay
+                                    const isAllVoxels = overlayColors[i - overlayStartIndex]?.is_all_segmentation;
+                                    if (isAllVoxels) {
+                                        console.log('🎯 ALL VOXELS: Ensured visibility after main volume processing - Volume:', vol.id, 'Opacity:', vol.opacity, 'Visible:', vol.visible);
+                                    } else {
+                                        console.log('Ensured overlay visibility for volume:', vol.id, 'opacity:', vol.opacity);
+                                    }
+                                }
+                            }
+                        }, 200);
                     }
                 }
 
@@ -406,6 +576,8 @@
                 
                 nv.drawScene();
                 
+                // Note: avoid re-applying overlays to prevent flash and unintended demotion to grayscale
+                
                 // Simple final step: just ensure 3D render mode if needed
                 setTimeout(() => {
                     // Force 3D render mode if slice type is 4
@@ -416,7 +588,33 @@
                         nv.opts.multiplanarForceRender = false;
                         nv.opts.showCrosshairs = false;
                         nv.opts.show3Dcrosshair = true;
+                        
+                        // Final check: Ensure all overlays remain visible after all rendering operations
+                        for (let i = overlayStartIndex; i < nv.volumes.length; i++) {
+                            const vol = nv.volumes[i];
+                            if (vol && vol.id !== mainVol?.id) {
+                                // Force overlay visibility - especially important for All Voxels mode
+                                try { vol.cal_min = 0; vol.cal_max = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1; } catch {}
+                                vol.opacity = segmentOpacity; // Force opacity
+                                vol.visible = true; // Force visibility
+                                vol.visible3D = true; // Force 3D visibility
+                                vol.visibleMultiplanar = true; // Force Multiplanar visibility
+                                vol.visibleAxial = true; // Force Axial visibility
+                                vol.visibleCoronal = true; // Force Coronal visibility
+                                vol.visibleSagittal = true; // Force Sagittal visibility
+                                
+                                // Check if this is an All Voxels overlay
+                                const isAllVoxels = overlayColors[i - overlayStartIndex]?.is_all_segmentation;
+                                if (isAllVoxels) {
+                                    console.log('🎯 ALL VOXELS: Final visibility check - Volume:', vol.id, 'Opacity:', vol.opacity, 'Visible:', vol.visible, 'Visible3D:', vol.visible3D);
+                                } else {
+                                    console.log('Final overlay visibility check - Volume:', vol.id, 'Opacity:', vol.opacity, 'Visible:', vol.visible);
+                                }
+                            }
+                        }
+                        
                         nv.drawScene();
+                        console.log('Final scene redraw completed with overlay visibility ensured');
                     }
                 }, 500);
 
