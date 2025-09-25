@@ -6,6 +6,16 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
         #niivue-canvas { width: 100%; height: 100%; display: block; pointer-events: auto; }
+        
+        /* Fix for preventOverflow modifier warning */
+        .streamlit-container {
+            overflow: visible !important;
+        }
+        
+        /* Ensure proper positioning context */
+        [data-popper-placement] {
+            position: relative !important;
+        }
     </style>
 </head>
 <body>
@@ -153,19 +163,105 @@
                 console.error('Invalid volumeList shape. Expected [{ url: string }, ...]. Got:', volumeList);
             }
 
-            // Using built-in NiiVue colormaps, no need to load external colormap files
-            console.log('Using built-in NiiVue vista3d_voxels colormap');
+            // We'll create our own custom colormap from the label colors
+            // No need to load the external vista3d_voxels colormap
+            async function loadVista3dColormap() {
+                console.log('✅ Skipping external colormap loading - using custom label colors instead');
+                return true;
+            }
             
-            // Using built-in colormaps, no helper functions needed
+            // Helper function to get label ID range
+            function getLabelIdRange() {
+                let minLabelId = 0;
+                let maxLabelId = 0;
+                if (labelColors && labelColors.length > 0) {
+                    labelColors.forEach(labelColor => {
+                        if (typeof labelColor.id === 'number') {
+                            minLabelId = Math.min(minLabelId, labelColor.id);
+                            maxLabelId = Math.max(maxLabelId, labelColor.id);
+                        }
+                    });
+                }
+                return { minLabelId, maxLabelId };
+            }
             
-            // Proceed directly since we're using built-in colormaps
+            // Wait for colormap to load before proceeding
             function waitForColormapAndProceed() {
-                proceedWithColormap();
+                loadVista3dColormap().then((loaded) => {
+                    if (loaded) {
+                        console.log('Using loaded vista3d_voxels colormap');
+                    } else {
+                        console.warn('Using fallback colormap - vista3d_voxels not available');
+                    }
+                    proceedWithColormap();
+                });
             }
             
             function proceedWithColormap() {
                 console.log('=== NEW VERSION: Using custom label colors colormap ===');
                 console.log('Proceeding with colormap application...');
+                
+                // Register the custom label colors colormap first
+                if (labelColors && Array.isArray(labelColors) && labelColors.length > 0) {
+                    console.log('🎨 Registering custom label colors colormap from', labelColors.length, 'label colors');
+                    
+                    // Find the maximum label ID to determine array size
+                    let maxId = 0;
+                    labelColors.forEach(labelColor => {
+                        if (typeof labelColor.id === 'number' && labelColor.id > maxId) {
+                            maxId = labelColor.id;
+                        }
+                    });
+                    
+                    const colormapSize = maxId + 1; // Use exact size needed
+                    const R = new Array(colormapSize).fill(0);
+                    const G = new Array(colormapSize).fill(0);
+                    const B = new Array(colormapSize).fill(0);
+                    const A = new Array(colormapSize).fill(0);
+                    const labels = new Array(colormapSize).fill('');
+                    
+                    // Set background (label 0) to be transparent
+                    labels[0] = 'Background';
+                    R[0] = 0;
+                    G[0] = 0;
+                    B[0] = 0;
+                    A[0] = 0; // Transparent background
+                    
+                    // Fill colormap from label colors
+                    labelColors.forEach(labelColor => {
+                        const id = labelColor.id;
+                        if (typeof id === 'number' && id >= 0 && id < colormapSize && labelColor.color) {
+                            const color = labelColor.color;
+                            R[id] = color[0] || 0;
+                            G[id] = color[1] || 0;
+                            B[id] = color[2] || 0;
+                            A[id] = 255;
+                            labels[id] = labelColor.name || `Label_${id}`;
+                        }
+                    });
+                    
+                    const customColormap = { R, G, B, A, labels };
+                    
+                    // Register the custom colormap with NiiVue
+                    try {
+                        nv.addColormap('vista3d_label_colors', customColormap);
+                        console.log('✅ Custom label colors colormap registered successfully');
+                        console.log('📊 Custom colormap details:', {
+                            size: colormapSize,
+                            labelCount: labelColors.length,
+                            maxId: maxId,
+                            sampleLabels: labels.slice(0, 10),
+                            sampleColors: {
+                                colon: { id: 62, color: [R[62], G[62], B[62]] },
+                                liver: { id: 1, color: [R[1], G[1], B[1]] }
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Failed to register custom label colors colormap:', e);
+                    }
+                } else {
+                    console.warn('No label colors available for custom colormap');
+                }
                 
                 // Check what colormaps are available
                 console.log('Colormaps registered in NiiVue:', nv.getColormapNames ? nv.getColormapNames() : 'getColormapNames not available');
@@ -177,10 +273,11 @@
                         const isAll = overlayColors[overlayIndex]?.is_all_segmentation === true;
                         if (!volumeList[i]) continue;
                         if (isAll) {
-                            volumeList[i].colormap = 'vista3d_voxels';
+                            // Now we can use the custom colormap since it's registered
+                            volumeList[i].colormap = 'vista3d_label_colors';
                         } else {
                             // Individual overlays will be assigned specific colormap later
-                            volumeList[i].colormap = 'vista3d_voxels';
+                            volumeList[i].colormap = 'vista3d_label_colors';
                         }
                         volumeList[i].opacity = 0.0;
                     }
@@ -232,119 +329,55 @@
                             console.log('Overlay ID:', overlayVol.id);
                             console.log('Overlay URL:', overlayColors[overlayIndex].url);
                             
-                            // Apply the segmentation colormap immediately to avoid grayscale flash
-                            // Ensure colormap is registered before applying
-                            function applyColormapToOverlay() {
-                                console.log('🎯 ALL VOXELS MODE: Applying colormap to overlay:', overlayVol.id);
-                                console.log('🎯 ALL VOXELS MODE: Overlay URL:', overlayColors[overlayIndex].url);
-                                
-                                // Build custom colormap from label colors
-                                if (labelColors && Array.isArray(labelColors) && labelColors.length > 0) {
-                                    console.log('🎨 Building custom colormap from', labelColors.length, 'label colors');
-                                    // Find the maximum label ID to determine array size
-                                    let maxId = 0;
-                                    labelColors.forEach(labelColor => {
-                                        if (typeof labelColor.id === 'number' && labelColor.id > maxId) {
-                                            maxId = labelColor.id;
-                                        }
-                                    });
-                                    
-                                    const colormapSize = Math.max(maxId + 1, 256);
-                                    const R = new Array(colormapSize).fill(0);
-                                    const G = new Array(colormapSize).fill(0);
-                                    const B = new Array(colormapSize).fill(0);
-                                    const A = new Array(colormapSize).fill(0);
-                                    const labels = new Array(colormapSize).fill('');
-                                    
-                                    // Set background (label 0)
-                                    labels[0] = 'Background';
-                                    
-                                    // Fill colormap from label colors
-                                    labelColors.forEach(labelColor => {
-                                        const id = labelColor.id;
-                                        if (typeof id === 'number' && id >= 0 && id < colormapSize && labelColor.color) {
-                                            const color = labelColor.color;
-                                            R[id] = color[0] || 0;
-                                            G[id] = color[1] || 0;
-                                            B[id] = color[2] || 0;
-                                            A[id] = 255;
-                                            labels[id] = labelColor.name || `Label_${id}`;
-                                        }
-                                    });
-                                    
-                                    const customColormap = { R, G, B, A, labels };
-                                    
-                                    // Register the custom colormap with NiiVue
-                                    try {
-                                        nv.addColormap('custom_label_colors', customColormap);
-                                        nv.setColormap(overlayVol.id, 'custom_label_colors');
-                                        console.log('✅ Applied custom label colors colormap');
-                                    } catch (e) {
-                                        console.error('Failed to apply custom label colors colormap:', e);
-                                        // Fallback to built-in colormap
-                                        try {
-                                            nv.setColormap(overlayVol.id, 'vista3d_voxels');
-                                            console.log('✅ Applied vista3d_voxels colormap as fallback');
-                                        } catch (e2) {
-                                            console.error('All colormap application failed:', e2);
-                                        }
-                                    }
-                                } else {
-                                    console.warn('No label colors available, using built-in colormap');
-                                    // Fallback to built-in colormap
-                                    try {
-                                        nv.setColormap(overlayVol.id, 'vista3d_voxels');
-                                        console.log('✅ Applied vista3d_voxels colormap');
-                                    } catch (e) {
-                                        console.error('Failed to apply vista3d_voxels colormap:', e);
-                                    }
-                                }
-                                
-                                // Set cal_min and cal_max for label LUT
-                                try {
-                                    overlayVol.cal_min = 0;
-                                    overlayVol.cal_max = 132; // Number of labels in vista3d_voxels
-                                    console.log('🎯 ALL VOXELS: Set cal_min/max for label LUT', overlayVol.cal_min, overlayVol.cal_max);
-                                } catch (e) { console.warn('Unable to set cal range for labels', e); }
+                            // The colormap is already registered and applied via volume list priming
+                            // Just need to configure the display parameters
+                            console.log('🎯 ALL VOXELS MODE: Configuring overlay display parameters');
+                            
+                            // Set cal_min and cal_max for label LUT
+                            try {
+                                const { minLabelId, maxLabelId } = getLabelIdRange();
+                                overlayVol.cal_min = minLabelId;
+                                overlayVol.cal_max = maxLabelId;
+                                console.log('🎯 ALL VOXELS: Set cal_min/max for label LUT', overlayVol.cal_min, overlayVol.cal_max, 'Label range:', minLabelId, 'to', maxLabelId);
+                                console.log('🎯 ALL VOXELS: Volume details:', {
+                                    id: overlayVol.id,
+                                    cal_min: overlayVol.cal_min,
+                                    cal_max: overlayVol.cal_max,
+                                    colormap: overlayVol.colormap
+                                });
+                            } catch (e) { console.warn('Unable to set cal range for labels', e); }
 
-                                // ALL VOXELS MODE: Ensure overlay is visible after colormap application
-                                overlayVol.opacity = segmentOpacity; // Force opacity for All Voxels mode
-                                console.log('🎯 ALL VOXELS: Set opacity to', segmentOpacity, 'for overlay:', overlayVol.id);
-                                
-                                // ALL VOXELS MODE: Ensure the volume is marked as visible for all view modes
+                            // ALL VOXELS MODE: Ensure overlay is visible after colormap application
+                            overlayVol.opacity = segmentOpacity; // Force opacity for All Voxels mode
+                            console.log('🎯 ALL VOXELS: Set opacity to', segmentOpacity, 'for overlay:', overlayVol.id);
+                            
+                            // ALL VOXELS MODE: Ensure the volume is marked as visible for all view modes
+                            overlayVol.visible = true;
+                            overlayVol.visible3D = true;
+                            overlayVol.visibleMultiplanar = true;
+                            overlayVol.visibleAxial = true;
+                            overlayVol.visibleCoronal = true;
+                            overlayVol.visibleSagittal = true;
+                            console.log('🎯 ALL VOXELS: Set visibility flags for overlay:', overlayVol.id, 'All view modes enabled');
+                            
+                            // Force a redraw to ensure the colormap is applied
+                            setTimeout(() => {
+                                // Double-check visibility before redraw - ensure ALL view modes are enabled
+                                try {
+                                    const { minLabelId, maxLabelId } = getLabelIdRange();
+                                    overlayVol.cal_min = minLabelId;
+                                    overlayVol.cal_max = maxLabelId;
+                                } catch {}
+                                overlayVol.opacity = segmentOpacity;
                                 overlayVol.visible = true;
                                 overlayVol.visible3D = true;
                                 overlayVol.visibleMultiplanar = true;
                                 overlayVol.visibleAxial = true;
                                 overlayVol.visibleCoronal = true;
                                 overlayVol.visibleSagittal = true;
-                                console.log('🎯 ALL VOXELS: Set visibility flags for overlay:', overlayVol.id, 'All view modes enabled');
-                                
-                                // Force a redraw to ensure the colormap is applied
-                                setTimeout(() => {
-                                    // Double-check visibility before redraw - ensure ALL view modes are enabled
-                                    try {
-                                        overlayVol.cal_min = 0;
-                                        overlayVol.cal_max = 132; // Number of labels in vista3d_voxels
-                                    } catch {}
-                                    overlayVol.opacity = segmentOpacity;
-                                    overlayVol.visible = true;
-                                    overlayVol.visible3D = true;
-                                    overlayVol.visibleMultiplanar = true;
-                                    overlayVol.visibleAxial = true;
-                                    overlayVol.visibleCoronal = true;
-                                    overlayVol.visibleSagittal = true;
-                                    nv.drawScene();
-                                    console.log('🎯 ALL VOXELS: Colormap applied and scene redrawn for overlay:', overlayVol.id, 'Opacity:', overlayVol.opacity, 'All view modes enabled');
-                                }, 100);
-                            }
-                            
-                            // Prevent grayscale flash: make overlay transparent until LUT is applied
-                            try { overlayVol.opacity = 0.0; } catch {}
-                            // Apply immediately (no delay) to avoid initial gray draw
-                            try { applyColormapToOverlay(); } catch (e) { console.error('Colormap apply failed:', e); }
-                            
-                            // Note: removed continuous monitoring to improve performance
+                                nv.drawScene();
+                                console.log('🎯 ALL VOXELS: Colormap applied and scene redrawn for overlay:', overlayVol.id, 'Opacity:', overlayVol.opacity, 'All view modes enabled');
+                            }, 100);
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
                             const color = overlayColors[overlayIndex].color;
                             const labelName = overlayColors[overlayIndex].label_name;
@@ -370,7 +403,11 @@
                                 console.log('Applied custom_segmentation colormap to overlay volume (fallback):', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
                                 // Force a redraw to ensure the colormap is applied
                                 setTimeout(() => {
-                                    try { overlayVol.cal_min = 0; overlayVol.cal_max = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1; } catch {}
+                                    try { 
+                                        const { minLabelId, maxLabelId } = getLabelIdRange();
+                                        overlayVol.cal_min = minLabelId; 
+                                        overlayVol.cal_max = maxLabelId; 
+                                    } catch {}
                                     nv.drawScene();
                                 }, 100);
                             } else {
@@ -393,7 +430,11 @@
                                 const vol = nv.volumes[i];
                                 if (vol && vol.id !== mainVol.id) {
                                     // Force overlay opacity and visibility - especially for All Voxels
-                                    try { vol.cal_min = 0; vol.cal_max = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1; } catch {}
+                                    try { 
+                                        const { minLabelId, maxLabelId } = getLabelIdRange();
+                                        vol.cal_min = minLabelId; 
+                                        vol.cal_max = maxLabelId; 
+                                    } catch {}
                                     vol.opacity = segmentOpacity;
                                     vol.visible = true;
                                     vol.visible3D = true;
@@ -469,7 +510,11 @@
                             const vol = nv.volumes[i];
                             if (vol && vol.id !== mainVol?.id) {
                                 // Force overlay visibility - especially important for All Voxels mode
-                                try { vol.cal_min = 0; vol.cal_max = (window.vista3dOriginalColormap?.labels?.length || window.vista3dColormap?.labels?.length || 256) - 1; } catch {}
+                                try { 
+                                    const { minLabelId, maxLabelId } = getLabelIdRange();
+                                    vol.cal_min = minLabelId; 
+                                    vol.cal_max = maxLabelId; 
+                                } catch {}
                                 vol.opacity = segmentOpacity; // Force opacity
                                 vol.visible = true; // Force visibility
                                 vol.visible3D = true; // Force 3D visibility
