@@ -41,6 +41,7 @@ class TemplateRenderer:
                 'volume_list_js': volume_list_js,
                 'overlay_colors_js': overlay_colors_js,
                 'label_colors_js': kwargs.get('label_colors_js', '[]'),
+                'label_colors_js': kwargs.get('label_colors_js', '[]'),
                 'image_server_url': kwargs.get('image_server_url', ''),
                 'main_is_nifti': kwargs.get('main_is_nifti', True),
                 'main_vol_visible': kwargs.get('main_vol_visible', True),

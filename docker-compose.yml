@@ -26,8 +26,16 @@ services:
       - MESA_GL_VERSION_OVERRIDE=3.3
       - MESA_GLSL_VERSION_OVERRIDE=330
     volumes:
+      # Mount source code directories for development
+      - ./assets:/app/assets
+      - ./utils:/app/utils
+      - ./NiiVue_Viewer.py:/app/NiiVue_Viewer.py
+      - ./app.py:/app/app.py
+      - ./pyproject.toml:/app/pyproject.toml
+      # Mount data directories
       - ${OUTPUT_FOLDER:-./output}:/app/output
       - ${DICOM_FOLDER:-./dicom}:/app/dicom
+      - ./.env:/app/.env:ro
     networks:
       - local-network
     extra_hosts:
