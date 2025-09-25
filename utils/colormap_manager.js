@@ -10,16 +10,31 @@ class ColormapManager {
     }
 
     async loadColormapSets() {
-        const sets = ['basic_medical', 'scientific', 'medical_specific', 'ct_brain', 'linspecer'];
+        const sets = ['basic_medical', 'scientific', 'medical_specific', 'ct_brain', 'linspecer', 'vista3d_voxels'];
+        
+        // Get the image server URL from the global variable or use default
+        const imageServerUrl = window.IMAGE_SERVER_URL || 'http://localhost:8888';
         
         for (const setName of sets) {
             try {
-                const response = await fetch(`/assets/colormaps/${setName}.json`);
+                const response = await fetch(`${imageServerUrl}/assets/colormaps/${setName}.json`);
                 if (response.ok) {
-                    this.colormapSets[setName] = await response.json();
-                    console.log(`Loaded colormap set: ${setName}`);
+                    const text = await response.text();
+                    // Check if the response is HTML (error page) instead of JSON
+                    if (text.trim().startsWith('<!DOCTYPE html>') || text.trim().startsWith('<html')) {
+                        console.warn(`Colormap set ${setName} returned HTML instead of JSON - server may be misconfigured`);
+                        continue;
+                    }
+                    
+                    try {
+                        this.colormapSets[setName] = JSON.parse(text);
+                        console.log(`Loaded colormap set: ${setName}`);
+                    } catch (parseError) {
+                        console.warn(`Error parsing JSON for colormap set ${setName}:`, parseError);
+                        console.warn(`Response text preview:`, text.substring(0, 200));
+                    }
                 } else {
-                    console.warn(`Could not load colormap set: ${setName}`);
+                    console.warn(`Could not load colormap set: ${setName} (HTTP ${response.status})`);
                 }
             } catch (error) {
                 console.warn(`Error loading colormap set ${setName}:`, error);

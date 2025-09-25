@@ -47,27 +47,45 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
 
-# Run the unified setup script
-python3 setup.py
+# Choose your setup approach:
+
+# Option A: Full setup (both frontend and backend on same machine)
+python3 setup_backend.py    # Sets up Vista3D AI server (requires GPU)
+python3 setup_frontend.py   # Sets up web interface and image server
+
+# Option B: Backend only (for GPU server)
+python3 setup_backend.py
+
+# Option C: Frontend only (for client machine)
+python3 setup_frontend.py
 ```
 
-The setup script will:
-- ✅ Check system requirements (Ubuntu/macOS, Python 3.11+, GPU, Docker)
+The setup scripts will:
+- ✅ **Backend Setup**: Check GPU requirements, configure Vista3D AI server, set up NGC integration
+- ✅ **Frontend Setup**: Set up web interface and image server, configure connection to Vista3D server
 - ✅ Set up Python environment with all dependencies
-- ✅ Configure Docker containers for all services
-- ✅ Guide you through configuration (NVIDIA NGC API key)
+- ✅ Configure Docker containers for services
+- ✅ Guide you through configuration (NVIDIA NGC API key for backend)
 - ✅ Create all necessary directories and files
 
-### Step 2: Start All Services
+### Step 2: Start Services
 ```bash
-# Start all services (web interface, image server, and Vista3D AI)
+# Choose your deployment approach:
+
+# Option A: Start all services (if both frontend and backend are on same machine)
 python3 start.py
+
+# Option B: Start only backend (Vista3D AI server)
+python3 start.py --vista3d-only
+
+# Option C: Start only frontend (web interface and image server)
+python3 start.py --frontend-only
 ```
 
 This starts:
 - 🌐 **Streamlit Web Interface** (http://localhost:8501)
 - 🖼️ **Image Server** (http://localhost:8888)
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
+- 🧠 **Vista3D AI Server** (http://localhost:8000) - backend only
 
 ### Step 3: Process Your Images
 ```bash
@@ -150,7 +168,8 @@ python3 utils/nifti2ply.py      # NIFTI to PLY conversion
 
 ```
 HPE-Nvidia-Vista-3D/
-├── setup.py              # Unified setup script
+├── setup_backend.py      # Backend setup script (Vista3D AI server)
+├── setup_frontend.py     # Frontend setup script (web interface)
 ├── start.py              # Unified start script
 ├── app.py                # Main Streamlit web application
 ├── .env                  # Environment configuration (created by setup)

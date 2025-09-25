@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #niivue-canvas { width: 100%; height: 100%; display: block; pointer-events: auto; }
+    </style>
+</head>
+<body>
+    <canvas id="niivue-canvas"></canvas>
+    
+    <!-- Hidden elements to store JSON data safely -->
+    <div id="volume-list-data" style="display: none;">{{ volume_list_js|safe }}</div>
+    <div id="overlay-colors-data" style="display: none;">{{ overlay_colors_js|safe }}</div>
+    <div id="color-map-data" style="display: none;">{{ color_map_js|safe }}</div>
+    
+    <script>{{ niivue_lib_content|safe }}</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <!-- <script src="/utils/colormap_manager.js"></script> -->
+    <script>
+        console.log('Starting NiiVue viewer initialization...');
+        
+        if (typeof niivue === 'undefined') {
+            console.error('Niivue library not loaded!');
+        } else {
+            console.log('NiiVue library loaded successfully');
+
+            const nv = new niivue.Niivue({
+                isColorbar: false,
+                loadingText: 'loading ...',
+                dragAndDropEnabled: false,
+                isResizeCanvas: true,
+                crosshairWidth: 1,
+                crosshairColor: [1, 0, 0, 1],
+                backColor: [0, 0, 0, 1]
+            });
+            nv.attachTo('niivue-canvas');
+
+            // Safely load template variables using hidden elements
+            let volumeList = [];
+            let overlayColors = [];
+            
+            try {
+                // Parse JSON from hidden elements to avoid template injection issues
+                const volumeListElement = document.getElementById('volume-list-data');
+                const overlayColorsElement = document.getElementById('overlay-colors-data');
+                
+                if (volumeListElement && volumeListElement.textContent) {
+                    volumeList = JSON.parse(volumeListElement.textContent);
+                }
+                if (overlayColorsElement && overlayColorsElement.textContent) {
+                    overlayColors = JSON.parse(overlayColorsElement.textContent);
+                }
+                
+                console.log('Prepared volumeList:', volumeList);
+                console.log('Overlay colors:', overlayColors);
+            } catch (e) {
+                console.error('Error loading template variables:', e);
+                volumeList = [];
+                overlayColors = [];
+            }
+            if (!Array.isArray(volumeList) || volumeList.some(v => !v || typeof v.url !== 'string')) {
+                console.error('Invalid volumeList shape. Expected [{ url: string }, ...]. Got:', volumeList);
+            }
+
+            // Simplified colormap loading 
+            let customSegmentationColormap = null;
+            
+            // Load Vista3D colormap after a short delay
+            setTimeout(() => {
+                fetch('/assets/colormaps/vista3d_voxels.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.colormaps && data.colormaps.vista3d_anatomical) {
+                            customSegmentationColormap = data.colormaps.vista3d_anatomical;
+                            
+                            // Create normalized colormap for NiiVue
+                            const normalizedColormap = {
+                                R: customSegmentationColormap.R.map(v => v / 255),
+                                G: customSegmentationColormap.G.map(v => v / 255),
+                                B: customSegmentationColormap.B.map(v => v / 255),
+                                A: customSegmentationColormap.A.map(v => v / 255),
+                                labels: customSegmentationColormap.labels
+                            };
+                            
+                            nv.addColormap('vista3d_anatomical', normalizedColormap);
+                            nv.addColormap('custom_segmentation', normalizedColormap);
+                            console.log('Vista3D voxels colormap loaded successfully');
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('Vista3D colormap not available, using defaults:', error);
+                    });
+            }, 100);
+
+            // For "all segmentation" mode, use the same colormap as individual voxels
+            // This ensures consistent colors between individual voxels and all segmentation mode
+
+            // Load volumes with error handling
+            nv.loadVolumes(volumeList).then(() => {
+                console.log('Volumes loaded successfully');
+                const hasVolumes = nv.volumes && nv.volumes.length > 0;
+                const mainVol = hasVolumes ? nv.volumes[0] : null;
+
+                // Apply main volume settings if available
+                {% if main_is_nifti and main_vol %}
+                if (mainVol) {
+                    try {
+                        // Safely parse template variables
+                        let colorMapValue = 'gray';
+                        try {
+                            colorMapValue = JSON.parse(document.getElementById('color-map-data')?.textContent || '"gray"');
+                        } catch (e) {
+                            console.warn('Could not parse color map, using default:', e);
+                        }
+                        
+                        const gammaValue = parseFloat('{{ nifti_gamma }}') || 1.0;
+                        const opacityValue = parseFloat('{{ nifti_opacity }}') || 1.0;
+                        const windowCenter = parseFloat('{{ window_center }}') || 50;
+                        const windowWidth = parseFloat('{{ window_width }}') || 350;
+                        
+                        if (colorMapValue) {
+                            nv.setColormap(mainVol.id, colorMapValue);
+                        }
+                        nv.setGamma(gammaValue);
+                        mainVol.opacity = opacityValue;
+
+                        // Apply CT windowing settings
+                        const windowMin = windowCenter - windowWidth / 2;
+                        const windowMax = windowCenter + windowWidth / 2;
+
+                        mainVol.cal_min = windowMin;
+                        mainVol.cal_max = windowMax;
+
+                        console.log('Applied CT windowing - Center:', windowCenter, 'Width:', windowWidth);
+                    } catch (e) {
+                        console.warn('Error applying main volume settings:', e);
+                    }
+                }
+                {% endif %}
+
+                // Apply overlay settings
+                setTimeout(() => {
+                    processOverlaysWithColormap();
+                }, 100);
+
+                // Honor requested slice type  
+                const sliceType = parseInt('{{ actual_slice_type }}') || 0;
+                console.log('Setting slice type to:', sliceType);
+                nv.setSliceType(sliceType);
+                
+                // Configure view options based on slice type
+                if (sliceType === 3) {
+                    // Multiplanar view with 4 panes
+                    console.log('Configuring for Multiplanar view');
+                    nv.opts.multiplanarShowRender = true;
+                    nv.opts.multiplanarForceRender = true;
+                    nv.opts.showCrosshairs = true;
+                    nv.opts.show3Dcrosshair = true;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                } else if (sliceType === 4) {
+                    // 3D Render mode - full 3D view
+                    console.log('Configuring for 3D Render view');
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = true;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                    nv.opts.isRadiologicalConvention = false;
+                } else {
+                    // Single view modes (0, 1, 2)
+                    console.log('Configuring for Single view mode');
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = false;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                }
+
+                // Post-render settings for 3D mode
+                if (sliceType === 4) {
+                    setTimeout(() => {
+                        nv.opts.multiplanarShowRender = false;
+                        nv.opts.multiplanarForceRender = false;
+                        nv.opts.showCrosshairs = false;
+                        nv.opts.show3Dcrosshair = true;
+                        nv.drawScene();
+                    }, 500);
+                }
+            });
+
+            // Function to process overlays once colormap is ready
+            function processOverlaysWithColormap() {
+                try {
+                    console.log('Processing overlays with Vista3D colormap');
+                    
+                    // Get template values with safe defaults
+                    const overlayStartIndex = parseInt('{{ overlay_start_index }}') || 1;
+                    const segmentOpacity = parseFloat('{{ segment_opacity }}') || 0.7;
+                    
+                    // Apply individual colors to overlays
+                    if (nv.volumes && nv.volumes.length > overlayStartIndex) {
+                        for (let i = overlayStartIndex; i < nv.volumes.length; i++) {
+                            const overlayVol = nv.volumes[i];
+                            if (!overlayVol) continue;
+                            
+                            // Set opacity based on view mode
+                            const isSingleView = sliceType !== 3 && sliceType !== 4;
+                            overlayVol.opacity = isSingleView ? 0.5 : segmentOpacity;
+
+                            // Get the corresponding overlay color info
+                            const overlayIndex = i - overlayStartIndex;
+
+                            // Check if this is the "all segmentation" mode
+                            if (overlayColors && overlayIndex < overlayColors.length && 
+                                overlayColors[overlayIndex] && overlayColors[overlayIndex].is_all_segmentation) {
+                                console.log('=== ALL SEGMENTATION OVERLAY DETECTED ===');
+                                
+                                // Apply Vista3D anatomical colormap if available
+                                const colormapToUse = customSegmentationColormap ? 'vista3d_anatomical' : 'gray';
+                                nv.setColormap(overlayVol.id, colormapToUse);
+                                overlayVol.opacity = segmentOpacity;
+                                
+                                console.log('Applied', colormapToUse, 'colormap to all segmentation overlay');
+                                
+                            } else if (overlayColors && overlayIndex < overlayColors.length && 
+                                      overlayColors[overlayIndex] && overlayColors[overlayIndex].color) {
+                                // Individual voxel with specific color
+                                const color = overlayColors[overlayIndex].color;
+                                const labelName = overlayColors[overlayIndex].label_name || 'Unknown';
+
+                                if (Array.isArray(color) && color.length >= 3) {
+                                    const customColormap = {
+                                        R: [0, color[0] / 255],
+                                        G: [0, color[1] / 255],
+                                        B: [0, color[2] / 255],
+                                        A: [0, 1],
+                                        labels: ['Background', labelName]
+                                    };
+
+                                    const colormapName = 'custom_' + overlayIndex;
+                                    nv.addColormap(colormapName, customColormap);
+                                    nv.setColormap(overlayVol.id, colormapName);
+                                    console.log('Applied custom color to overlay ' + overlayIndex + ': ' + (labelName || 'Unknown'));
+                                }
+                            } else {
+                                // Fallback colormap
+                                const fallbackColormap = customSegmentationColormap ? 'custom_segmentation' : 'gray';
+                                nv.setColormap(overlayVol.id, fallbackColormap);
+                                console.log('Applied', fallbackColormap, 'colormap (fallback)');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error processing overlays:', e);
+                }
+            }
+            }).catch((error) => {
+                console.error('Error loading volumes:', error);
+                console.error('Volume list that failed:', volumeList);
+                
+                // Try to provide more helpful error information
+                if (error.message && error.message.includes('fetch')) {
+                    console.error('Network error - check if image server is running and file exists');
+                } else if (error.message && error.message.includes('parse')) {
+                    console.error('File parsing error - check if file is valid NIfTI format');
+                } else {
+                    console.error('Unknown error during volume loading');
+                }
+            });
+        } catch (error) {
+            console.error('Critical error in NiiVue viewer initialization:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+        }
+    </script>
+</body>
+</html>

@@ -39,27 +39,45 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
 
-# Run the unified setup script
-python3 setup.py
+# Choose your setup approach:
+
+# Option A: Full setup (both frontend and backend)
+python3 setup_backend.py    # Sets up Vista3D AI server (requires GPU)
+python3 setup_frontend.py   # Sets up web interface and image server
+
+# Option B: Backend only (for GPU server)
+python3 setup_backend.py
+
+# Option C: Frontend only (for client machine)
+python3 setup_frontend.py
 ```
 
-**What the setup script does:**
-- ✅ Checks system requirements (OS, Python, GPU, Docker)
+**What the setup scripts do:**
+- ✅ **Backend Setup**: Checks GPU requirements, configures Vista3D AI server, sets up NGC integration
+- ✅ **Frontend Setup**: Sets up web interface and image server, configures connection to Vista3D server
 - ✅ Sets up Python environment with all dependencies
-- ✅ Configures Docker containers for all services
-- ✅ Prompts for your NVIDIA NGC API key
+- ✅ Configures Docker containers for services
+- ✅ Prompts for your NVIDIA NGC API key (backend only)
 - ✅ Creates all necessary directories and files
 
-### Step 2: Start All Services
+### Step 2: Start Services
 ```bash
-# Start all services (web interface, image server, and Vista3D AI)
+# Choose your deployment approach:
+
+# Option A: Start all services (if both frontend and backend are on same machine)
 python3 start.py
+
+# Option B: Start only backend (Vista3D AI server)
+python3 start.py --vista3d-only
+
+# Option C: Start only frontend (web interface and image server)
+python3 start.py --frontend-only
 ```
 
 **This starts:**
 - 🌐 **Streamlit Web Interface** (http://localhost:8501)
 - 🖼️ **Image Server** (http://localhost:8888)
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
+- 🧠 **Vista3D AI Server** (http://localhost:8000) - backend only
 
 ### Step 3: Process Your Images
 ```bash
@@ -136,8 +154,8 @@ docker compose --profile local-vista3d up vista3d-server
 ```
 Nvidia-Vista3d-segmenation/
 ├── app.py                 # Main Streamlit web application
-├── setup_vista3d_server.py    # Server setup script
-├── setup_vista3d_frontend.py  # Frontend setup script
+├── setup_backend.py       # Backend setup script (Vista3D AI server)
+├── setup_frontend.py      # Frontend setup script (web interface)
 ├── dot_env_template       # Environment configuration template
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
 ├── output/               # Generated files

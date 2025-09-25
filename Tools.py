@@ -11,6 +11,18 @@ import time
 # Add utils to path for imports
 sys.path.append(str(Path(__file__).parent / 'utils'))
 
+# Import badge modules
+from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vista_card
+from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
+
+def render_nvidia_vista_card():
+    """Delegate rendering to assets.vista3d_badge module."""
+    _render_nvidia_vista_card()
+
+def render_hpe_badge():
+    """Delegate rendering to assets.hpe_badge module."""
+    _render_hpe_badge()
+
 def run_command(command: List[str], description: str = "") -> tuple[bool, str, str]:
     """Run a command and return success status, stdout, and stderr."""
     try:
@@ -509,6 +521,13 @@ def main():
             page_icon="🛠️",
             layout="wide"
         )
+    
+    # Render badges in sidebar
+    render_nvidia_vista_card()
+    render_hpe_badge()
+    
+    # Add spacing between badges and main content
+    st.sidebar.markdown("")
     
     st.title("🛠️ Tools & Utilities")
     st.markdown("Access various tools and utilities for medical image processing and 3D visualization.")

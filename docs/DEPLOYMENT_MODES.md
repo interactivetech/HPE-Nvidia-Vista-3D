@@ -64,7 +64,8 @@ docker compose --profile local-vista3d up vista3d-server
 # 1. Clone and setup
 git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
-python3 setup.py
+python3 setup_backend.py    # Sets up Vista3D AI server (requires GPU)
+python3 setup_frontend.py   # Sets up web interface and image server
 
 # 2. Start all services
 python3 start.py
@@ -93,7 +94,7 @@ python3 start.py
 # 1. Setup frontend only
 git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
-python3 setup.py
+python3 setup_frontend.py   # Sets up web interface and image server only
 
 # 2. Edit .env file for remote Vista3D
 VISTA3D_SERVER=https://your-vista3d-server.com:8000

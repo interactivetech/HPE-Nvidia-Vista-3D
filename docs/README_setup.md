@@ -1,7 +1,9 @@
 
 # HPE NVIDIA Vista3D Medical AI Platform - Manual Setup Guide
 
-This guide provides manual setup steps for the Vista3D platform. For automated setup, see the main README.md.
+This guide provides manual setup steps for the Vista3D platform. For automated setup, see the main README.md or use the setup scripts:
+- `python setup_backend.py` - Sets up Vista3D AI server (requires GPU)
+- `python setup_frontend.py` - Sets up web interface and image server
 
 ## 🐳 Docker Setup (Recommended)
 

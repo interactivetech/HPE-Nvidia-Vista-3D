@@ -177,59 +177,11 @@ class VoxelManager:
         return overlays
 
     def create_custom_colormap_js(self) -> str:
-        """Generate JavaScript for custom segmentation colormap."""
-        try:
-            label_colors_list = self.config.label_colors
-            if not label_colors_list:
-                return ""
-
-            r_values, g_values, b_values, a_values, labels = [0]*256, [0]*256, [0]*256, [0]*256, [""]*256
-            r_values[0], g_values[0], b_values[0], a_values[0], labels[0] = 0, 0, 0, 0, "Background"
-
-            max_id = 0
-            for item in label_colors_list:
-                idx = item.get('id', 0)
-                label_name = item.get('name', '')
-                color = item.get('color', [0, 0, 0])
-
-                if 0 <= idx < 256:
-                    r_values[idx] = color[0]
-                    g_values[idx] = color[1]
-                    b_values[idx] = color[2]
-                    a_values[idx] = 255
-                    labels[idx] = label_name
-
-                if idx > max_id:
-                    max_id = idx
-
-            # Trim arrays to max_id + 1
-            r_values = r_values[:max_id+1]
-            g_values = g_values[:max_id+1]
-            b_values = b_values[:max_id+1]
-            a_values = a_values[:max_id+1]
-            labels = labels[:max_id+1]
-
-            # Format labels for JavaScript
-            js_labels = []
-            for label in labels:
-                escaped_label = label.replace('"', '\\"')
-                js_labels.append(f'"{escaped_label}"')
-            labels_string = ",".join(js_labels)
-
-            return f"""
-            const customSegmentationColormap = {{
-                R: [{",".join(map(str, r_values))}],
-                G: [{",".join(map(str, g_values))}],
-                B: [{",".join(map(str, b_values))}],
-                A: [{",".join(map(str, a_values))}],
-                labels: [{labels_string}]
-            }};
-            console.log('Vista3D colormap loaded from vista3d_label_colors.json:', customSegmentationColormap);
-            """
-
-        except Exception as e:
-            print(f"Error creating custom colormap: {e}")
-            return ""
+        """
+        Legacy method for backward compatibility.
+        The colormap is now loaded directly in the HTML template from the colormap system.
+        """
+        return "// Vista3D voxels colormap now loaded from colormap system in HTML template"
 
     def get_voxel_legend_html(self) -> str:
         """Generate HTML for the voxel legend display."""
