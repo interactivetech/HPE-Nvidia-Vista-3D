@@ -22,7 +22,6 @@ class TemplateRenderer:
         self,
         volume_list_js: str,
         overlay_colors_js: str,
-        custom_colormap_js: str,
         **kwargs
     ) -> str:
         """
@@ -34,23 +33,17 @@ class TemplateRenderer:
             with open(niivue_lib_path, 'r') as f:
                 niivue_lib_content = f.read()
 
-            # Load the colormap manager content directly from the utils folder
-            colormap_manager_path = Path(__file__).parent / 'colormap_manager.js'
-            with open(colormap_manager_path, 'r') as f:
-                colormap_manager_content = f.read()
-
             template = self.env.get_template('niivue_viewer.html')
 
             # Prepare template variables
             template_vars = {
                 'niivue_lib_content': niivue_lib_content,
-                'colormap_manager_content': colormap_manager_content,
                 'volume_list_js': volume_list_js,
                 'overlay_colors_js': overlay_colors_js,
-                'custom_colormap_js': custom_colormap_js,
+                'label_colors_js': kwargs.get('label_colors_js', '[]'),
                 'image_server_url': kwargs.get('image_server_url', ''),
                 'main_is_nifti': kwargs.get('main_is_nifti', True),
-                'main_vol': kwargs.get('main_vol', True),
+                'main_vol_visible': kwargs.get('main_vol_visible', True),
                 'color_map_js': kwargs.get('color_map_js', '"gray"'),
                 'nifti_gamma': kwargs.get('nifti_gamma', 1.0),
                 'nifti_opacity': kwargs.get('nifti_opacity', 1.0),

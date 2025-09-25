@@ -1,13 +1,15 @@
 {
   "name": "Linspecer Colormap Set",
   "description": "Linspecer colormap for various visualizations.",
+  "version": "1.0",
+  "default": "linspecer",
   "colormaps": {
     "linspecer": {
-      "min": 0,
-      "max": 0,
       "R": [0, 0, 0, 0, 10, 182, 255, 255, 255, 240, 169],
       "G": [156, 172, 233, 248, 206, 230, 232, 199, 142, 70, 0],
-      "B": [156, 172, 137, 72, 0, 0, 0, 0, 0, 0, 0]
+      "B": [156, 172, 137, 72, 0, 0, 0, 0, 0, 0, 0],
+      "A": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+      "labels": ["Min", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
     }
   }
 }

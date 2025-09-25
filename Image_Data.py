@@ -133,6 +133,9 @@ def main():
     # Render HPE AI badge in sidebar
     _render_hpe_badge()
     
+    # Add spacing between HPE badge and server status
+    st.sidebar.markdown("")
+    
     # Render server status widgets in sidebar
     render_server_status_sidebar()
     

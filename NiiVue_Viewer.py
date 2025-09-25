@@ -300,7 +300,9 @@ def render_file_upload():
 # --- Main Application ---
 def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: bool = False):
     """Render the main NiiVue viewer."""
+    print(f"DEBUG: render_viewer called with patient={selected_patient}, file={selected_file}, is_uploaded={is_uploaded_file}")
     if not selected_file:
+        print("DEBUG: No file selected, showing message")
         st.info(MESSAGES['select_patient_file'])
         return
 
@@ -329,9 +331,15 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
         # Regular patient file
         base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
 
+    # Build volume list for NiiVue
+    volume_list_entries = []
+    show_nifti_setting = viewer_config.settings.get('show_nifti', True)
+    if show_nifti_setting:
+        volume_list_entries.append({"url": base_file_url})
+
     # Create overlays based on voxel mode (only for regular patient files, not uploaded files)
     overlays = []
-    if not is_uploaded_file and selected_patient:
+    if not is_uploaded_file and selected_patient and viewer_config.settings.get('show_overlay', False):
         overlays = voxel_manager.create_overlays(
             selected_patient,
             selected_file,
@@ -339,17 +347,16 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
             viewer_config.selected_individual_voxels,
             external_url=EXTERNAL_IMAGE_SERVER_URL
         )
-
-    # Build volume list for NiiVue
-    volume_list_entries = []
-    if viewer_config.settings.get('show_nifti', True):
-        volume_list_entries.append({"url": base_file_url})
-
-    # Add overlay volumes
-    if viewer_config.settings.get('show_overlay', False) and overlays:
+        
+        # Add overlay volumes to the volume list
         for overlay in overlays:
             if overlay.get('url'):
                 volume_list_entries.append({"url": overlay['url']})
+
+    # If only voxels are requested (no NIfTI) and at least one overlay exists,
+    # DO NOT include the base NIfTI. Modern NiiVue can render overlays-only.
+    # Keep this flag false to avoid accidental visibility of the base scan.
+    force_base_placeholder = False
 
     if not volume_list_entries:
         st.info(MESSAGES['no_nifti_or_voxels'])
@@ -358,7 +365,6 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
     # Prepare JavaScript data
     volume_list_js = json.dumps(volume_list_entries)
     overlay_colors_js = json.dumps(overlays)
-    custom_colormap_js = voxel_manager.create_custom_colormap_js()
 
     print(f"DEBUG (NiiVue_Viewer): Prepared volume_list_js: {volume_list_js}")
 
@@ -378,21 +384,24 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
     html_content = template_renderer.render_viewer(
         volume_list_js=volume_list_js,
         overlay_colors_js=overlay_colors_js,
-        custom_colormap_js=custom_colormap_js,
+        label_colors_js=json.dumps(config_manager.label_colors or []),
         image_server_url=EXTERNAL_IMAGE_SERVER_URL,
-        main_is_nifti=settings.get('show_nifti', True),
-        main_vol=settings.get('show_nifti', True),
+        # Keep a hidden base when overlays-only view is requested
+        main_is_nifti=True if force_base_placeholder else settings.get('show_nifti', True),
+        main_vol_visible=False if force_base_placeholder else True,
         color_map_js=json.dumps(settings.get('color_map', 'gray')),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
-        nifti_opacity=settings.get('nifti_opacity', 1.0),
+        # Make placeholder base fully transparent
+        nifti_opacity=0.0 if force_base_placeholder else settings.get('nifti_opacity', 1.0),
         window_center=window_center,
         window_width=window_width,
-        overlay_start_index=1 if settings.get('show_nifti', True) else 0,
+        overlay_start_index=1 if (settings.get('show_nifti', True) or force_base_placeholder) else 0,
         actual_slice_type=actual_slice_type,
         segment_opacity=settings.get('segment_opacity', 0.5)
     )
 
     # Display the viewer
+    print(f"DEBUG: Rendering viewer with colormap: {settings.get('color_map', 'gray')}")
     components.html(html_content, height=VIEWER_HEIGHT, scrolling=False)
 
 
