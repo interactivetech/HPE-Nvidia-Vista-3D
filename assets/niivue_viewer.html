@@ -39,8 +39,28 @@
 
             {{ custom_colormap_js|safe }}
             if (typeof customSegmentationColormap !== 'undefined') {
-                nv.addColormap('custom_segmentation', customSegmentationColormap);
-                console.log('Custom segmentation colormap added');
+                // Create a normalized colormap for NiiVue (values 0-1)
+                const normalizedColormap = {
+                    R: customSegmentationColormap.R.map(v => v / 255),
+                    G: customSegmentationColormap.G.map(v => v / 255),
+                    B: customSegmentationColormap.B.map(v => v / 255),
+                    A: customSegmentationColormap.A.map(v => v / 255),
+                    labels: customSegmentationColormap.labels
+                };
+                
+                nv.addColormap('custom_segmentation', normalizedColormap);
+                console.log('Custom segmentation colormap added (normalized):', normalizedColormap);
+                console.log('First 10 normalized colors:', {
+                    R: normalizedColormap.R.slice(0, 10),
+                    G: normalizedColormap.G.slice(0, 10),
+                    B: normalizedColormap.B.slice(0, 10)
+                });
+                
+                // Also add the original format as backup
+                nv.addColormap('vista3d_original', customSegmentationColormap);
+                console.log('Original format colormap added as backup');
+            } else {
+                console.error('Custom segmentation colormap is undefined!');
             }
 
             // For "all segmentation" mode, use the same colormap as individual voxels
@@ -85,11 +105,25 @@
 
                         // Check if this is the "all segmentation" mode
                         if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].is_all_segmentation) {
-                            // Use the same colormap as individual voxels for consistency
-                            if (typeof customSegmentationColormap !== 'undefined') {
-                                nv.setColormap(overlayVol.id, 'custom_segmentation');
-                                console.log('Applied custom_segmentation colormap to all segmentation overlay');
-                            }
+                            console.log('=== ALL SEGMENTATION OVERLAY DETECTED ===');
+                            console.log('Overlay ID:', overlayVol.id);
+                            console.log('Overlay URL:', overlayColors[overlayIndex].url);
+                            
+                            // Apply Vista3D colormap
+                            nv.setColormap(overlayVol.id, 'vista3d_original');
+                            
+                            // Set and log properties
+                            overlayVol.opacity = {{ segment_opacity }};
+                            console.log('Set opacity to:', overlayVol.opacity);
+                            console.log('Volume visible after setup:', overlayVol.visible);
+                            
+                            // Add a check to monitor if the overlay disappears
+                            setTimeout(() => {
+                                console.log('=== 2 SECOND CHECK ===');
+                                console.log('Overlay still visible?:', overlayVol.visible);
+                                console.log('Overlay opacity now:', overlayVol.opacity);
+                                console.log('Current colormap:', overlayVol.colormap);
+                            }, 2000);
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
                             const color = overlayColors[overlayIndex].color;
                             const labelName = overlayColors[overlayIndex].label_name;
@@ -111,7 +145,13 @@
                             // Fallback to generic segmentation colormap
                             if (typeof customSegmentationColormap !== 'undefined') {
                                 nv.setColormap(overlayVol.id, 'custom_segmentation');
-                                console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
+                                console.log('Applied custom_segmentation colormap to overlay volume (fallback):', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
+                                // Force a redraw to ensure the colormap is applied
+                                setTimeout(() => {
+                                    nv.drawScene();
+                                }, 100);
+                            } else {
+                                console.error('Custom segmentation colormap is undefined in fallback!');
                             }
                         }
                     }
@@ -120,51 +160,65 @@
                 // PROTECTED: Re-enforce main volume colormap after overlay processing to prevent interference
                 {% if main_is_nifti and main_vol %}
                 if ({{ main_is_nifti|lower }} && mainVol) {
-                    nv.setColormap(mainVol.id, {{ color_map_js|safe }});
-                    console.log('Re-applied main volume colormap after overlay processing');
+                    // Only apply to the main volume, not overlays
+                    if (mainVol.id !== nv.volumes[{{ overlay_start_index }}]?.id) {
+                        nv.setColormap(mainVol.id, {{ color_map_js|safe }});
+                        console.log('Re-applied main volume colormap after overlay processing');
+                    }
                 }
                 {% endif %}
 
                 // Honor requested slice type
-                nv.setSliceType({{ actual_slice_type }});
-                {% if actual_slice_type == 3 %}
-                // Multiplanar view with 4 panes
-                nv.opts.multiplanarShowRender = true;
-                nv.opts.multiplanarForceRender = true;
-                nv.opts.showCrosshairs = true;
-                nv.opts.show3Dcrosshair = true;
-                // Enable 3D rendering for the bottom-right panel
-                nv.opts.isOrientCube = false;
-                nv.opts.isRuler = false;
-                setTimeout(() => {
-                    nv.drawScene();
-                }, 500);
-                {% elif actual_slice_type == 4 %}
-                // 3D Render mode - full 3D view
-                nv.opts.multiplanarShowRender = false;
-                nv.opts.multiplanarForceRender = false;
-                nv.opts.showCrosshairs = false;
-                nv.opts.show3Dcrosshair = true;
-                nv.opts.isOrientCube = false;
-                nv.opts.isRuler = false;
-                nv.opts.isRadiologicalConvention = false;
-                // Enable 3D rendering
-                setTimeout(() => {
-                    nv.drawScene();
-                }, 500);
-                {% else %}
-                // Ensure multiplanar flags are disabled when not in multiplanar mode
-                nv.opts.multiplanarShowRender = false;
-                nv.opts.multiplanarForceRender = false;
-                nv.opts.showCrosshairs = false;
-                nv.opts.show3Dcrosshair = false;
-                {% endif %}
+                const sliceType = {{ actual_slice_type }};
+                console.log('Setting slice type to:', sliceType);
+                nv.setSliceType(sliceType);
+                
+                // Configure view options based on slice type
+                if (sliceType === 3) {
+                    // Multiplanar view with 4 panes
+                    console.log('Configuring for Multiplanar view');
+                    nv.opts.multiplanarShowRender = true;
+                    nv.opts.multiplanarForceRender = true;
+                    nv.opts.showCrosshairs = true;
+                    nv.opts.show3Dcrosshair = true;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                } else if (sliceType === 4) {
+                    // 3D Render mode - full 3D view
+                    console.log('Configuring for 3D Render view');
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = true;
+                    nv.opts.isOrientCube = false;
+                    nv.opts.isRuler = false;
+                    nv.opts.isRadiologicalConvention = false;
+                } else {
+                    // Single view modes (0, 1, 2)
+                    console.log('Configuring for Single view mode');
+                    nv.opts.multiplanarShowRender = false;
+                    nv.opts.multiplanarForceRender = false;
+                    nv.opts.showCrosshairs = false;
+                    nv.opts.show3Dcrosshair = false;
+                }
+                
                 nv.drawScene();
-
-                // Final redraw to ensure colormap is applied
+                
+                // Simple final step: just ensure 3D render mode if needed
                 setTimeout(() => {
-                    nv.drawScene();
-                }, 100);
+                    // Force 3D render mode if slice type is 4
+                    if (sliceType === 4) {
+                        console.log('Final: Ensuring 3D render mode');
+                        nv.setSliceType(4);
+                        nv.opts.multiplanarShowRender = false;
+                        nv.opts.multiplanarForceRender = false;
+                        nv.opts.showCrosshairs = false;
+                        nv.opts.show3Dcrosshair = true;
+                        nv.drawScene();
+                    }
+                }, 500);
+
+                
 
             }).catch((error) => {
                 console.error('Error loading volumes:', error);

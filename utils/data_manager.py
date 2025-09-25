@@ -9,7 +9,7 @@ import requests
 from typing import List, Dict, Optional, Tuple, Set
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from constants import SERVER_TIMEOUT
+from utils.constants import SERVER_TIMEOUT
 
 # Load environment variables
 load_dotenv()
