@@ -328,20 +328,11 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
             # Update the NIfTI image with enhanced data
             enhanced_img = nib.Nifti1Image(data, img.affine, img.header)
             
-            # Save the enhanced version with proper filename handling
-            if nifti_file.suffix == '.gz':
-                # Handle .nii.gz files properly
-                base_name = nifti_file.name.replace('.nii.gz', '')
-                enhanced_file = nifti_file.parent / f"{base_name}_enhanced.nii.gz"
-            else:
-                # Handle .nii files
-                base_name = nifti_file.stem
-                enhanced_file = nifti_file.with_name(base_name + '_enhanced' + nifti_file.suffix)
-            
-            nib.save(enhanced_img, enhanced_file)
+            # Save the enhanced version directly to the original file (in-place enhancement)
+            nib.save(enhanced_img, str(nifti_file))
             
             print(f"    ✅ Applied unsharp mask sharpening (σ={sigma}, amount={amount})")
-            print(f"    💾 Saved enhanced version: {enhanced_file.name}")
+            print(f"    💾 Enhanced original file in-place: {nifti_file.name}")
             
             # Update the data for quality reporting
             data = enhanced_img.get_fdata()
@@ -484,7 +475,7 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
                         'is_reformatted': True,
                         'image_type': json_metadata.get('ImageType', []),
                         'series_description': json_metadata.get('SeriesDescription', 'Unknown'),
-                        'quality_note': 'This is a reformatted slice derived from axial data. Quality may be affected by interpolation and compression artifacts.'
+                        'quality_note': 'This is a reformatted slice enhanced in-place with unsharp mask sharpening for maximum quality visualization.'
                     }
                 else:
                     quality_info['reformatted_slice_info'] = {
@@ -517,7 +508,7 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         
         if is_reformatted:
             print(f"    📐 Reformatted Slice Quality:")
-            print(f"       Enhanced with unsharp mask sharpening")
+            print(f"       Enhanced in-place with unsharp mask sharpening")
             print(f"       Optimized for maximum edge definition")
         
         return {
@@ -823,7 +814,7 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
         print("   • No cropping/rotation (preserves all data)")
         print("   • Lossless 16-bit scaling for full dynamic range")
         print("   • Optimal compression with maximum quality")
-        print("   • Unsharp mask sharpening for reformatted slices")
+        print("   • In-place unsharp mask sharpening for reformatted slices")
         print("   • Advanced interpolation (cubic/quintic)")
         print("   • Comprehensive quality metrics calculation")
         print("   • Enhanced quality reports with detailed analysis")
