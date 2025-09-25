@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-HPE NVIDIA Vista3D - Unified Setup Script
-Simplified setup for single GPU-enabled host running all services locally
+HPE NVIDIA Vista3D - Frontend Setup Script
+Sets up the frontend components (Streamlit app and image server) for Vista3D
 """
 
 import os
@@ -27,8 +27,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class Vista3DUnifiedSetup:
-    """Unified setup for Vista3D on single GPU-enabled host"""
+class Vista3DFrontendSetup:
+    """Setup for Vista3D frontend components (Streamlit app and image server)"""
     
     def __init__(self):
         self.script_dir = Path(__file__).parent
@@ -50,36 +50,36 @@ class Vista3DUnifiedSetup:
     def print_banner(self):
         """Print setup banner"""
         print("\n" + "="*80)
-        print("🚀 HPE NVIDIA Vista3D - Unified Setup")
+        print("🌐 HPE NVIDIA Vista3D - Frontend Setup")
         print("="*80)
-        print("This script will set up the complete Vista3D platform on your GPU-enabled host.")
-        print("It will configure and start all services (frontend, image server, and Vista3D AI).")
+        print("This script will set up the frontend components for Vista3D:")
+        print("- Streamlit web interface (port 8501)")
+        print("- Image server for medical files (port 8888)")
         print("="*80)
         
         print("\n📋 WHAT THIS SETUP DOES:")
         print("-" * 40)
-        print("✅ Sets up Python environment with all dependencies")
-        print("✅ Configures Docker containers for all services")
-        print("✅ Sets up Vista3D AI server (requires NVIDIA GPU)")
-        print("✅ Configures web interface and image server")
-        print("✅ Creates all necessary directories and files")
-        print("✅ Starts all services automatically")
+        print("✅ Sets up Python environment with frontend dependencies")
+        print("✅ Configures Docker containers for frontend services")
+        print("✅ Sets up Streamlit web interface")
+        print("✅ Configures image server for medical files")
+        print("✅ Creates necessary directories and files")
+        print("✅ Configures networking and CORS settings")
         
         print("\n🔧 REQUIREMENTS:")
         print("-" * 40)
         print("• Ubuntu Linux (18.04+) or macOS")
-        print("• NVIDIA GPU with CUDA support (8GB+ VRAM recommended)")
-        print("• 16GB+ RAM")
-        print("• Docker and NVIDIA Container Toolkit (REQUIRED)")
-        print("• NVIDIA NGC account and API key")
+        print("• 8GB+ RAM (no GPU required for frontend)")
+        print("• Docker and Docker Compose")
         print("• Internet connectivity")
+        print("• Vista3D backend server URL (for AI processing)")
         
         print("="*80 + "\n")
     
     def check_system_requirements(self) -> bool:
-        """Check system requirements"""
+        """Check system requirements for frontend"""
         print("\n" + "="*60)
-        print("🔍 CHECKING SYSTEM REQUIREMENTS")
+        print("🔍 CHECKING FRONTEND SYSTEM REQUIREMENTS")
         print("="*60)
         
         issues = []
@@ -111,7 +111,7 @@ class Vista3DUnifiedSetup:
         print("\n📍 Checking Docker...")
         if not shutil.which('docker'):
             print("❌ Docker not found")
-            print("   Docker is required for Vista3D containers")
+            print("   Docker is required for frontend containers")
             issues.append("Docker not found")
         else:
             try:
@@ -126,161 +126,68 @@ class Vista3DUnifiedSetup:
                 print(f"❌ Docker error: {e}")
                 issues.append(f"Docker error: {e}")
         
-        # Check NVIDIA GPU
-        print("\n📍 Checking NVIDIA GPU...")
-        nvidia_gpus = self.check_nvidia_gpus()
-        if nvidia_gpus['has_gpus']:
-            print(f"✅ NVIDIA GPU(s) detected:")
-            for i, gpu in enumerate(nvidia_gpus['gpus']):
-                print(f"   {i+1}. {gpu['name']} ({gpu['memory']})")
-            print("   This system can run Vista3D AI models")
+        # Check Docker Compose
+        print("\n📍 Checking Docker Compose...")
+        if not self.check_docker_compose():
+            print("❌ Docker Compose not found")
+            print("   Docker Compose is required for frontend services")
+            issues.append("Docker Compose not found")
         else:
-            print("❌ No NVIDIA GPUs detected")
-            print("   NVIDIA GPUs are required for Vista3D")
-            issues.append("NVIDIA GPU required for Vista3D")
+            print("✅ Docker Compose is available")
         
-        # Check NVIDIA Container Toolkit
-        print("\n📍 Checking NVIDIA Container Toolkit...")
-        if not self.check_nvidia_container_toolkit():
-            print("❌ NVIDIA Container Toolkit not found")
-            print("   Required for GPU access in Docker containers")
-            issues.append("NVIDIA Container Toolkit not found")
-        else:
-            print("✅ NVIDIA Container Toolkit is available")
+        # Check memory (less strict for frontend)
+        print("\n📍 Checking system memory...")
+        try:
+            if self.system_info['platform'] == 'Linux':
+                with open('/proc/meminfo', 'r') as f:
+                    meminfo = f.read()
+                for line in meminfo.split('\n'):
+                    if line.startswith('MemTotal:'):
+                        total_kb = int(line.split()[1])
+                        total_gb = total_kb / (1024 * 1024)
+                        if total_gb < 4:
+                            print(f"⚠️  Low memory: {total_gb:.1f}GB (recommended: 4GB+)")
+                            print("   Frontend may run slowly with insufficient memory")
+                        else:
+                            print(f"✅ Sufficient memory: {total_gb:.1f}GB")
+                        break
+            else:
+                print("✅ Memory check skipped on macOS")
+        except Exception as e:
+            print(f"⚠️  Could not check memory: {e}")
         
         # Summary
         print("\n" + "-"*60)
         if issues:
-            print("❌ SYSTEM REQUIREMENTS SUMMARY:")
+            print("❌ FRONTEND REQUIREMENTS SUMMARY:")
             print(f"   Found {len(issues)} issue(s) that need attention:")
             for i, issue in enumerate(issues, 1):
                 print(f"   {i}. {issue}")
             return False
         else:
-            print("✅ SYSTEM REQUIREMENTS SUMMARY:")
-            print("   All system requirements are met!")
-            print("   Your system is ready for Vista3D setup.")
+            print("✅ FRONTEND REQUIREMENTS SUMMARY:")
+            print("   All frontend requirements are met!")
+            print("   Your system is ready for frontend setup.")
         
         return True
     
-    def check_nvidia_gpus(self) -> Dict:
-        """Check for NVIDIA GPUs"""
+    def check_docker_compose(self) -> bool:
+        """Check if Docker Compose is available"""
         try:
-            result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total', '--format=csv,noheader,nounits'], 
-                                  capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0 and result.stdout.strip():
-                gpus = []
-                for line in result.stdout.strip().split('\n'):
-                    if line.strip():
-                        parts = line.split(',')
-                        if len(parts) >= 2:
-                            name = parts[0].strip()
-                            memory_mb = parts[1].strip()
-                            try:
-                                memory_gb = int(memory_mb) / 1024
-                                gpus.append({
-                                    'name': name,
-                                    'memory': f"{memory_gb:.1f} GB",
-                                    'memory_mb': int(memory_mb)
-                                })
-                            except:
-                                gpus.append({
-                                    'name': name,
-                                    'memory': f"{memory_mb} MB",
-                                    'memory_mb': 0
-                                })
-                
-                return {
-                    'has_gpus': len(gpus) > 0,
-                    'gpu_count': len(gpus),
-                    'gpus': gpus,
-                    'total_memory_gb': sum(gpu['memory_mb'] for gpu in gpus) / 1024 if gpus else 0
-                }
-            else:
-                return {'has_gpus': False, 'gpu_count': 0, 'gpus': [], 'total_memory_gb': 0}
-                
-        except Exception:
-            return {'has_gpus': False, 'gpu_count': 0, 'gpus': [], 'total_memory_gb': 0}
-    
-    def check_nvidia_container_toolkit(self) -> bool:
-        """Check if NVIDIA Container Toolkit is installed"""
-        try:
-            result = subprocess.run(['which', 'nvidia-ctk'], capture_output=True, text=True)
+            result = subprocess.run(['docker', 'compose', 'version'], capture_output=True, text=True)
             if result.returncode == 0:
-                result = subprocess.run(['docker', 'info'], capture_output=True, text=True)
-                if 'nvidia' in result.stdout.lower():
-                    return True
-            return False
+                return True
+            
+            # Try older docker-compose command
+            result = subprocess.run(['docker-compose', '--version'], capture_output=True, text=True)
+            return result.returncode == 0
         except Exception:
             return False
-    
-    def get_ngc_api_key(self) -> Optional[str]:
-        """Get NGC API key from environment variable, .env file, or prompt user"""
-        # First check environment variable
-        api_key = os.getenv('NGC_API_KEY')
-        if api_key and api_key.startswith('nvapi-') and len(api_key) > 10:
-            print("✅ Found NGC API key in environment variable")
-            return api_key
-        
-        # Then check .env file if it exists
-        if self.env_file.exists():
-            try:
-                with open(self.env_file, 'r') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith('NGC_API_KEY='):
-                            # Extract value, handling both quoted and unquoted values
-                            value = line.split('=', 1)[1].strip()
-                            if value.startswith('"') and value.endswith('"'):
-                                value = value[1:-1]
-                            elif value.startswith("'") and value.endswith("'"):
-                                value = value[1:-1]
-                            
-                            if value.startswith('nvapi-') and len(value) > 10:
-                                print("✅ Found NGC API key in .env file")
-                                return value
-            except Exception as e:
-                logger.warning(f"Could not read .env file: {e}")
-        
-        # If not found, return None to prompt user
-        return None
-    
-    def get_ngc_org_id(self) -> Optional[str]:
-        """Get NGC Organization ID from environment variable, .env file, or prompt user"""
-        # First check environment variable
-        org_id = os.getenv('NGC_ORG_ID')
-        if org_id and org_id.strip():
-            print("✅ Found NGC Organization ID in environment variable")
-            return org_id.strip()
-        
-        # Then check .env file if it exists
-        if self.env_file.exists():
-            try:
-                with open(self.env_file, 'r') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith('NGC_ORG_ID='):
-                            # Extract value, handling both quoted and unquoted values
-                            value = line.split('=', 1)[1].strip()
-                            if value.startswith('"') and value.endswith('"'):
-                                value = value[1:-1]
-                            elif value.startswith("'") and value.endswith("'"):
-                                value = value[1:-1]
-                            
-                            if value.strip():
-                                print("✅ Found NGC Organization ID in .env file")
-                                return value.strip()
-            except Exception as e:
-                logger.warning(f"Could not read .env file: {e}")
-        
-        # If not found, return None to prompt user
-        return None
     
     def setup_python_environment(self) -> bool:
-        """Set up Python environment"""
+        """Set up Python environment for frontend"""
         print("\n" + "="*60)
-        print("🐍 SETTING UP PYTHON ENVIRONMENT")
+        print("🐍 SETTING UP PYTHON ENVIRONMENT (FRONTEND)")
         print("="*60)
         
         # Check for uv package manager
@@ -297,7 +204,7 @@ class Vista3DUnifiedSetup:
             print("✅ uv package manager is available")
         
         # Install dependencies
-        print("\n📍 Installing project dependencies...")
+        print("\n📍 Installing frontend dependencies...")
         try:
             print("🔧 Running 'uv sync' to install dependencies...")
             result = subprocess.run(['uv', 'sync'], cwd=self.project_root, 
@@ -305,7 +212,7 @@ class Vista3DUnifiedSetup:
                                  text=True, universal_newlines=True)
             
             if result.returncode == 0:
-                print("✅ Dependencies installed successfully")
+                print("✅ Frontend dependencies installed successfully")
                 return True
             else:
                 print("❌ Dependency installation failed")
@@ -341,9 +248,9 @@ class Vista3DUnifiedSetup:
             return False
     
     def gather_configuration(self) -> Dict:
-        """Gather configuration from user"""
+        """Gather configuration for frontend"""
         print("\n" + "="*60)
-        print("📝 CONFIGURATION")
+        print("📝 FRONTEND CONFIGURATION")
         print("="*60)
         
         config = {}
@@ -357,53 +264,41 @@ class Vista3DUnifiedSetup:
         print(f"✅ DICOM folder: {config['DICOM_FOLDER']}")
         print(f"✅ Output folder: {config['OUTPUT_FOLDER']}")
         
-        # Server URLs
+        # Frontend server URLs
         config['IMAGE_SERVER'] = "http://localhost:8888"
-        config['VISTA3D_SERVER'] = "http://localhost:8000"
         print(f"✅ Image server: {config['IMAGE_SERVER']}")
+        
+        # Vista3D backend server URL
+        print("\n📍 Vista3D Backend Configuration:")
+        print("   Enter the URL of your Vista3D backend server")
+        print("   (This can be localhost if running locally, or a remote server)")
+        
+        vista3d_server = input("Vista3D Server URL [http://localhost:8000]: ").strip() or "http://localhost:8000"
+        config['VISTA3D_SERVER'] = vista3d_server
         print(f"✅ Vista3D server: {config['VISTA3D_SERVER']}")
         
-        # NGC credentials
-        print("\n📍 NVIDIA NGC Configuration:")
-        print("   Get your API key from: https://ngc.nvidia.com/")
+        # Frontend ports
+        print("\n📍 Frontend Port Configuration:")
+        streamlit_port = input("Streamlit port [8501]: ").strip() or "8501"
+        image_server_port = input("Image server port [8888]: ").strip() or "8888"
         
-        # Try to get API key from environment or .env file first
-        api_key = self.get_ngc_api_key()
+        config['STREAMLIT_SERVER_PORT'] = streamlit_port
+        config['IMAGE_SERVER_PORT'] = image_server_port
+        print(f"✅ Streamlit port: {streamlit_port}")
+        print(f"✅ Image server port: {image_server_port}")
         
-        if api_key is None:
-            # Prompt user for API key if not found
-            print("   No valid API key found in environment or .env file")
-            while True:
-                api_key = input("Enter your NGC API Key (starts with 'nvapi-'): ").strip()
-                if api_key.startswith('nvapi-') and len(api_key) > 10:
-                    print("✅ API key accepted")
-                    break
-                print("❌ Invalid API key. Must start with 'nvapi-' and be longer than 10 characters.")
+        # Network configuration
+        print("\n📍 Network Configuration:")
+        use_host_networking = input("Use host networking? (y/N): ").strip().lower() in ['y', 'yes']
+        config['USE_HOST_NETWORKING'] = str(use_host_networking)
+        print(f"✅ Host networking: {use_host_networking}")
         
-        config['NGC_API_KEY'] = api_key
-        
-        # Try to get Organization ID from environment or .env file first
-        org_id = self.get_ngc_org_id()
-        
-        if org_id is None:
-            # Prompt user for Organization ID if not found
-            print("   No Organization ID found in environment or .env file")
-            org_id = input("Enter NGC Organization ID [nvidia]: ").strip() or "nvidia"
-        else:
-            print(f"   Using Organization ID: {org_id}")
-        
-        config['NGC_ORG_ID'] = org_id
-        config['LOCAL_NIM_CACHE'] = str(Path.home() / ".cache" / "nim")
-        
-        # Segmentation settings
-        config['VESSELS_OF_INTEREST'] = "all"
-        print("✅ Segmentation: All detectable structures")
         
         return config
     
     def create_env_file(self, config: Dict) -> bool:
-        """Create .env file"""
-        logger.info("📄 Creating .env file...")
+        """Create .env file for frontend"""
+        logger.info("📄 Creating .env file for frontend...")
         
         try:
             # Read template
@@ -436,13 +331,16 @@ class Vista3DUnifiedSetup:
             return False
     
     def create_directories(self, config: Dict) -> bool:
-        """Create required directories"""
+        """Create required directories for frontend"""
         logger.info("📁 Creating required directories...")
         
         try:
             directories = [
                 Path(config['DICOM_FOLDER']),
-                Path(config['OUTPUT_FOLDER'])
+                Path(config['OUTPUT_FOLDER']),
+                Path(config['OUTPUT_FOLDER']) / "nifti",
+                Path(config['OUTPUT_FOLDER']) / "logs",
+                Path(config['OUTPUT_FOLDER']) / "scans"
             ]
             
             for directory in directories:
@@ -455,35 +353,67 @@ class Vista3DUnifiedSetup:
             logger.error(f"❌ Failed to create directories: {e}")
             return False
     
+    def test_frontend_connectivity(self, config: Dict) -> bool:
+        """Test frontend connectivity to backend"""
+        print("\n" + "="*60)
+        print("🔗 TESTING FRONTEND CONNECTIVITY")
+        print("="*60)
+        
+        vista3d_server = config.get('VISTA3D_SERVER', 'http://localhost:8000')
+        
+        print(f"\n📍 Testing connection to Vista3D backend: {vista3d_server}")
+        try:
+            response = requests.get(f"{vista3d_server}/health", timeout=10)
+            if response.status_code == 200:
+                print("✅ Vista3D backend is accessible")
+                return True
+            else:
+                print(f"⚠️  Vista3D backend responded with status {response.status_code}")
+                print("   This may be normal if the backend is not running yet")
+                return True  # Don't fail setup for this
+        except Exception as e:
+            print(f"⚠️  Could not connect to Vista3D backend: {e}")
+            print("   This is normal if the backend is not running yet")
+            print("   You can start the backend later with: python start_backend.py")
+            return True  # Don't fail setup for this
+    
     def print_next_steps(self, config: Dict):
-        """Print next steps"""
+        """Print next steps for frontend"""
         print("\n" + "="*80)
-        print("🎉 SETUP COMPLETE!")
+        print("🎉 FRONTEND SETUP COMPLETE!")
         print("="*80)
         
         print("\n📋 NEXT STEPS:")
-        print("\n1. 🚀 Start all services:")
-        print("   python start.py")
-        print("   • This starts the web interface, image server, and Vista3D AI")
-        print("   • All services will run in Docker containers")
+        print("\n1. 🚀 Start frontend services:")
+        print("   python start_frontend.py")
+        print("   • This starts the Streamlit app and image server")
+        print("   • Both services will run in Docker containers")
         
-        print("\n2. 📁 Add your medical images:")
+        print("\n2. 🧠 Start Vista3D backend (on GPU-enabled machine):")
+        print("   python start_backend.py")
+        print("   • This starts the Vista3D AI server")
+        print("   • Requires NVIDIA GPU and NGC API key")
+        
+        print("\n3. 📁 Add your medical images:")
         print(f"   • Place DICOM files in: {config['DICOM_FOLDER']}")
         print("   • Or place NIFTI files in: output/nifti/")
         
-        print("\n3. 🌐 Access the web interface:")
-        print("   • Open your browser to: http://localhost:8501")
+        print("\n4. 🌐 Access the web interface:")
+        streamlit_port = config.get('STREAMLIT_SERVER_PORT', '8501')
+        image_server_port = config.get('IMAGE_SERVER_PORT', '8888')
+        print(f"   • Open your browser to: http://localhost:{streamlit_port}")
+        print(f"   • Image server available at: http://localhost:{image_server_port}")
         print("   • Use the Tools page to convert DICOM to NIFTI")
         print("   • Use the Tools page to run AI segmentation")
         print("   • View 3D visualizations of your results")
         
         print(f"\n📄 Configuration saved to: {self.env_file}")
-        print("🔐 Keep your .env file secure - it contains your API key")
+        print("🔐 Keep your .env file secure - it contains your configuration")
         
         print("\n" + "="*80)
     
     def run_setup(self) -> bool:
-        """Run the complete setup process"""
+        """Run the complete frontend setup process"""
         try:
             self.print_banner()
             
@@ -510,6 +440,9 @@ class Vista3DUnifiedSetup:
                 print("\n❌ Failed to create directories")
                 return False
             
+            # Step 6: Test connectivity
+            self.test_frontend_connectivity(config)
+            
             # Final step: Show next steps
             self.print_next_steps(config)
             
@@ -525,33 +458,36 @@ class Vista3DUnifiedSetup:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description="HPE NVIDIA Vista3D - Unified Setup",
+        description="HPE NVIDIA Vista3D - Frontend Setup",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-This script sets up the complete Vista3D platform on a single GPU-enabled host.
+This script sets up the frontend components of the Vista3D platform.
+
+Frontend Components:
+  • Streamlit web interface (port 8501)
+  • Image server for medical files (port 8888)
 
 Requirements:
   • Ubuntu Linux (18.04+) or macOS
-  • NVIDIA GPU with CUDA support (8GB+ VRAM recommended)
-  • 16GB+ RAM
-  • Docker and NVIDIA Container Toolkit
-  • NVIDIA NGC account and API key
+  • 4GB+ RAM (no GPU required for frontend)
+  • Docker and Docker Compose
+  • Internet connectivity
 
 The setup will:
   1. Check system requirements
   2. Set up Python environment with dependencies
-  3. Configure Docker containers
-  4. Set up Vista3D AI server
-  5. Create necessary directories and files
+  3. Configure Docker containers for frontend services
+  4. Create necessary directories and files
+  5. Test connectivity to Vista3D backend
   6. Provide instructions for starting services
 
-After setup, run 'python start.py' to start all services.
+After setup, run 'python start_frontend.py' to start frontend services.
         """
     )
     
     args = parser.parse_args()
     
-    setup = Vista3DUnifiedSetup()
+    setup = Vista3DFrontendSetup()
     
     try:
         success = setup.run_setup()
