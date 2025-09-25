@@ -71,6 +71,16 @@
             
             // Safely load other template variables
             let mainIsNifti = true;
+            // Map our names to Niivue built-ins when needed
+            function normalizeMainColormapName(name) {
+                if (!name) return 'gray';
+                const n = String(name).replaceAll('"','').trim().toLowerCase();
+                if (n === 'grayscale') return 'gray';
+                // Known built-ins for this Niivue build
+                const builtins = new Set(['gray','jet','hot','viridis','plasma','inferno','magma','hsv','turbo','bone']);
+                if (builtins.has(n)) return n;
+                return n; // allow custom names as-is
+            }
             let colorMapJs = 'gray';
             let niftiGamma = 1.0;
             let niftiOpacity = 1.0;
@@ -95,7 +105,7 @@
                     mainIsNifti = mainIsNiftiElement.textContent.toLowerCase() === 'true';
                 }
                 if (colorMapJsElement && colorMapJsElement.textContent) {
-                    colorMapJs = colorMapJsElement.textContent;
+                    colorMapJs = normalizeMainColormapName(colorMapJsElement.textContent);
                 }
                 if (niftiGammaElement && niftiGammaElement.textContent) {
                     niftiGamma = parseFloat(niftiGammaElement.textContent) || 1.0;
@@ -260,7 +270,7 @@
 
                 if (mainIsNifti && mainVol) {
                     // MAIN VOLUME COLORMAP APPLICATION - DO NOT MODIFY WITHOUT CAREFUL TESTING
-                    nv.setColormap(mainVol.id, colorMapJs);
+                    try { nv.setColormap(mainVol.id, colorMapJs); } catch (e) { console.warn('Fallback to gray, unknown colormap:', colorMapJs); try { nv.setColormap(mainVol.id, 'gray'); } catch (_) {} }
                     nv.setGamma(niftiGamma);
                     mainVol.opacity = niftiOpacity;
 
@@ -346,7 +356,7 @@
                 if (mainIsNifti && mainVol) {
                     // Only apply to the main volume, not overlays
                     if (mainVol.id !== nv.volumes[overlayStartIndex]?.id) {
-                        nv.setColormap(mainVol.id, colorMapJs);
+                        try { nv.setColormap(mainVol.id, colorMapJs); } catch (e) { try { nv.setColormap(mainVol.id, 'gray'); } catch (_) {} }
                         console.log('Re-applied main volume colormap after overlay processing');
                     }
                 }
