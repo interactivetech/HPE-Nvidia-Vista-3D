@@ -333,9 +333,8 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
 
     # Build volume list for NiiVue
     volume_list_entries = []
-    show_nifti_setting = viewer_config.settings.get('show_nifti', True)
-    if show_nifti_setting:
-        volume_list_entries.append({"url": base_file_url})
+    # Always show NIfTI (no longer user configurable)
+    volume_list_entries.append({"url": base_file_url})
 
     # Create overlays based on voxel mode (only for regular patient files, not uploaded files)
     overlays = []
@@ -387,7 +386,7 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
         label_colors_js=json.dumps(config_manager.label_colors or []),
         image_server_url=EXTERNAL_IMAGE_SERVER_URL,
         # Keep a hidden base when overlays-only view is requested
-        main_is_nifti=True if force_base_placeholder else settings.get('show_nifti', True),
+        main_is_nifti=True if force_base_placeholder else True,  # Always show NIfTI
         main_vol_visible=False if force_base_placeholder else True,
         color_map_js=json.dumps(settings.get('color_map', 'gray')),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
@@ -395,7 +394,7 @@ def render_viewer(selected_patient: str, selected_file: str, is_uploaded_file: b
         nifti_opacity=0.0 if force_base_placeholder else settings.get('nifti_opacity', 1.0),
         window_center=window_center,
         window_width=window_width,
-        overlay_start_index=1 if (settings.get('show_nifti', True) or force_base_placeholder) else 0,
+        overlay_start_index=1 if (True or force_base_placeholder) else 0,  # Always show NIfTI
         actual_slice_type=actual_slice_type,
         segment_opacity=settings.get('segment_opacity', 0.5)
     )

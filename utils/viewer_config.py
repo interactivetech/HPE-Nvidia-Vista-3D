@@ -145,80 +145,79 @@ class ViewerConfig:
                 index=orientations.index(self._settings.get('orientation', 'Axial'))
             )
 
-        # NIfTI display settings
-        self._settings['show_nifti'] = st.checkbox("Show NIfTI", value=self._settings['show_nifti'])
+        # NIfTI display settings (always show)
+        self._settings['show_nifti'] = True  # Always show NIfTI
+        
+        with st.expander("NIfTI Image Settings", expanded=False):
+            # Get current color map index, with fallback to 0 if not found
+            current_color_map = self._settings['color_map']
+            try:
+                color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
+            except ValueError:
+                # If current color map is not in the list, use 'bone' as fallback
+                if 'bone' in AVAILABLE_COLOR_MAPS:
+                    color_map_index = AVAILABLE_COLOR_MAPS.index('bone')
+                    self._settings['color_map'] = 'bone'
+                else:
+                    color_map_index = 0
+                    self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
+            
+            self._settings['color_map'] = st.selectbox(
+                "Color Map",
+                AVAILABLE_COLOR_MAPS,
+                index=color_map_index
+            )
+            self._settings['nifti_opacity'] = st.slider(
+                "NIfTI Opacity",
+                0.0, 1.0,
+                self._settings['nifti_opacity'],
+                key="nifti_opacity"
+            )
+            self._settings['nifti_gamma'] = st.slider(
+                "NIfTI Gamma",
+                0.1, 3.0,
+                self._settings['nifti_gamma'],
+                step=0.1,
+                key="nifti_gamma"
+            )
 
-        if self._settings['show_nifti']:
-            with st.expander("NIfTI Image Settings", expanded=False):
-                # Get current color map index, with fallback to 0 if not found
-                current_color_map = self._settings['color_map']
-                try:
-                    color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
-                except ValueError:
-                    # If current color map is not in the list, use 'bone' as fallback
-                    if 'bone' in AVAILABLE_COLOR_MAPS:
-                        color_map_index = AVAILABLE_COLOR_MAPS.index('bone')
-                        self._settings['color_map'] = 'bone'
-                    else:
-                        color_map_index = 0
-                        self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
+            # Window/Level settings (CT/MRI adaptive)
+            st.markdown("**Window/Level Settings**")
+            
+            # Show modality detection info if available
+            if min_value is not None and max_value is not None and mean_value is not None:
+                modality = detect_modality_from_data(min_value, max_value, mean_value)
+                current_center, current_width = self.get_window_settings()
+                optimal_center, optimal_width = get_optimal_window_settings(min_value, max_value, mean_value)
                 
-                self._settings['color_map'] = st.selectbox(
-                    "Color Map",
-                    AVAILABLE_COLOR_MAPS,
-                    index=color_map_index
-                )
-                self._settings['nifti_opacity'] = st.slider(
-                    "NIfTI Opacity",
-                    0.0, 1.0,
-                    self._settings['nifti_opacity'],
-                    key="nifti_opacity"
-                )
-                self._settings['nifti_gamma'] = st.slider(
-                    "NIfTI Gamma",
-                    0.1, 3.0,
-                    self._settings['nifti_gamma'],
-                    step=0.1,
-                    key="nifti_gamma"
-                )
+                if current_center == optimal_center and current_width == optimal_width:
+                    st.success(f"✅ Auto-applied {modality} optimal settings: Center={current_center}, Width={current_width}")
+                else:
+                    st.info(f"📊 {modality} data detected (range: {min_value:.0f}-{max_value:.0f}, mean: {mean_value:.0f})")
+            self._settings['window_center'] = st.slider(
+                "Window Center (Level)",
+                -2500, 2500,
+                self._settings['window_center'],
+                key="window_center"
+            )
+            self._settings['window_width'] = st.slider(
+                "Window Width",
+                50, 5000,
+                self._settings['window_width'],
+                key="window_width"
+            )
 
-                # Window/Level settings (CT/MRI adaptive)
-                st.markdown("**Window/Level Settings**")
-                
-                # Show modality detection info if available
-                if min_value is not None and max_value is not None and mean_value is not None:
-                    modality = detect_modality_from_data(min_value, max_value, mean_value)
-                    current_center, current_width = self.get_window_settings()
-                    optimal_center, optimal_width = get_optimal_window_settings(min_value, max_value, mean_value)
-                    
-                    if current_center == optimal_center and current_width == optimal_width:
-                        st.success(f"✅ Auto-applied {modality} optimal settings: Center={current_center}, Width={current_width}")
-                    else:
-                        st.info(f"📊 {modality} data detected (range: {min_value:.0f}-{max_value:.0f}, mean: {mean_value:.0f})")
-                self._settings['window_center'] = st.slider(
-                    "Window Center (Level)",
-                    -2500, 2500,
-                    self._settings['window_center'],
-                    key="window_center"
-                )
-                self._settings['window_width'] = st.slider(
-                    "Window Width",
-                    50, 5000,
-                    self._settings['window_width'],
-                    key="window_width"
-                )
+            # Preset windowing options (modality-specific)
+            modality_presets = self.get_modality_specific_presets(min_value, max_value, mean_value)
+            preset_options = list(modality_presets.keys())
+            window_preset = st.selectbox(
+                "Window Preset",
+                preset_options,
+                key="window_preset"
+            )
 
-                # Preset windowing options (modality-specific)
-                modality_presets = self.get_modality_specific_presets(min_value, max_value, mean_value)
-                preset_options = list(modality_presets.keys())
-                window_preset = st.selectbox(
-                    "Window Preset",
-                    preset_options,
-                    key="window_preset"
-                )
-
-                if window_preset != "Custom":
-                    self.apply_window_preset(window_preset)
+            if window_preset != "Custom":
+                self.apply_window_preset(window_preset)
 
         # Voxel display settings - only show if voxels are available
         if has_voxels:

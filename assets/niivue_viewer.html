@@ -304,21 +304,30 @@
                             console.log('Overlay ID:', overlayVol.id);
                             console.log('Overlay URL:', overlayColors[overlayIndex].url);
                             
-                            // Apply Vista3D colormap
-                            nv.setColormap(overlayVol.id, 'vista3d_original');
-                            
-                            // Set and log properties
-                            overlayVol.opacity = segmentOpacity;
-                            console.log('Set opacity to:', overlayVol.opacity);
-                            console.log('Volume visible after setup:', overlayVol.visible);
-                            
-                            // Add a check to monitor if the overlay disappears
+                            // Apply the normalized custom segmentation colormap (not the original)
+                            // Add a longer delay to ensure volume is fully loaded and colormap is registered
                             setTimeout(() => {
-                                console.log('=== 2 SECOND CHECK ===');
-                                console.log('Overlay still visible?:', overlayVol.visible);
-                                console.log('Overlay opacity now:', overlayVol.opacity);
-                                console.log('Current colormap:', overlayVol.colormap);
-                            }, 2000);
+                                // Check if the colormap is available in NiiVue
+                                const availableColormaps = Object.keys(nv.colormaps || {});
+                                console.log('Available colormaps:', availableColormaps);
+                                
+                                try {
+                                    if (availableColormaps.includes('custom_segmentation')) {
+                                        nv.setColormap(overlayVol.id, 'custom_segmentation');
+                                        console.log('Applied custom_segmentation colormap to all segmentation overlay');
+                                    } else if (availableColormaps.includes('vista3d_original')) {
+                                        nv.setColormap(overlayVol.id, 'vista3d_original');
+                                        console.log('Applied vista3d_original colormap to all segmentation overlay');
+                                    } else {
+                                        console.warn('Neither custom_segmentation nor vista3d_original colormap found, using gray');
+                                        nv.setColormap(overlayVol.id, 'gray');
+                                    }
+                                    // Force a redraw to ensure the colormap is applied
+                                    nv.drawScene();
+                                } catch (e) {
+                                    console.error('Failed to apply any colormap to overlay:', e);
+                                }
+                            }, 200);
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
                             const color = overlayColors[overlayIndex].color;
                             const labelName = overlayColors[overlayIndex].label_name;
