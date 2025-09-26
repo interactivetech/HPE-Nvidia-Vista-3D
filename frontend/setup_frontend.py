@@ -446,11 +446,11 @@ if ! docker image inspect vista3d-image-server:local > /dev/null 2>&1; then
 fi
 
 # Start the image server first
-echo "🖼️  Starting image server..."
+echo "🖼️  Starting image server (development mode)..."
 cd ../image_server
 if [ -f "docker-compose.yml" ]; then
     docker-compose up -d
-    echo "✅ Image server started"
+    echo "✅ Image server started (development mode)"
 else
     echo "❌ Image server docker-compose.yml not found"
     exit 1
@@ -477,6 +477,7 @@ fi
 
 if docker ps | grep -q vista3d-image-server-standalone; then
     echo "✅ Image server is running on http://localhost:${IMAGE_SERVER_PORT:-8888}"
+    echo "🔄 Image server development mode: Code changes will auto-reload"
 else
     echo "❌ Image server failed to start"
     echo "📊 Check logs with: docker logs vista3d-image-server-standalone"
@@ -486,7 +487,7 @@ fi
 echo "🎉 Frontend setup complete!"
 echo "🌐 Web Interface: http://localhost:${FRONTEND_PORT:-8501}"
 echo "🖼️  Image Server: http://localhost:${IMAGE_SERVER_PORT:-8888}"
-echo "🔄 Development: Edit code and see changes automatically!"
+echo "🔄 Development: Edit code in both frontend and image server and see changes automatically!"
 echo "📊 Check logs with: docker-compose logs -f"
 """
     
@@ -639,7 +640,7 @@ def main():
     print_info("3. Stop services: ./stop_frontend.sh")
     print_info("4. View logs: ./logs_frontend.sh")
     print_info(f"5. Open web interface: http://localhost:{config['FRONTEND_PORT']}")
-    print_info("🔄 Development mode: Edit code and see changes automatically!")
+    print_info("🔄 Development mode: Edit code in both frontend and image server and see changes automatically!")
     
     print_info("\nConfiguration saved to .env file")
     print_info(f"DICOM folder: {config['DICOM_FOLDER']}")

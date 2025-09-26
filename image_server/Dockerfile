@@ -21,7 +21,7 @@ RUN uv sync --frozen
 RUN useradd -m appuser
 USER appuser
 
-# Copy server code
+# Copy server code (will be overridden by volume mount in development)
 COPY --chown=appuser:appuser main.py ./main.py
 COPY --chown=appuser:appuser server.py ./server.py
 COPY --chown=appuser:appuser conf ./conf

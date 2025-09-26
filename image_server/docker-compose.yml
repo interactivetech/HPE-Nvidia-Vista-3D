@@ -13,9 +13,18 @@ services:
       - OUTPUT_FOLDER=/data/output
       - DICOM_FOLDER=/data/dicom
       - IMAGE_SERVER=http://localhost:8888
+      # Development mode settings (default)
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
     volumes:
       - ${OUTPUT_FOLDER:-./output}:/data/output:ro
       - ${DICOM_FOLDER:-./dicom}:/data/dicom:ro
+      # Development: Mount source code for live development (default mode)
+      - .:/srv
+      # Exclude build artifacts from mounting
+      - /srv/.venv
+      - /srv/__pycache__
+      - /srv/.pytest_cache
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/health"]

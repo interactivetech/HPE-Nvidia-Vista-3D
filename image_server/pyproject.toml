@@ -1,17 +1,55 @@
 [project]
 name = "vista3d-image-server"
 version = "0.1.0"
-description = "Standalone FastAPI image server for Vista3D"
+description = "Standalone FastAPI image server for Vista3D medical imaging files"
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [
+    {name = "HPE Vista3D Team"}
+]
+keywords = ["medical-imaging", "dicom", "nifti", "fastapi", "image-server"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
 dependencies = [
     "python-dotenv>=1.0.0",
     "fastapi>=0.111.0",
-    "uvicorn>=0.30.1",
+    "uvicorn[standard]>=0.30.1",
     "nibabel>=5.3.2",
     "numpy>=2.0.0",
 ]
 
-# no build backend required; runtime-only project
+[project.urls]
+Homepage = "https://github.com/hpe/vista3d"
+Repository = "https://github.com/hpe/vista3d"
+Documentation = "https://github.com/hpe/vista3d/blob/main/docs/IMAGE_SERVER.md"
+Issues = "https://github.com/hpe/vista3d/issues"
+
+[project.scripts]
+vista3d-image-server = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/image_server",
+    "/conf",
+    "README.md",
+    "pyproject.toml",
+]
 
 
