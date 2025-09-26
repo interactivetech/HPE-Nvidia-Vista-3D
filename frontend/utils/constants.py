@@ -137,76 +137,44 @@ def get_optimal_window_settings(min_value: float, max_value: float, mean_value: 
 
 # Color maps available for NIfTI images
 def load_colormaps():
-    """Load colormap names in a specific order from configuration file."""
+    """Load colormap names from JSON files."""
     import json
     import os
     import glob
     
-    try:
-        # First, try to load the colormap order configuration
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        config_file = os.path.join(current_dir, '..', 'conf', 'colormap_order.json')
-        config_file = os.path.abspath(config_file)
-        
-        if os.path.exists(config_file):
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-                if 'colormap_order' in config:
-                    # Get all available colormaps from the JSON files
-                    colormaps_dir = os.path.join(current_dir, '..', 'assets', 'colormaps')
-                    colormaps_dir = os.path.abspath(colormaps_dir)
-                    
-                    colormap_files = glob.glob(os.path.join(colormaps_dir, '*.json'))
-                    
-                    available_colormaps = set()
-                    for colormap_file in colormap_files:
-                        try:
-                            with open(colormap_file, 'r') as cf:
-                                data = json.load(cf)
-                                if 'colormaps' in data and isinstance(data['colormaps'], dict):
-                                    available_colormaps.update(data['colormaps'].keys())
-                        except (json.JSONDecodeError, KeyError) as e:
-                            print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
-                            continue
-                    
-                    # Filter the ordered list to only include available colormaps
-                    ordered_colormaps = []
-                    for colormap in config['colormap_order']:
-                        if colormap in available_colormaps:
-                            ordered_colormaps.append(colormap)
-                    
-                    # Add any available colormaps not in the order list
-                    for colormap in available_colormaps:
-                        if colormap not in ordered_colormaps:
-                            ordered_colormaps.append(colormap)
-                    
-                    return ordered_colormaps if ordered_colormaps else config.get('fallback_colormaps', ['gray', 'viridis', 'plasma', 'inferno', 'magma'])
-        
-        # Fallback to original method if config file doesn't exist
-        colormaps_dir = os.path.join(current_dir, '..', 'assets', 'colormaps')
-        colormaps_dir = os.path.abspath(colormaps_dir)
-        
-        colormap_files = glob.glob(os.path.join(colormaps_dir, '*.json'))
-        
-        all_colormaps = []
-        for colormap_file in colormap_files:
-            try:
-                with open(colormap_file, 'r') as f:
-                    data = json.load(f)
-                    if 'colormaps' in data and isinstance(data['colormaps'], dict):
-                        # Extract colormap names from the keys
-                        all_colormaps.extend(list(data['colormaps'].keys()))
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
-                continue
-        
-        # Remove duplicates and return
-        return list(set(all_colormaps)) if all_colormaps else ['gray', 'viridis', 'plasma', 'inferno', 'magma']
-        
-    except Exception as e:
-        print(f"Warning: Could not load colormaps from JSON files, using fallback: {e}")
-        # Fallback to basic set
-        return ['gray', 'viridis', 'plasma', 'inferno', 'magma']
+    # Get all available colormaps from the JSON files
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    colormaps_dir = os.path.join(current_dir, '..', 'assets', 'colormaps')
+    colormaps_dir = os.path.abspath(colormaps_dir)
+    
+    if not os.path.exists(colormaps_dir):
+        raise FileNotFoundError(f"Colormaps directory not found: {colormaps_dir}")
+    
+    colormap_files = glob.glob(os.path.join(colormaps_dir, '*.json'))
+    
+    if not colormap_files:
+        raise FileNotFoundError(f"No colormap JSON files found in: {colormaps_dir}")
+    
+    available_colormaps = set()
+    for colormap_file in colormap_files:
+        try:
+            with open(colormap_file, 'r') as cf:
+                data = json.load(cf)
+                if 'colormaps' in data and isinstance(data['colormaps'], dict):
+                    available_colormaps.update(data['colormaps'].keys())
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
+            continue
+    
+    if not available_colormaps:
+        raise ValueError("No valid colormaps found in JSON files")
+    
+    # Return sorted list with gray first, then rest alphabetically
+    colormap_list = sorted(list(available_colormaps))
+    if 'gray' in colormap_list:
+        colormap_list.remove('gray')
+        colormap_list.insert(0, 'gray')
+    return colormap_list
 
 AVAILABLE_COLOR_MAPS = load_colormaps()
 

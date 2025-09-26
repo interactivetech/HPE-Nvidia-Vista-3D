@@ -1,0 +1,13 @@
+{
+  "name": "CT Vessels Colormap",
+  "description": "Colormap for visualizing CT vessel scans",
+  "colormaps": {
+    "ct_vessels": {
+      "R": [0, 255, 255],
+      "G": [0, 128, 255],
+      "B": [0, 128, 255],
+      "A": [0, 64, 96],
+      "labels": ["Background", "Vessels", "Contrast"]
+    }
+  }
+}

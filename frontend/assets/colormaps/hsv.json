@@ -1,0 +1,13 @@
+{
+  "name": "HSV Colormap",
+  "description": "HSV color space colormap",
+  "colormaps": {
+    "hsv": {
+      "R": [255, 255, 128, 0, 0, 128, 255, 255, 255, 255],
+      "G": [0, 128, 255, 255, 128, 0, 0, 64, 128, 192],
+      "B": [0, 0, 0, 128, 255, 255, 128, 0, 0, 0],
+      "A": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+      "labels": ["Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Magenta", "Pink", "Red"]
+    }
+  }
+}

@@ -48,10 +48,10 @@ def get_server_config():
 
 def load_image_server_config():
     """Load image server configuration from JSON file."""
-    # Get project root for config directory - use the directory containing this script
+    # Use the image_server's config file instead of duplicating it
     script_dir = Path(__file__).parent
     project_root = script_dir.parent
-    config_path = project_root / "conf" / "image_server_conf.json"
+    config_path = project_root / "image_server" / "conf" / "image_server_conf.json"
     
     # Default configuration with resolved absolute paths
     default_config = {

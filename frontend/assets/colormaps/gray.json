@@ -1,0 +1,14 @@
+{
+  "name": "Gray Colormap",
+  "description": "Linear grayscale colormap from black to white",
+  "colormaps": {
+    "gray": {
+      "R": [0, 255],
+      "G": [0, 255],
+      "B": [0, 255],
+      "A": [255, 255],
+      "I": [0, 255],
+      "labels": ["Black", "White"]
+    }
+  }
+}

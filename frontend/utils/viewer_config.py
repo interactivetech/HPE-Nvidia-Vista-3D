@@ -174,7 +174,7 @@ class ViewerConfig:
         # NIfTI display settings - always show NIfTI
         self._settings['show_nifti'] = True
         
-        with st.expander("NIfTI Image Settings", expanded=False):
+        with st.expander("Image Settings", expanded=False):
             self._settings['nifti_opacity'] = st.slider(
                 "NIfTI Opacity",
                 0.0, 1.0,
