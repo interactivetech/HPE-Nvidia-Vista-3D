@@ -149,28 +149,32 @@ class ViewerConfig:
                 index=orientations.index(self._settings.get('orientation', 'Axial'))
             )
 
+        # Color Map Selection - moved above NIfTI Image Settings
+        st.markdown("Color Map")
+        # Get current color map index, with fallback to 0 if not found
+        current_color_map = self._settings['color_map']
+        try:
+            color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
+        except ValueError:
+            # If current color map is not in the list, use 'bone' as fallback
+            if 'bone' in AVAILABLE_COLOR_MAPS:
+                color_map_index = AVAILABLE_COLOR_MAPS.index('bone')
+                self._settings['color_map'] = 'bone'
+            else:
+                color_map_index = 0
+                self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
+        
+        self._settings['color_map'] = st.selectbox(
+            "Select Color Map",
+            AVAILABLE_COLOR_MAPS,
+            index=color_map_index,
+            label_visibility="collapsed"
+        )
+
         # NIfTI display settings - always show NIfTI
         self._settings['show_nifti'] = True
         
         with st.expander("NIfTI Image Settings", expanded=False):
-            # Get current color map index, with fallback to 0 if not found
-            current_color_map = self._settings['color_map']
-            try:
-                color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
-            except ValueError:
-                # If current color map is not in the list, use 'bone' as fallback
-                if 'bone' in AVAILABLE_COLOR_MAPS:
-                    color_map_index = AVAILABLE_COLOR_MAPS.index('bone')
-                    self._settings['color_map'] = 'bone'
-                else:
-                    color_map_index = 0
-                    self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
-            
-            self._settings['color_map'] = st.selectbox(
-                "Color Map",
-                AVAILABLE_COLOR_MAPS,
-                index=color_map_index
-            )
             self._settings['nifti_opacity'] = st.slider(
                 "NIfTI Opacity",
                 0.0, 1.0,

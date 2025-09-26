@@ -115,9 +115,9 @@ def render_server_status_sidebar():
     # Vista3D Server Status
     vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
     if check_vista3d_server_status():
-        st.sidebar.info(f"🧠 **Vista3D Server**  \n✅ Online • {vista3d_server_url}")
+        st.sidebar.info(f"🫁 **Vista3D Server**  \n✅ Online • {vista3d_server_url}")
     else:
-        st.sidebar.error(f"🧠 **Vista3D Server**  \n❌ Offline • {vista3d_server_url}")
+        st.sidebar.error(f"🫁 **Vista3D Server**  \n❌ Offline • {vista3d_server_url}")
 
 st.set_page_config(
     page_title="NIfTI Vessel Segmentation and Viewer",
@@ -155,7 +155,7 @@ if current_page == 'home':
     **🔄 Workflow Process**:  
     1. **📁 Add DICOM Folders**: Upload patient DICOM imaging data through the Image Data section
     2. **🔄 Convert to NIfTI**: Automatically convert DICOM files to NIfTI format for processing
-    3. **🧠 AI Segmentation**: Run Vista3D model to perform automated vessel and organ segmentation
+    3. **🫁 AI Segmentation**: Run Vista3D model to perform automated vessel and organ segmentation
     4. **👁️ 3D Visualization**: View and analyze results using the interactive NiiVue viewer
     
     > **📋 Vista3D Capabilities & Limitations**:  
