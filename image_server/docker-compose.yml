@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: vista3d-image-server:local
+    image: dwtwp/vista3d-image-server:latest
     container_name: vista3d-image-server-standalone
     ports:
       - "8888:8888"

@@ -72,6 +72,46 @@ def run_command(command: str, check: bool = True, capture_output: bool = False) 
             sys.exit(1)
         return e
 
+def check_docker_hub_images() -> Dict[str, bool]:
+    """Check if Docker Hub images are available and pull them"""
+    print_header("Checking Docker Hub Images")
+    
+    docker_hub_images = {
+        'frontend': 'dwtwp/vista3d-frontend:latest',
+        'image_server': 'dwtwp/vista3d-image-server:latest'
+    }
+    
+    image_status = {}
+    
+    for service, image in docker_hub_images.items():
+        print_info(f"Checking {service} image: {image}")
+        
+        # Check if image exists locally first
+        try:
+            result = run_command(f"docker image inspect {image}", capture_output=True)
+            if result.returncode == 0:
+                print_success(f"{service} image found locally: {image}")
+                image_status[service] = True
+                continue
+        except:
+            pass
+        
+        # Try to pull from Docker Hub
+        try:
+            print_info(f"Pulling {image} from Docker Hub...")
+            result = run_command(f"docker pull {image}", capture_output=True)
+            if result.returncode == 0:
+                print_success(f"Successfully pulled {image}")
+                image_status[service] = True
+            else:
+                print_warning(f"Failed to pull {image}: {result.stderr}")
+                image_status[service] = False
+        except Exception as e:
+            print_warning(f"Failed to pull {image}: {e}")
+            image_status[service] = False
+    
+    return image_status
+
 def check_system_requirements() -> Dict[str, bool]:
     """Check if system meets requirements"""
     print_header("Checking System Requirements")
@@ -341,8 +381,9 @@ COMPOSE_PROJECT_NAME=vista3d-image-server
             with open(compose_file, 'r') as f:
                 content = f.read()
             
-            # Update ports
+            # Update ports and image
             content = content.replace('"8888:8888"', f'"{config["IMAGE_SERVER_PORT"]}:8888"')
+            content = content.replace('image: vista3d-image-server:local', 'image: dwtwp/vista3d-image-server:latest')
             
             with open(compose_file, 'w') as f:
                 f.write(content)
@@ -351,37 +392,43 @@ COMPOSE_PROJECT_NAME=vista3d-image-server
         except Exception as e:
             print_error(f"Failed to update image server docker-compose.yml: {e}")
 
-def build_docker_images() -> None:
-    """Build required Docker images"""
+def build_docker_images(image_status: Dict[str, bool]) -> None:
+    """Build required Docker images only if Docker Hub images are not available"""
     print_header("Building Docker Images")
     
-    # Build frontend image
-    print_info("Building frontend image...")
-    try:
-        result = run_command("docker build -t vista3d-frontend:local .", capture_output=True)
-        if result.returncode == 0:
-            print_success("Frontend image built successfully")
-        else:
-            print_error("Failed to build frontend image")
-            print_error(result.stderr)
-    except Exception as e:
-        print_error(f"Failed to build frontend image: {e}")
-    
-    # Build image server image
-    print_info("Building image server image...")
-    try:
-        image_server_dir = os.path.join(os.getcwd(), "..", "image_server")
-        if os.path.exists(image_server_dir):
-            result = run_command(f"docker build -t vista3d-image-server:local {image_server_dir}", capture_output=True)
+    # Build frontend image only if not available from Docker Hub
+    if not image_status.get('frontend', False):
+        print_info("Building frontend image locally...")
+        try:
+            result = run_command("docker build -t vista3d-frontend:local .", capture_output=True)
             if result.returncode == 0:
-                print_success("Image server image built successfully")
+                print_success("Frontend image built successfully")
             else:
-                print_error("Failed to build image server image")
+                print_error("Failed to build frontend image")
                 print_error(result.stderr)
-        else:
-            print_warning("Image server directory not found, skipping image server build")
-    except Exception as e:
-        print_error(f"Failed to build image server image: {e}")
+        except Exception as e:
+            print_error(f"Failed to build frontend image: {e}")
+    else:
+        print_success("Using Docker Hub frontend image, skipping local build")
+    
+    # Build image server image only if not available from Docker Hub
+    if not image_status.get('image_server', False):
+        print_info("Building image server image locally...")
+        try:
+            image_server_dir = os.path.join(os.getcwd(), "..", "image_server")
+            if os.path.exists(image_server_dir):
+                result = run_command(f"docker build -t vista3d-image-server:local {image_server_dir}", capture_output=True)
+                if result.returncode == 0:
+                    print_success("Image server image built successfully")
+                else:
+                    print_error("Failed to build image server image")
+                    print_error(result.stderr)
+            else:
+                print_warning("Image server directory not found, skipping image server build")
+        except Exception as e:
+            print_error(f"Failed to build image server image: {e}")
+    else:
+        print_success("Using Docker Hub image server image, skipping local build")
 
 def update_docker_compose(config: Dict[str, str]) -> None:
     """Update docker-compose.yml with user configuration"""
@@ -397,9 +444,11 @@ def update_docker_compose(config: Dict[str, str]) -> None:
         with open(compose_file, 'r') as f:
             content = f.read()
         
-        # Update ports
+        # Update ports and images
         content = content.replace('"8501:8501"', f'"{config["FRONTEND_PORT"]}:8501"')
         content = content.replace('"8888:8888"', f'"{config["IMAGE_SERVER_PORT"]}:8888"')
+        content = content.replace('image: vista3d-frontend:local', 'image: dwtwp/vista3d-frontend:latest')
+        content = content.replace('image: vista3d-image-server:local', 'image: dwtwp/vista3d-image-server:latest')
         
         with open(compose_file, 'w') as f:
             f.write(content)
@@ -434,15 +483,25 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Check if required images exist
-if ! docker image inspect vista3d-frontend:local > /dev/null 2>&1; then
-    echo "❌ Frontend image not found. Please run setup_frontend.py first."
-    exit 1
+# Check if required images exist, pull from Docker Hub if needed
+echo "🔍 Checking Docker Hub images..."
+
+# Check frontend image
+if ! docker image inspect ${FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest} > /dev/null 2>&1; then
+    echo "📥 Pulling frontend image from Docker Hub..."
+    if ! docker pull ${FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest}; then
+        echo "❌ Failed to pull frontend image. Please check your internet connection and Docker Hub access."
+        exit 1
+    fi
 fi
 
-if ! docker image inspect vista3d-image-server:local > /dev/null 2>&1; then
-    echo "❌ Image server image not found. Please run setup_frontend.py first."
-    exit 1
+# Check image server image
+if ! docker image inspect ${IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest} > /dev/null 2>&1; then
+    echo "📥 Pulling image server image from Docker Hub..."
+    if ! docker pull ${IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest}; then
+        echo "❌ Failed to pull image server image. Please check your internet connection and Docker Hub access."
+        exit 1
+    fi
 fi
 
 # Start the image server first
@@ -604,6 +663,9 @@ def main():
             print_info("Setup cancelled.")
             sys.exit(0)
     
+    # Check Docker Hub images
+    image_status = check_docker_hub_images()
+    
     # Get user configuration
     config = get_user_input()
     
@@ -623,8 +685,8 @@ def main():
     # Setup image server
     setup_image_server(config)
     
-    # Build Docker images
-    build_docker_images()
+    # Build Docker images only if Docker Hub images are not available
+    build_docker_images(image_status)
     
     # Create management scripts
     create_startup_script()

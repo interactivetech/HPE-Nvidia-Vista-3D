@@ -70,6 +70,46 @@ def run_command(command: str, check: bool = True, capture_output: bool = False) 
             sys.exit(1)
         return e
 
+def check_docker_hub_images() -> Dict[str, bool]:
+    """Check if Docker Hub images are available and pull them"""
+    print_header("Checking Docker Hub Images")
+    
+    docker_hub_images = {
+        'frontend': 'dwtwp/vista3d-frontend:latest',
+        'image_server': 'dwtwp/vista3d-image-server:latest'
+    }
+    
+    image_status = {}
+    
+    for service, image in docker_hub_images.items():
+        print_info(f"Checking {service} image: {image}")
+        
+        # Check if image exists locally first
+        try:
+            result = run_command(f"docker image inspect {image}", capture_output=True)
+            if result.returncode == 0:
+                print_success(f"{service} image found locally: {image}")
+                image_status[service] = True
+                continue
+        except:
+            pass
+        
+        # Try to pull from Docker Hub
+        try:
+            print_info(f"Pulling {image} from Docker Hub...")
+            result = run_command(f"docker pull {image}", capture_output=True)
+            if result.returncode == 0:
+                print_success(f"Successfully pulled {image}")
+                image_status[service] = True
+            else:
+                print_warning(f"Failed to pull {image}: {result.stderr}")
+                image_status[service] = False
+        except Exception as e:
+            print_warning(f"Failed to pull {image}: {e}")
+            image_status[service] = False
+    
+    return image_status
+
 def check_system_requirements() -> Dict[str, bool]:
     """Check if system meets requirements"""
     print_header("Checking System Requirements")
@@ -301,6 +341,10 @@ VESSELS_OF_INTEREST="{config['VESSELS_OF_INTEREST']}"
 
 # Docker Configuration
 COMPOSE_PROJECT_NAME=vista3d-platform
+
+# Docker Hub Images
+FRONTEND_IMAGE=dwtwp/vista3d-frontend:latest
+IMAGE_SERVER_IMAGE=dwtwp/vista3d-image-server:latest
 """
     
     env_file = os.path.join(os.getcwd(), '.env')
@@ -407,6 +451,27 @@ fi
 
 # Load environment variables
 export $(cat .env | grep -v '^#' | xargs)
+
+# Check if Docker Hub images are available
+echo "🔍 Checking Docker Hub images..."
+
+# Check frontend image
+if ! docker image inspect ${FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest} > /dev/null 2>&1; then
+    echo "📥 Pulling frontend image from Docker Hub..."
+    if ! docker pull ${FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest}; then
+        echo "❌ Failed to pull frontend image. Please check your internet connection and Docker Hub access."
+        exit 1
+    fi
+fi
+
+# Check image server image
+if ! docker image inspect ${IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest} > /dev/null 2>&1; then
+    echo "📥 Pulling image server image from Docker Hub..."
+    if ! docker pull ${IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest}; then
+        echo "❌ Failed to pull image server image. Please check your internet connection and Docker Hub access."
+        exit 1
+    fi
+fi
 
 # Start backend (Vista3D server)
 echo "🧠 Starting Vista3D server..."
@@ -559,6 +624,20 @@ def main():
     if missing_optional:
         print_warning(f"Missing optional requirements: {', '.join(missing_optional)}")
         print_info("Some features may not work properly without these requirements.")
+        
+        response = input("Continue anyway? (y/N): ").strip().lower()
+        if response not in ['y', 'yes']:
+            print_info("Setup cancelled.")
+            sys.exit(0)
+    
+    # Check Docker Hub images
+    image_status = check_docker_hub_images()
+    
+    # Warn if images couldn't be pulled
+    failed_images = [service for service, status in image_status.items() if not status]
+    if failed_images:
+        print_warning(f"Could not pull Docker Hub images: {', '.join(failed_images)}")
+        print_info("The setup will continue, but you may need to build images locally.")
         
         response = input("Continue anyway? (y/N): ").strip().lower()
         if response not in ['y', 'yes']:
