@@ -345,6 +345,45 @@ ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
 # - Remote port 8888 → Local image server port 8888
 ```
 
+### VPN and Secure Network Access
+
+When the Vista3D backend server is behind a VPN or firewall, SSH tunneling provides secure access:
+
+#### VPN Scenario Setup
+```bash
+# 1. Connect to VPN (if required)
+# Your organization's VPN client should be running
+
+# 2. Establish SSH tunnel through VPN
+ssh user@vpn_server -L 8000:localhost:8000 -R 8888:localhost:8888
+
+# 3. Configure frontend to use tunneled ports
+echo "VISTA3D_SERVER=http://localhost:8000" >> .env
+echo "IMAGE_SERVER=http://localhost:8888" >> .env
+```
+
+#### Why SSH Tunneling for VPN?
+- **Security**: Encrypts all traffic between frontend and backend
+- **Firewall Bypass**: Works through corporate firewalls and VPNs
+- **Port Access**: Makes backend services accessible on localhost
+- **No Direct Network Access**: Frontend doesn't need direct VPN access
+
+#### VPN Troubleshooting
+```bash
+# Test VPN connectivity
+ping vpn_server
+
+# Test SSH access through VPN
+ssh user@vpn_server "echo 'VPN SSH access working'"
+
+# Verify port forwarding
+netstat -an | grep 8000
+netstat -an | grep 8888
+
+# Check if ports are accessible
+curl -v http://localhost:8000/v1/vista3d/info
+```
+
 ### Configuration for Remote Vista3D
 ```bash
 # Edit .env file to point to remote server
