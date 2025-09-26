@@ -27,7 +27,6 @@ dependencies = [
     
     # Medical imaging
     "nibabel>=5.1.0",
-    "monai>=1.3.0",
     "scikit-image>=0.21.0",
     
     # 3D processing and visualization

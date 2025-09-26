@@ -3,7 +3,7 @@
 Vista3D Color Mapping Validator and Corrector
 
 This utility ensures that voxel files maintain proper Vista3D label ID to color mapping
-after MONAI post-processing. It validates and corrects any inconsistencies.
+after post-processing. It validates and corrects any inconsistencies.
 """
 
 import os

@@ -99,7 +99,7 @@ The project uses **separate virtual environments** for frontend and backend serv
 
 ### Environment Structure
 - **`.venv-frontend/`** - Frontend environment (Streamlit, FastAPI, web frameworks)
-- **`.venv-backend/`** - Backend environment (MONAI, PyTorch, AI/ML libraries)
+- **`.venv-backend/`** - Backend environment (PyTorch, AI/ML libraries)
 - **`.venv/`** - Shared environment (legacy, contains common dependencies)
 
 ### Activating Environments
@@ -130,7 +130,7 @@ python -c "import streamlit, fastapi, nibabel; print('✅ Frontend environment w
 
 # Test backend environment
 source .venv-backend/bin/activate
-python -c "import monai, torch, nibabel; print('✅ Backend environment working!')"
+python -c "import torch, nibabel; print('✅ Backend environment working!')"
 ```
 
 ## 🌐 Remote Server Setup

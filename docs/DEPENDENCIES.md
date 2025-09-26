@@ -10,7 +10,7 @@ This project uses a unified dependency configuration for simplified management a
 **Key dependencies**:
 - `streamlit`, `fastapi`, `uvicorn` - Web framework
 - `nibabel`, `dcm2niix` - Medical imaging
-- `monai` - AI/ML framework (includes PyTorch and Triton)
+- `torch` - AI/ML framework (includes Triton)
 - `vtk`, `trimesh`, `open3d` - 3D visualization
 - `pandas`, `plotly` - Data handling and visualization
 

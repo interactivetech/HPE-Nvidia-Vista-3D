@@ -5,7 +5,7 @@ Simple guide for using a unified virtual environment for the complete Vista3D pl
 ## Unified Environment
 
 - **Single Environment**: All dependencies (frontend and backend) in one virtual environment
-- **Complete Platform**: Includes both Streamlit frontend and MONAI backend capabilities
+- **Complete Platform**: Includes both Streamlit frontend and PyTorch backend capabilities
 - **Simplified Management**: One environment to manage all development needs
 
 ## Quick Setup
@@ -85,7 +85,7 @@ source .venv/bin/activate
 uv sync
 
 # Update specific packages
-uv pip install --upgrade streamlit fastapi pandas plotly monai torch
+uv pip install --upgrade streamlit fastapi pandas plotly torch
 ```
 
 ## What's in the Unified Environment
@@ -94,7 +94,7 @@ uv pip install --upgrade streamlit fastapi pandas plotly monai torch
 - ✅ Streamlit, FastAPI, Uvicorn
 - ✅ Medical imaging: nibabel, dcm2niix
 - ✅ 3D visualization: vtk, trimesh, open3d
-- ✅ MONAI (medical AI)
+- ✅ Medical imaging libraries
 - ✅ PyTorch (deep learning)
 - ✅ Triton (GPU kernels, Linux only)
 
@@ -120,9 +120,9 @@ uv sync
 ### Wrong Dependencies
 ```bash
 # Check what's installed
-uv pip list | grep -E "(torch|triton|monai)"
+uv pip list | grep -E "(torch|triton)"
 
-# Should show: monai, torch, (triton on Linux only)
+# Should show: torch, (triton on Linux only)
 ```
 
 ### Memory Issues

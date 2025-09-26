@@ -2,7 +2,7 @@
 """
 Vista3D Label ID Preserver
 
-This utility ensures that MONAI post-processing preserves the correct Vista3D label IDs
+This utility ensures that post-processing preserves the correct Vista3D label IDs
 for each anatomical structure, maintaining proper color mapping.
 """
 
@@ -14,7 +14,7 @@ from typing import Dict, List, Tuple, Optional
 
 
 class Vista3DLabelPreserver:
-    """Preserves Vista3D label IDs during MONAI post-processing."""
+    """Preserves Vista3D label IDs during post-processing."""
     
     def __init__(self, label_colors_path: str = "conf/vista3d_label_colors.json"):
         """Initialize with Vista3D label colors configuration."""

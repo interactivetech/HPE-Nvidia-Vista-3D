@@ -116,7 +116,7 @@ streamlit run app.py
 # Backend environment (full AI stack)
 uv venv .venv-backend
 source .venv-backend/bin/activate
-uv pip install python-dotenv numpy tqdm requests beautifulsoup4 bs4 nibabel dcm2niix vtk trimesh pymeshfix open3d stl scikit-image plyfile monai
+uv pip install python-dotenv numpy tqdm requests beautifulsoup4 bs4 nibabel dcm2niix vtk trimesh pymeshfix open3d stl scikit-image plyfile
 python start_backend.py
 ```
 

@@ -67,7 +67,7 @@ def assign_colors_to_vessels(voxel_dir, output_dir, color_map, label_dict):
     for file_name in os.listdir(voxel_dir):
         if file_name.endswith('.nii.gz'):
             input_path = os.path.join(voxel_dir, file_name)
-            vessel_name = file_name.replace('.nii.gz', '').replace('_monai', '').replace(' ', '_')
+            vessel_name = file_name.replace('.nii.gz', '').replace(' ', '_')
 
             # Check if vessel has a defined color with exact match
             color = None
@@ -107,7 +107,7 @@ def visualize_voxel_data(data, color, output_path):
 if __name__ == "__main__":
     # Example usage
     patient_folder = "/Users/dave/AI/HPE/HPE-Nvidia-Vista-3D/output/PA00000002"
-    voxel_subdir = "2.5MM_ARTERIAL_3_MONAI"
+    voxel_subdir = "2.5MM_ARTERIAL_3"
     voxel_dir = os.path.join(patient_folder, 'voxels', voxel_subdir)
     output_dir = os.path.join(patient_folder, 'visualizations', voxel_subdir)
     color_json_path = "/Users/dave/AI/HPE/HPE-Nvidia-Vista-3D/conf/vista3d_label_colors.json"

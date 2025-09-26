@@ -68,7 +68,7 @@ uv pip install package_name  # Use this instead of uv sync
 ```bash
 # Test backend environment
 source .venv-backend/bin/activate
-python -c "import monai, torch, nibabel; print('✅ Backend environment working!'); print(f'MONAI: {monai.__version__}, PyTorch: {torch.__version__}')"
+python -c "import torch, nibabel; print('✅ Backend environment working!'); print(f'PyTorch: {torch.__version__}')"
 ```
 
 ## 🔧 Configuration
