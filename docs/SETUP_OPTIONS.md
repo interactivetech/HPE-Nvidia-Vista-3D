@@ -136,7 +136,11 @@ python3 setup.py
 ```bash
 # On non-GPU machine
 python3 setup.py --setup frontend
-cd frontend && ./start_frontend.sh
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 
 # On GPU machine (separate)
 python3 setup.py --setup backend
@@ -195,7 +199,11 @@ python3 setup.py --config-file dev_config.env
 cd backend && ./start_backend.sh
 
 # Frontend only
-cd frontend && ./start_frontend.sh
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 
 ## Troubleshooting
@@ -234,7 +242,11 @@ python3 setup.py --setup frontend --check-only
 python3 setup.py --setup frontend
 
 # Start frontend services
-cd frontend && ./start_frontend.sh
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 
 ### Automated Backend Setup

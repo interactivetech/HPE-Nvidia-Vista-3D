@@ -156,9 +156,14 @@ docker-compose down   # Stop Vista3D server
 
 # Frontend (Web interface + Image server)
 cd frontend
-./start_frontend.sh   # Start frontend services
-./stop_frontend.sh    # Stop frontend services
-./logs_frontend.sh    # View logs
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
+# Stop services
+docker-compose down && cd ../image_server && docker-compose down
+# View logs
+docker-compose logs -f
 ```
 
 ## 🔍 Troubleshooting

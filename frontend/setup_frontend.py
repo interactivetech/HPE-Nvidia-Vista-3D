@@ -505,175 +505,6 @@ def update_docker_compose(config: Dict[str, str]) -> None:
     except Exception as e:
         print_error(f"Failed to update docker-compose.yml: {e}")
 
-def create_startup_script() -> None:
-    """Create a startup script for the frontend"""
-    print_header("Creating Startup Script")
-    
-    startup_script = """#!/bin/bash
-# HPE NVIDIA Vista3D Frontend Startup Script
-
-set -e
-
-echo "🚀 Starting HPE NVIDIA Vista3D Frontend (Development Mode)..."
-
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    echo "❌ .env file not found. Please run setup_frontend.py first."
-    exit 1
-fi
-
-# Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
-
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker is not running. Please start Docker first."
-    exit 1
-fi
-
-# Check if required images exist, pull from Docker Hub if needed
-echo "🔍 Checking Docker Hub images..."
-
-# Check frontend image
-if ! docker image inspect ${FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest} > /dev/null 2>&1; then
-    echo "📥 Pulling frontend image from Docker Hub..."
-    if ! docker pull ${FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest}; then
-        echo "❌ Failed to pull frontend image. Please check your internet connection and Docker Hub access."
-        exit 1
-    fi
-fi
-
-# Check image server image
-if ! docker image inspect ${IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest} > /dev/null 2>&1; then
-    echo "📥 Pulling image server image from Docker Hub..."
-    if ! docker pull ${IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest}; then
-        echo "❌ Failed to pull image server image. Please check your internet connection and Docker Hub access."
-        exit 1
-    fi
-fi
-
-# Start the image server first
-echo "🖼️  Starting image server (development mode)..."
-cd ../image_server
-if [ -f "docker-compose.yml" ]; then
-    docker-compose up -d
-    echo "✅ Image server started (development mode)"
-else
-    echo "❌ Image server docker-compose.yml not found"
-    exit 1
-fi
-cd ../frontend
-
-# Start the frontend services
-echo "🌐 Starting frontend services..."
-docker-compose up -d
-
-# Wait for the services to be ready
-echo "⏳ Waiting for services to be ready..."
-sleep 15
-
-# Check if the services are running
-if docker ps | grep -q vista3d-frontend-standalone; then
-    echo "✅ Frontend is running on http://localhost:${FRONTEND_PORT:-8501}"
-    echo "🔄 Development mode: Code changes will auto-reload"
-else
-    echo "❌ Frontend failed to start"
-    echo "📊 Check logs with: docker logs vista3d-frontend-standalone"
-    exit 1
-fi
-
-if docker ps | grep -q vista3d-image-server-standalone; then
-    echo "✅ Image server is running on http://localhost:${IMAGE_SERVER_PORT:-8888}"
-    echo "🔄 Image server development mode: Code changes will auto-reload"
-else
-    echo "❌ Image server failed to start"
-    echo "📊 Check logs with: docker logs vista3d-image-server-standalone"
-    exit 1
-fi
-
-echo "🎉 Frontend setup complete!"
-echo "🌐 Web Interface: http://localhost:${FRONTEND_PORT:-8501}"
-echo "🖼️  Image Server: http://localhost:${IMAGE_SERVER_PORT:-8888}"
-echo "🔄 Development: Edit code in both frontend and image server and see changes automatically!"
-echo "📊 Check logs with: docker-compose logs -f"
-"""
-    
-    script_path = os.path.join(os.getcwd(), 'start_frontend.sh')
-    try:
-        with open(script_path, 'w') as f:
-            f.write(startup_script)
-        os.chmod(script_path, 0o755)
-        print_success(f"Created: {script_path}")
-    except Exception as e:
-        print_error(f"Failed to create startup script: {e}")
-
-def create_stop_script() -> None:
-    """Create a stop script for the frontend"""
-    print_header("Creating Stop Script")
-    
-    stop_script = """#!/bin/bash
-# HPE NVIDIA Vista3D Frontend Stop Script
-
-echo "🛑 Stopping HPE NVIDIA Vista3D Frontend..."
-
-# Stop the frontend services
-docker-compose down
-
-# Stop the image server
-echo "🖼️  Stopping image server..."
-cd ../image_server
-if [ -f "docker-compose.yml" ]; then
-    docker-compose down
-    echo "✅ Image server stopped"
-else
-    echo "⚠️  Image server docker-compose.yml not found"
-fi
-cd ../frontend
-
-echo "✅ Frontend services stopped"
-"""
-    
-    script_path = os.path.join(os.getcwd(), 'stop_frontend.sh')
-    try:
-        with open(script_path, 'w') as f:
-            f.write(stop_script)
-        os.chmod(script_path, 0o755)
-        print_success(f"Created: {script_path}")
-    except Exception as e:
-        print_error(f"Failed to create stop script: {e}")
-
-def create_logs_script() -> None:
-    """Create a logs viewing script"""
-    print_header("Creating Logs Script")
-    
-    logs_script = """#!/bin/bash
-# HPE NVIDIA Vista3D Frontend Logs Script
-
-echo "📊 Viewing HPE NVIDIA Vista3D Frontend logs..."
-
-# Show logs for frontend services
-echo "🌐 Frontend logs:"
-docker-compose logs -f --tail=50
-
-# Show logs for image server
-echo "🖼️  Image server logs:"
-cd ../image_server
-if [ -f "docker-compose.yml" ]; then
-    docker-compose logs -f --tail=50
-else
-    echo "⚠️  Image server not found"
-fi
-cd ../frontend
-"""
-    
-    script_path = os.path.join(os.getcwd(), 'logs_frontend.sh')
-    try:
-        with open(script_path, 'w') as f:
-            f.write(logs_script)
-        os.chmod(script_path, 0o755)
-        print_success(f"Created: {script_path}")
-    except Exception as e:
-        print_error(f"Failed to create logs script: {e}")
 
 
 def main():
@@ -745,19 +576,15 @@ def main():
     # Build Docker images only if Docker Hub images are not available
     build_docker_images(image_status)
     
-    # Create management scripts
-    create_startup_script()
-    create_stop_script()
-    create_logs_script()
     
     # Final instructions
     print_header("Setup Complete!")
     print_success("Frontend setup completed successfully!")
     print_info("Next steps:")
-    print_info("1. Start the frontend (development mode): ./start_frontend.sh")
-    print_info("2. Or use Docker Compose: docker-compose up -d")
-    print_info("3. Stop services: ./stop_frontend.sh")
-    print_info("4. View logs: ./logs_frontend.sh")
+    print_info("1. Start image server: cd ../image_server && docker-compose up -d")
+    print_info("2. Start frontend: docker-compose up -d")
+    print_info("3. Stop services: docker-compose down && cd ../image_server && docker-compose down")
+    print_info("4. View logs: docker-compose logs -f")
     print_info(f"5. Open web interface: http://localhost:{config['FRONTEND_PORT']}")
     print_info("🔄 Development mode: Edit code in both frontend and image server and see changes automatically!")
     

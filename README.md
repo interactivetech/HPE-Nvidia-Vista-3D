@@ -170,7 +170,11 @@ python3 setup.py
 python3 setup.py --setup frontend
 
 # Start frontend services
-cd frontend && ./start_frontend.sh
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 **Best for**: Web interfaces on non-GPU systems, connecting to remote Vista3D
 
@@ -267,13 +271,17 @@ cd backend && docker-compose restart
 #### Frontend Services Management
 ```bash
 # Start frontend services
-cd frontend && ./start_frontend.sh
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 
 # Stop frontend services
-cd frontend && ./stop_frontend.sh
+cd frontend && docker-compose down && cd ../image_server && docker-compose down
 
 # View frontend logs
-cd frontend && docker logs -f vista3d-frontend-standalone
+cd frontend && docker-compose logs -f
 cd frontend && docker logs -f vista3d-image-server-standalone
 ```
 

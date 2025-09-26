@@ -100,7 +100,7 @@ python3 setup_frontend.py
 4. Generates `.env` file
 5. Sets up image server configuration
 6. Builds Docker images
-7. Creates management scripts (`start_frontend.sh`, `stop_frontend.sh`, `logs_frontend.sh`)
+7. Provides Docker commands for service management
 
 ## System Requirements
 
@@ -166,7 +166,10 @@ python3 setup_backend.py
 # Setup frontend (in another terminal)
 cd frontend
 python3 setup_frontend.py
-./start_frontend.sh
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 
 ## Management Commands
@@ -186,12 +189,19 @@ docker-compose up -d  # Alternative start method
 docker-compose down   # Stop Vista3D server
 ```
 
-### Frontend Scripts
+### Frontend Commands
 ```bash
 cd frontend
-./start_frontend.sh   # Start frontend services
-./stop_frontend.sh    # Stop frontend services
-./logs_frontend.sh    # View logs
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
+
+# Stop services
+docker-compose down && cd ../image_server && docker-compose down
+
+# View logs
+docker-compose logs -f
 ```
 
 ## Troubleshooting
