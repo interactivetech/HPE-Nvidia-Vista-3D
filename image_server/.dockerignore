@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+README.md
+
+# Don't include repo data; container will mount host paths
+output/
+dicom/
+assets/
+logs/
+

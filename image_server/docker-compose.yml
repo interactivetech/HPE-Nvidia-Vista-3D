@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  image-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vista3d-image-server:local
+    container_name: vista3d-image-server-standalone
+    ports:
+      - "8888:8888"
+    environment:
+      - OUTPUT_FOLDER=/data/output
+      - DICOM_FOLDER=/data/dicom
+      - IMAGE_SERVER=http://localhost:8888
+    volumes:
+      - ${OUTPUT_FOLDER:-./output}:/data/output:ro
+      - ${DICOM_FOLDER:-./dicom}:/data/dicom:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+

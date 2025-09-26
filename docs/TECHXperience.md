@@ -9,9 +9,7 @@ SSH_SERVER="ssh.axisapps.io"
 # The SSH command with multiple -R flags
 ssh -N \
   -L 0.0.0.0:8000:localhost:8000 \
-  -L 0.0.0.0:8000:localhost:8001 \
   -L 0.0.0.0:8501:localhost:8501 \
-  -L 0.0.0.0:8888:localhost:8888 \
   -R 0.0.0.0:8888:localhost:8888 \
   ${USER}@${SSH_SERVER}
 

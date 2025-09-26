@@ -1,0 +1,25 @@
+{
+  "viewable_folders": [
+    {
+      "name": "dicom",
+      "path": "dicom",
+      "url_path": "dicom",
+      "description": "DICOM medical imaging files",
+      "icon": "📁"
+    },
+    {
+      "name": "output",
+      "path": "output",
+      "url_path": "output",
+      "description": "Processed medical imaging output files",
+      "icon": "📁"
+    }
+  ],
+  "server_settings": {
+    "title": "Medical Imaging Server",
+    "description": "HTTP server for medical imaging files with directory browsing",
+    "show_file_sizes": true,
+    "show_hidden_files": false
+  }
+}
+

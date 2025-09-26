@@ -1,0 +1,20 @@
+[project]
+name = "vista3d-frontend"
+version = "0.1.0"
+description = "Streamlit frontend for Vista3D"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "streamlit>=1.32.0",
+    "requests>=2.31.0",
+    "extra-streamlit-components>=0.1.81",
+    "streamlit-mermaid>=0.3.0",
+    "pandas>=2.0.0",
+    "plotly>=5.0.0",
+    "numpy>=2.0.0",
+    # Frontend utilities rely on BeautifulSoup for parsing server listings
+    "beautifulsoup4>=4.12.3",
+]
+
+

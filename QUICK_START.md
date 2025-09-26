@@ -1,6 +1,6 @@
 # 🚀 HPE NVIDIA Vista3D - Quick Start Guide
 
-**Get up and running with our new three-script architecture!**
+**Get up and running in 3 simple steps!**
 
 ## Prerequisites
 
@@ -17,48 +17,39 @@
 git clone <repository-url>
 cd HPE-Nvidia-Vista-3D
 
-# Run the unified setup script
+# Run the master setup script
 python3 setup.py
 ```
 
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
-- ✅ Sets up Python environment with all dependencies
-- ✅ Configures environment variables and Docker settings
 - ✅ Prompts for your NVIDIA NGC API key
-- ✅ Creates all necessary directories and files
+- ✅ Configures directories and ports
+- ✅ Sets up backend (Vista3D AI server)
+- ✅ Sets up frontend (Web interface + Image server)
+- ✅ Creates management scripts
 
-## Step 2: Start Vista3D Server (GPU-Enabled Machine)
+## Step 2: Start All Services
 
 ```bash
-# On your GPU-enabled machine (local or remote)
-python3 start_backend.py
+# Start the entire platform
+./start_all.sh
 ```
 
 **This starts:**
 - 🧠 **Vista3D AI Server** (http://localhost:8000)
-- ⚡ **GPU-accelerated processing** for medical image segmentation
-- 🔄 **Auto-restart capability** for production deployments
-
-**Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
-
-## Step 3: Start Frontend Services
-
-```bash
-# On any machine (can be same as Vista3D or different)
-python3 start_frontend.py
-```
-
-**This starts:**
 - 🌐 **Streamlit Web Interface** (http://localhost:8501)
 - 🖼️ **Image Server** (http://localhost:8888)
 
-## Step 4: Process Your Images
+**Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
+
+## Step 3: Process Your Images
 
 ```bash
 # Add your medical images
 # Option A: Place DICOM files in dicom/ folder
-mkdir -p dicom/PA00000001
+# The dicom/ folder contains patient folders (e.g., PA00000001, PA00000002)
+mkdir -p dicom
 # Copy your DICOM files to dicom/PA00000001/
 
 # Option B: Place NIFTI files directly
@@ -74,7 +65,7 @@ mkdir -p output/nifti
 
 ## 🎉 You're Done!
 
-You now have a fully functional medical AI platform with distributed architecture.
+You now have a fully functional medical AI platform running!
 
 ## 🌐 Remote Server Setup
 
@@ -116,64 +107,48 @@ The web interface includes a powerful **Tools page** where you can:
 
 ## 🔧 Management Commands
 
-### Vista3D Server Management
+### Master Platform Management
 ```bash
-# Start Vista3D server
-python3 start_backend.py
+# Start all services
+./start_all.sh
 
-# Stop Vista3D server
-docker stop vista3d
-
-# View Vista3D logs
-docker logs -f vista3d
-
-# Restart Vista3D server
-docker restart vista3d
-```
-
-### Frontend Services Management
-```bash
-# Start frontend services
-python3 start_frontend.py
-
-# Stop frontend services
-docker compose down
-
-# View frontend logs
-docker compose logs -f
-
-# View specific service logs
-docker logs -f hpe-nvidia-vista3d-app
-docker logs -f vista3d-image-server
-```
-
-### Systemd Service Management (Production)
-```bash
-# Create systemd services for auto-startup
-sudo python3 start_backend.py --create-service
-sudo python3 start_frontend.py --create-service
-
-# Start services
-sudo systemctl start vista3d
-sudo systemctl start vista3d-gui
+# Stop all services
+./stop_all.sh
 
 # Check service status
-sudo systemctl status vista3d
-sudo systemctl status vista3d-gui
+./status.sh
+```
+
+### Individual Service Management
+```bash
+# Backend (Vista3D AI server)
+cd backend
+./start_backend.sh    # Start Vista3D server
+docker-compose down   # Stop Vista3D server
+
+# Frontend (Web interface + Image server)
+cd frontend
+./start_frontend.sh   # Start frontend services
+./stop_frontend.sh    # Stop frontend services
+./logs_frontend.sh    # View logs
 ```
 
 ## 🔍 Troubleshooting
 
-### Vista3D Not Starting
+### Services Not Starting
 ```bash
+# Check service status
+./status.sh
+
+# Check Docker is running
+docker info
+
 # Check GPU availability
 nvidia-smi
 
-# Check Docker GPU support
-docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi
-
-# Check Vista3D logs
-docker logs -f vista3d
+# Check specific service logs
+cd backend && docker logs -f vista3d-server-standalone
+cd frontend && docker logs -f vista3d-frontend-standalone
 ```
 
 ### Permission Issues
@@ -189,6 +164,9 @@ sudo chmod -R 755 output/
 lsof -i :8501
 lsof -i :8888
 lsof -i :8000
+
+# Stop conflicting services
+sudo systemctl stop conflicting-service
 ```
 
 ## 📚 Next Steps
@@ -202,9 +180,9 @@ lsof -i :8000
 ## 🆘 Need Help?
 
 - Check the full [README.md](README.md) for detailed documentation
-- See the [docs/](docs/) directory for comprehensive guides
+- See the [docs/SETUP_SCRIPTS.md](docs/SETUP_SCRIPTS.md) for comprehensive setup guide
 - Check the troubleshooting section above for common issues
 
 ---
 
-**Ready to Go?** Follow the steps above and you'll be up and running in 15 minutes! 🚀
+**Ready to Go?** Follow the 3 steps above and you'll be up and running in 10 minutes! 🚀

@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  vista3d-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vista3d-frontend:local
+    container_name: vista3d-frontend-standalone
+    ports:
+      - "8501:8501"
+    environment:
+      - IMAGE_SERVER=${IMAGE_SERVER:-http://localhost:8888}
+      - EXTERNAL_IMAGE_SERVER=${EXTERNAL_IMAGE_SERVER:-http://localhost:8888}
+      - OUTPUT_FOLDER=/app/output
+      - DICOM_FOLDER=/app/dicom
+      - VISTA3D_SERVER=${VISTA3D_SERVER:-http://localhost:8000}
+      - DOCKER_CONTAINER=true
+    volumes:
+      - ${OUTPUT_FOLDER:-./output}:/app/output
+      - ${DICOM_FOLDER:-./dicom}:/app/dicom
+    depends_on:
+      - image-server
+    restart: unless-stopped
+
+  image-server:
+    image: vista3d-image-server:local
+    container_name: vista3d-image-server-for-frontend
+    ports:
+      - "8888:8888"
+    environment:
+      - OUTPUT_FOLDER=/data/output
+      - DICOM_FOLDER=/data/dicom
+      - IMAGE_SERVER=http://localhost:8888
+    volumes:
+      - ${OUTPUT_FOLDER:-./output}:/data/output:ro
+      - ${DICOM_FOLDER:-./dicom}:/data/dicom:ro
+    restart: unless-stopped
+
+
