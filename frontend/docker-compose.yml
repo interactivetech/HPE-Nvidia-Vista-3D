@@ -16,9 +16,18 @@ services:
       - DICOM_FOLDER=/app/dicom
       - VISTA3D_SERVER=${VISTA3D_SERVER:-http://localhost:8000}
       - DOCKER_CONTAINER=true
+      # Development mode settings (default)
+      - STREAMLIT_SERVER_RUN_ON_SAVE=true
+      - STREAMLIT_SERVER_FILE_WATCHER_TYPE=auto
     volumes:
       - ${OUTPUT_FOLDER:-./output}:/app/output
       - ${DICOM_FOLDER:-./dicom}:/app/dicom
+      # Development: Mount source code for live development (default mode)
+      - .:/app
+      # Exclude build artifacts from mounting
+      - /app/.venv
+      - /app/__pycache__
+      - /app/.pytest_cache
     depends_on:
       - image-server
     restart: unless-stopped
