@@ -440,7 +440,7 @@ sudo ufw allow 8000
 
 ## 📚 Additional Resources
 
-- **Setup Options Guide**: See [docs/SETUP_OPTIONS.md](docs/SETUP_OPTIONS.md) for detailed setup scenarios
+- **Setup Guide**: See [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) for comprehensive setup guide and options
 - **Full Documentation**: See `docs/` directory for detailed guides
 - **API Reference**: Check `utils/` directory for script documentation
 - **HPE GreenLake**: Learn about HPE infrastructure integration

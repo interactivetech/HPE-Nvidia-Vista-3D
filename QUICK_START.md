@@ -243,8 +243,7 @@ sudo systemctl stop conflicting-service
 ## 🆘 Need Help?
 
 - Check the full [README.md](README.md) for detailed documentation
-- See the [docs/SETUP_OPTIONS.md](docs/SETUP_OPTIONS.md) for setup scenarios and options
-- See the [docs/SETUP_SCRIPTS.md](docs/SETUP_SCRIPTS.md) for comprehensive setup guide
+- See the [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) for comprehensive setup guide and options
 - Check the troubleshooting section above for common issues
 
 ---

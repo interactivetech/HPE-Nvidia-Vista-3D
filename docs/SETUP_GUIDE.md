@@ -40,7 +40,7 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 
 ## 🚀 Quick Start
 
-**Get up and running with our three-script architecture!**
+**Get up and running with our unified setup script!**
 
 ### Step 1: Initial Setup
 ```bash
@@ -52,27 +52,6 @@ cd HPE-Nvidia-Vista-3D
 python3 setup.py
 ```
 
-**Setup Options:**
-```bash
-# Setup everything (default)
-python3 setup.py
-
-# Setup only frontend (for non-GPU systems)
-python3 setup.py --setup frontend
-
-# Setup only backend (for GPU-enabled systems)
-python3 setup.py --setup backend
-
-# Check system requirements only
-python3 setup.py --check-only
-
-# Non-interactive setup with defaults
-python3 setup.py --non-interactive
-
-# Get help
-python3 setup.py --help
-```
-
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
 - ✅ Sets up separate Python environments for frontend and backend
@@ -80,34 +59,57 @@ python3 setup.py --help
 - ✅ Prompts for your NVIDIA NGC API key (backend only)
 - ✅ Creates all necessary directories and files
 
-### Step 2: Start Vista3D Server (GPU-Enabled Machine)
+### Step 2: Start Services
+
+**The commands depend on what you set up in Step 1:**
+
+#### If you set up both frontend and backend:
 ```bash
-# On your GPU-enabled machine (local or remote)
-python3 start_backend.py
+# Start Vista3D AI Server (GPU-enabled machine)
+cd backend
+docker-compose up -d
+
+# Start Frontend Services (any machine)
+cd ../frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
+```
+
+#### If you set up only the backend:
+```bash
+# Start Vista3D AI Server
+cd backend
+docker-compose up -d
+```
+
+#### If you set up only the frontend:
+```bash
+# Start Frontend Services
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 
 **This starts:**
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
-- ⚡ **GPU-accelerated processing** for medical image segmentation
-- 🔄 **Auto-restart capability** for production deployments
+- 🧠 **Vista3D AI Server** (http://localhost:8000) - if backend was set up
+- 🌐 **Streamlit Web Interface** (http://localhost:8501) - if frontend was set up
+- 🖼️ **Image Server** (http://localhost:8888) - if frontend was set up
 
 **Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
 
-### Step 3: Start Frontend Services
-```bash
-# On any machine (can be same as Vista3D or different)
-python3 start_frontend.py
-```
+### Step 3: Process Your Images
 
-**This starts:**
-- 🌐 **Streamlit Web Interface** (http://localhost:8501)
-- 🖼️ **Image Server** (http://localhost:8888)
+**Note**: This step requires the frontend web interface to be running.
 
-### Step 4: Process Your Images
 ```bash
 # Add your medical images
 # Option A: Place DICOM files in dicom/ folder
-mkdir -p dicom/PA00000001
+# The dicom/ folder contains patient folders (e.g., PA00000001, PA00000002)
+mkdir -p dicom
 # Copy your DICOM files to dicom/PA00000001/
 
 # Option B: Place NIFTI files directly
@@ -121,7 +123,173 @@ mkdir -p output/nifti
 # - View 3D visualizations
 ```
 
-**🎉 You're ready!** You now have a fully functional medical AI platform with distributed architecture.
+**🎉 You're ready!** You now have a fully functional medical AI platform.
+
+## ⚙️ Setup Options
+
+The `setup.py` script provides flexible installation options to accommodate different deployment scenarios and system configurations.
+
+### 1. Full Platform Setup (Default)
+```bash
+python3 setup.py
+# or
+python3 setup.py --setup both
+```
+
+**What it does:**
+- Sets up both frontend and backend components
+- Requires GPU-enabled system
+- Prompts for NVIDIA NGC API key
+- Creates complete platform with all services
+
+**Best for:**
+- Complete development environments
+- Single-machine deployments
+- Testing and evaluation
+
+### 2. Frontend-Only Setup
+```bash
+python3 setup.py --setup frontend
+```
+
+**What it does:**
+- Sets up only the web interface and image server
+- No GPU requirements
+- No NVIDIA NGC API key needed
+- Connects to remote Vista3D server
+
+**Best for:**
+- Non-GPU systems (laptops, workstations)
+- Web interfaces connecting to remote Vista3D
+- Lightweight deployments
+
+**System Requirements:**
+- OS: Ubuntu Linux (18.04+) or macOS
+- Memory: 8GB+ RAM (minimum)
+- Docker: Required
+- Disk Space: 5GB+ free space
+
+### 3. Backend-Only Setup
+```bash
+python3 setup.py --setup backend
+```
+
+**What it does:**
+- Sets up only the Vista3D AI server
+- Requires GPU-enabled system
+- Prompts for NVIDIA NGC API key
+- Provides API for frontend connections
+
+**Best for:**
+- GPU servers providing Vista3D API
+- Backend-only deployments
+- API service providers
+
+**System Requirements:**
+- OS: Ubuntu Linux (18.04+) or macOS
+- GPU: NVIDIA GPU with CUDA support (8GB+ VRAM recommended)
+- Memory: 16GB+ RAM
+- Docker: Required with NVIDIA Container Toolkit
+- Disk Space: 10GB+ free space
+
+## 🔧 Additional Setup Options
+
+### Check System Requirements Only
+```bash
+python3 setup.py --check-only
+```
+
+**What it does:**
+- Validates system requirements
+- No installation or configuration
+- Useful for pre-deployment validation
+
+### Non-Interactive Setup
+```bash
+python3 setup.py --non-interactive
+```
+
+**What it does:**
+- Uses default configuration values
+- No user prompts
+- Suitable for automated deployments
+
+### Skip Docker Hub Check
+```bash
+python3 setup.py --skip-docker-check
+```
+
+**What it does:**
+- Skips Docker Hub image availability check
+- Useful when images are already available locally
+- Speeds up setup process
+
+### Use Configuration File
+```bash
+python3 setup.py --config-file my_config.env
+```
+
+**What it does:**
+- Loads configuration from external file
+- Bypasses interactive configuration
+- Useful for consistent deployments
+
+### Get Help
+```bash
+python3 setup.py --help
+```
+
+**What it does:**
+- Displays comprehensive help information
+- Shows all available options
+- Provides usage examples
+
+## 🌐 Deployment Scenarios
+
+### Scenario 1: Single GPU Machine
+```bash
+# Complete setup on one machine
+python3 setup.py
+
+# Start all services
+cd backend && docker-compose up -d
+cd ../frontend
+cd ../image_server && docker-compose up -d
+cd ../frontend && docker-compose up -d
+```
+
+### Scenario 2: Frontend on Non-GPU Machine
+```bash
+# On non-GPU machine
+python3 setup.py --setup frontend
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
+
+# On GPU machine (separate)
+python3 setup.py --setup backend
+cd backend && docker-compose up -d
+```
+
+### Scenario 3: Backend API Server
+```bash
+# On GPU server
+python3 setup.py --setup backend
+cd backend && docker-compose up -d
+
+# Frontend machines connect to API
+```
+
+### Scenario 4: Development Environment
+```bash
+# Check requirements first
+python3 setup.py --check-only
+
+# Setup with custom config
+python3 setup.py --config-file dev_config.env
+```
 
 ## 🐍 Virtual Environment Management
 
@@ -417,6 +585,21 @@ grep NGC_API_KEY .env
 docker login nvcr.io -u '$oauthtoken' -p 'your-api-key'
 ```
 
+#### Frontend-Only Setup Issues
+- Ensure remote Vista3D server is accessible
+- Check network connectivity
+- Verify port forwarding if using SSH tunnels
+
+#### Backend-Only Setup Issues
+- Verify GPU availability with `nvidia-smi`
+- Check NVIDIA Container Toolkit installation
+- Validate NGC API key format
+
+#### Mixed Setup Issues
+- Ensure consistent configuration across machines
+- Check network connectivity between services
+- Verify port availability
+
 ### Getting Help
 1. Check the logs for error messages
 2. Verify system requirements
@@ -447,6 +630,7 @@ docker login nvcr.io -u '$oauthtoken' -p 'your-api-key'
 
 ## 📚 Additional Resources
 
+- **Sample Data**: See [docs/SAMPLE_DATA.md](SAMPLE_DATA.md) for sample data setup
 - **Backend Guide**: See `docs/BACKEND_GUIDE.md` for Vista3D server details
 - **Frontend Guide**: See `docs/FRONTEND_GUIDE.md` for web interface details
 - **API Reference**: Check `utils/` directory for script documentation
