@@ -152,6 +152,15 @@ if current_page == 'home':
 
     This platform provides automated vessel segmentation using NVIDIA's Vista3D model on HPE infrastructure, transforming DICOM medical imaging data into actionable clinical insights through AI-powered segmentation and 3D visualization.
     
+    **🔄 Workflow Process**:  
+    1. **📁 Add DICOM Folders**: Upload patient DICOM imaging data through the Image Data section
+    2. **🔄 Convert to NIfTI**: Automatically convert DICOM files to NIfTI format for processing
+    3. **🧠 AI Segmentation**: Run Vista3D model to perform automated vessel and organ segmentation
+    4. **👁️ 3D Visualization**: View and analyze results using the interactive NiiVue viewer
+    
+    > **📋 Vista3D Capabilities & Limitations**:  
+    > Vista3D supports both **CT and MRI DICOM files** (converted to NIfTI format) and excels at whole-body organ and lesion segmentation across 127+ anatomical structures. However, it has specific limitations: while it can process brain imaging data, it may not be optimal for detailed brain structure segmentation tasks that typically require specialized brain-focused models.
+    
     Use the navigation menu on the left to access different features:
     
     - **📥 Image Data**: Browse and analyze patient medical imaging data

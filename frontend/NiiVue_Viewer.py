@@ -15,6 +15,10 @@ from utils.constants import (
     NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
     VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data
 )
+
+# Import badge components
+from assets.vista3d_badge import render_nvidia_vista_card
+from assets.hpe_badge import render_hpe_badge
  
  
 
@@ -169,6 +173,13 @@ def render_sidebar():
             # Voxel legend
             viewer_config.render_voxel_legend()
 
+        # Add spacing before badges
+        st.sidebar.markdown("---")
+        
+        # Render Nvidia Vista 3D card in sidebar
+        render_nvidia_vista_card()
+        # Render HPE AI badge in sidebar
+        render_hpe_badge()
 
     return selected_patient, selected_file
 
