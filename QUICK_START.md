@@ -21,7 +21,7 @@
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+gh repo clone dw-flyingw/HPE-Nvidia-Vista-3D
 cd HPE-Nvidia-Vista-3D
 
 # Run the master setup script
@@ -55,13 +55,21 @@ python3 setup.py --help
 - ✅ Configures directories and ports
 - ✅ Sets up backend (Vista3D AI server) - if selected
 - ✅ Sets up frontend (Web interface + Image server) - if selected
-- ✅ Creates management scripts
+- ✅ Creates Docker configurations
 
 ## Step 2: Start All Services
 
 ```bash
-# Start the entire platform
-./start_all.sh
+# Start Vista3D AI Server (GPU-enabled machine)
+cd backend
+docker-compose up -d
+
+# Start Frontend Services (any machine)
+cd ../frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 
 **This starts:**
@@ -135,44 +143,37 @@ The web interface includes a powerful **Tools page** where you can:
 
 ## 🔧 Management Commands
 
-### Master Platform Management
+### Individual Service Management
+
+#### Backend (Vista3D AI Server)
 ```bash
-# Start all services
-./start_all.sh
-
-# Stop all services
-./stop_all.sh
-
-# Check service status
-./status.sh
+cd backend
+docker-compose up -d    # Start Vista3D server
+docker-compose down     # Stop Vista3D server
+docker-compose logs -f  # View logs
 ```
 
-### Individual Service Management
+#### Frontend (Web Interface + Image Server)
 ```bash
-# Backend (Vista3D AI server)
-cd backend
-./start_backend.sh    # Start Vista3D server
-docker-compose down   # Stop Vista3D server
-
-# Frontend (Web interface + Image server)
+# Start services
 cd frontend
 # Start image server first
 cd ../image_server && docker-compose up -d
 # Start frontend
 cd ../frontend && docker-compose up -d
+
 # Stop services
-docker-compose down && cd ../image_server && docker-compose down
+cd frontend && docker-compose down && cd ../image_server && docker-compose down
+
 # View logs
-docker-compose logs -f
+cd frontend && docker-compose logs -f
+cd image_server && docker-compose logs -f
 ```
 
 ## 🔍 Troubleshooting
 
 ### Services Not Starting
 ```bash
-# Check service status
-./status.sh
-
 # Check Docker is running
 docker info
 
@@ -182,6 +183,7 @@ nvidia-smi
 # Check specific service logs
 cd backend && docker logs -f vista3d-server-standalone
 cd frontend && docker logs -f vista3d-frontend-standalone
+cd image_server && docker logs -f vista3d-image-server-standalone
 ```
 
 ### Permission Issues
