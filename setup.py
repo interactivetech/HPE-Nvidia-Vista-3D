@@ -662,170 +662,6 @@ def run_frontend_setup() -> None:
     except Exception as e:
         print_error(f"Failed to run frontend setup: {e}")
 
-def create_master_scripts(setup_choice: str = 'both') -> None:
-    """Create master management scripts"""
-    print_header("Creating Master Management Scripts")
-    
-    # Create start all script
-    start_all_script = f"""#!/bin/bash
-# HPE NVIDIA Vista3D Master Start Script
-
-set -e
-
-echo "🚀 Starting HPE NVIDIA Vista3D Platform..."
-
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    echo "❌ .env file not found. Please run setup.py first."
-    exit 1
-fi
-
-# Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
-
-# Check if Docker Hub images are available
-echo "🔍 Checking Docker Hub images..."
-
-{f'''# Check frontend image
-if ! docker image inspect ${{FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest}} > /dev/null 2>&1; then
-    echo "📥 Pulling frontend image from Docker Hub..."
-    if ! docker pull ${{FRONTEND_IMAGE:-dwtwp/vista3d-frontend:latest}}; then
-        echo "❌ Failed to pull frontend image. Please check your internet connection and Docker Hub access."
-        exit 1
-    fi
-fi
-
-# Check image server image
-if ! docker image inspect ${{IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest}} > /dev/null 2>&1; then
-    echo "📥 Pulling image server image from Docker Hub..."
-    if ! docker pull ${{IMAGE_SERVER_IMAGE:-dwtwp/vista3d-image-server:latest}}; then
-        echo "❌ Failed to pull image server image. Please check your internet connection and Docker Hub access."
-        exit 1
-    fi
-fi''' if setup_choice in ['frontend', 'both'] else ''}
-
-{f'''# Start backend (Vista3D server)
-echo "🧠 Starting Vista3D server..."
-cd backend
-if [ -f "start_backend.sh" ]; then
-    ./start_backend.sh
-else
-    docker-compose up -d
-fi
-cd ..
-
-# Wait for backend to be ready
-echo "⏳ Waiting for Vista3D server to be ready..."
-sleep 30''' if setup_choice in ['backend', 'both'] else ''}
-
-{f'''# Start frontend services (includes image server)
-echo "🌐 Starting frontend services (including image server)..."
-cd frontend
-if [ -f "start_frontend.sh" ]; then
-    ./start_frontend.sh
-else
-    docker-compose up -d
-fi
-cd ..''' if setup_choice in ['frontend', 'both'] else ''}
-
-echo "🎉 Platform startup complete!"
-{f'''echo "🌐 Web Interface: http://localhost:${{FRONTEND_PORT:-8501}}"''' if setup_choice in ['frontend', 'both'] else ''}
-{f'''echo "🧠 Vista3D API: http://localhost:8000"''' if setup_choice in ['backend', 'both'] else ''}
-{f'''echo "🖼️  Image Server: http://localhost:8888"''' if setup_choice in ['frontend', 'both'] else ''}
-"""
-    
-    script_path = os.path.join(os.getcwd(), 'start_all.sh')
-    try:
-        with open(script_path, 'w') as f:
-            f.write(start_all_script)
-        os.chmod(script_path, 0o755)
-        print_success(f"Created: {script_path}")
-    except Exception as e:
-        print_error(f"Failed to create start_all.sh: {e}")
-    
-    # Create stop all script
-    stop_all_script = f"""#!/bin/bash
-# HPE NVIDIA Vista3D Master Stop Script
-
-echo "🛑 Stopping HPE NVIDIA Vista3D Platform..."
-
-{f'''# Stop frontend services (includes image server)
-echo "Stopping frontend services (including image server)..."
-cd frontend
-if [ -f "stop_frontend.sh" ]; then
-    ./stop_frontend.sh
-else
-    docker-compose down
-    # Also stop image server
-    cd ../image_server
-    docker-compose down
-    cd ../frontend
-fi
-cd ..''' if setup_choice in ['frontend', 'both'] else ''}
-
-{f'''# Stop backend services
-echo "Stopping backend services..."
-cd backend
-docker-compose down
-cd ..''' if setup_choice in ['backend', 'both'] else ''}
-
-echo "✅ Platform stopped"
-"""
-    
-    script_path = os.path.join(os.getcwd(), 'stop_all.sh')
-    try:
-        with open(script_path, 'w') as f:
-            f.write(stop_all_script)
-        os.chmod(script_path, 0o755)
-        print_success(f"Created: {script_path}")
-    except Exception as e:
-        print_error(f"Failed to create stop_all.sh: {e}")
-    
-    # Create status script
-    status_script = f"""#!/bin/bash
-# HPE NVIDIA Vista3D Master Status Script
-
-echo "📊 HPE NVIDIA Vista3D Platform Status"
-echo "======================================"
-
-{f'''# Check backend
-echo "Backend (Vista3D Server):"
-if docker ps | grep -q vista3d-server-standalone; then
-    echo "  ✅ Running on http://localhost:8000"
-else
-    echo "  ❌ Not running"
-fi''' if setup_choice in ['backend', 'both'] else ''}
-
-{f'''# Check frontend
-echo "Frontend (Web Interface):"
-if docker ps | grep -q vista3d-frontend-standalone; then
-    echo "  ✅ Running on http://localhost:8501"
-else
-    echo "  ❌ Not running"
-fi
-
-# Check image server
-echo "Image Server:"
-if docker ps | grep -q vista3d-image-server-standalone; then
-    echo "  ✅ Running on http://localhost:8888"
-else
-    echo "  ❌ Not running"
-fi''' if setup_choice in ['frontend', 'both'] else ''}
-
-echo ""
-echo "📊 All containers:"
-docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
-"""
-    
-    script_path = os.path.join(os.getcwd(), 'status.sh')
-    try:
-        with open(script_path, 'w') as f:
-            f.write(status_script)
-        os.chmod(script_path, 0o755)
-        print_success(f"Created: {script_path}")
-    except Exception as e:
-        print_error(f"Failed to create status.sh: {e}")
-
 def get_setup_choice_interactive() -> str:
     """Get setup choice from user interactively"""
     print_header("Setup Options")
@@ -959,8 +795,7 @@ def main():
     if setup_choice in ['frontend', 'both']:
         run_frontend_setup()
     
-    # Create master management scripts
-    create_master_scripts(setup_choice)
+    # Master management scripts removed - using direct Docker Compose commands instead
     
     # Final instructions
     print_header("🎉 Setup Complete!")
@@ -1011,11 +846,6 @@ def main():
         print_info("")
         print_info("🛑 TO STOP EVERYTHING: cd frontend && docker-compose down")
         print_info("")
-        print_info("💡 Alternative: Use convenience scripts:")
-        print_info("   • Start: ./start_all.sh")
-        print_info("   • Status: ./status.sh") 
-        print_info("   • Stop: ./stop_all.sh")
-        print_info("")
         print_info("📊 WHAT YOU'LL HAVE RUNNING:")
         print_info(f"• Web Interface: http://localhost:{config['FRONTEND_PORT']}")
         print_info(f"• Vista3D API: {config['VISTA3D_SERVER']}")
@@ -1031,9 +861,6 @@ def main():
         print_highlight("3. Check status: docker ps")
         print_info("")
         print_info("🛑 TO STOP THE BACKEND: cd backend && docker-compose down")
-        print_info("")
-        print_info("💡 Alternative: Use convenience script:")
-        print_info("   • Start: cd backend && ./start_backend.sh")
         print_info("")
         print_info("📊 WHAT YOU'LL HAVE RUNNING:")
         print_info(f"• Vista3D API: {config['VISTA3D_SERVER']}")
@@ -1055,9 +882,6 @@ def main():
         print_highlight(f"4. Open web interface: http://localhost:{config['FRONTEND_PORT']}")
         print_info("")
         print_info("🛑 TO STOP THE FRONTEND: cd frontend && docker-compose down")
-        print_info("")
-        print_info("💡 Alternative: Use convenience script:")
-        print_info("   • Start: cd frontend && ./start_frontend.sh")
         print_info("")
         print_info("📊 WHAT YOU'LL HAVE RUNNING:")
         print_info(f"• Web Interface: http://localhost:{config['FRONTEND_PORT']}")
