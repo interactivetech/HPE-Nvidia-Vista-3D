@@ -13,7 +13,14 @@ Functions:
 - File format exports
 """
 
-import open3d as o3d
+# Try to import Open3D with fallback handling
+try:
+    import open3d as o3d
+    OPEN3D_AVAILABLE = True
+except ImportError:
+    o3d = None
+    OPEN3D_AVAILABLE = False
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go

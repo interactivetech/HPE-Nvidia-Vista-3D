@@ -22,7 +22,14 @@ Dependencies:
     - scipy: For scientific computing
 """
 
-import open3d as o3d
+# Try to import Open3D with fallback handling
+try:
+    import open3d as o3d
+    OPEN3D_AVAILABLE = True
+except ImportError:
+    o3d = None
+    OPEN3D_AVAILABLE = False
+
 import numpy as np
 import trimesh
 from typing import Dict, List, Tuple, Optional, Union

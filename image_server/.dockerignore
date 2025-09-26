@@ -5,7 +5,6 @@ __pycache__
 .env
 .git
 .gitignore
-README.md
 
 # Don't include repo data; container will mount host paths
 output/

@@ -184,10 +184,74 @@ elif current_page == 'niivue':
     niivue_viewer_main()
 
 elif current_page == 'ply_viewer':
-    # Import and run Open3D Viewer content
-    sys.path.append(str(Path(__file__).parent))
-    from Open3d_Viewer import main as open3d_viewer_main
-    open3d_viewer_main()
+    # Open3D Viewer is now a separate service
+    st.title("🔺 Open3D Viewer")
+    st.info("The Open3D Viewer has been moved to a separate service for better performance and isolation.")
+    
+    # Get the Open3D service URL from environment
+    open3d_service_url = os.getenv("OPEN3D_SERVICE_URL", "http://localhost:8502")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown(f"""
+        **Open3D Viewer Service**
+        
+        The Open3D Viewer is now running as a separate service with dedicated resources for 3D processing.
+        
+        **Features:**
+        - Advanced 3D mesh visualization with Open3D
+        - Point cloud processing and analysis
+        - 3D printing preparation tools
+        - Mesh repair and optimization
+        - Multiple format export (PLY, STL, OBJ, etc.)
+        """)
+    
+    with col2:
+        st.markdown("**Quick Access**")
+        if st.button("🚀 Open Open3D Viewer", type="primary", use_container_width=True):
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={open3d_service_url}">', unsafe_allow_html=True)
+            st.success(f"Redirecting to Open3D service at {open3d_service_url}")
+        
+        st.markdown(f"**Service URL:** `{open3d_service_url}`")
+        
+        # Check if service is running
+        try:
+            import requests
+            response = requests.get(f"{open3d_service_url}/_stcore/health", timeout=5)
+            if response.status_code == 200:
+                st.success("✅ Open3D service is running")
+            else:
+                st.warning("⚠️ Open3D service may not be ready")
+        except:
+            st.error("❌ Open3D service is not accessible")
+            st.info("Start the Open3D service with: `cd open3d && docker-compose up`")
+    
+    st.divider()
+    
+    # Instructions for running the service
+    with st.expander("🔧 How to run the Open3D service", expanded=False):
+        st.markdown("""
+        **Option 1: Using Docker Compose (Recommended)**
+        ```bash
+        cd open3d
+        docker-compose up
+        ```
+        
+        **Option 2: Using Docker directly**
+        ```bash
+        cd open3d
+        docker build -t vista3d-open3d .
+        docker run -p 8502:8502 vista3d-open3d
+        ```
+        
+        **Option 3: Local development**
+        ```bash
+        cd open3d
+        uv sync
+        uv run streamlit run Open3d_Viewer.py --server.port=8502
+        ```
+        """)
 
 elif current_page == 'tools':
     # Import and run Tools content

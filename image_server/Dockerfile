@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.11-slim
+FROM python:3.11-slim
 
 WORKDIR /srv
 
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir uv
 
 # Copy minimal project metadata and install deps
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen
 
 # Create unprivileged user

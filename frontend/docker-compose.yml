@@ -12,6 +12,7 @@ services:
     environment:
       - IMAGE_SERVER=${IMAGE_SERVER:-http://localhost:8888}
       - EXTERNAL_IMAGE_SERVER=${EXTERNAL_IMAGE_SERVER:-http://localhost:8888}
+      - OPEN3D_SERVICE_URL=${OPEN3D_SERVICE_URL:-http://localhost:8502}
       - OUTPUT_FOLDER=/app/output
       - DICOM_FOLDER=/app/dicom
       - VISTA3D_SERVER=${VISTA3D_SERVER:-http://localhost:8000}
