@@ -251,10 +251,9 @@ def render_viewer(selected_patient: str, selected_file: str):
             external_url=EXTERNAL_IMAGE_SERVER_URL
         )
 
-    # Build volume list for NiiVue
+    # Build volume list for NiiVue - always include NIfTI
     volume_list_entries = []
-    if viewer_config.settings.get('show_nifti', True):
-        volume_list_entries.append({"url": base_file_url})
+    volume_list_entries.append({"url": base_file_url})
 
     # Add overlay volumes
     if viewer_config.settings.get('show_overlay', False) and overlays:
@@ -303,7 +302,7 @@ def render_viewer(selected_patient: str, selected_file: str):
         window_center=window_center,
         window_width=window_width,
         actual_slice_type=actual_slice_type,
-        overlay_start_index=1 if settings.get('show_nifti', True) else 0,
+        overlay_start_index=1,  # NIfTI is always at index 0, overlays start at 1
         segment_opacity=segment_opacity,
         segment_gamma=segment_gamma
     )

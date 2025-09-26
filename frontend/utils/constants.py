@@ -36,7 +36,6 @@ DEFAULT_VIEWER_SETTINGS = {
     'color_map': 'gray',
     'nifti_opacity': 0.5,
     'nifti_gamma': 1.0,
-    'show_nifti': True,
     'show_overlay': False,
     'segment_opacity': 0.5,
     'segment_gamma': 1.0,
