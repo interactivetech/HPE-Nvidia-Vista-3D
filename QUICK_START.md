@@ -4,11 +4,18 @@
 
 ## Prerequisites
 
+### For Backend Setup (Vista3D Server):
 - **OS**: Ubuntu Linux (18.04+) or macOS
 - **GPU**: NVIDIA GPU with CUDA support (8GB+ VRAM recommended)
 - **Memory**: 16GB+ RAM
 - **Docker**: Docker and NVIDIA Container Toolkit installed
 - **NVIDIA NGC**: Account and API key (free at [ngc.nvidia.com](https://ngc.nvidia.com/))
+
+### For Frontend Setup (Web Interface):
+- **OS**: Ubuntu Linux (18.04+) or macOS
+- **Memory**: 8GB+ RAM (minimum)
+- **Docker**: Docker installed
+- **NVIDIA NGC**: Not required (connects to remote Vista3D server)
 
 ## Step 1: Clone and Setup
 
@@ -21,12 +28,33 @@ cd HPE-Nvidia-Vista-3D
 python3 setup.py
 ```
 
+**Setup Options:**
+```bash
+# Setup everything (default)
+python3 setup.py
+
+# Setup only frontend (for non-GPU systems)
+python3 setup.py --setup frontend
+
+# Setup only backend (for GPU-enabled systems)
+python3 setup.py --setup backend
+
+# Check system requirements only
+python3 setup.py --check-only
+
+# Non-interactive setup with defaults
+python3 setup.py --non-interactive
+
+# Get help
+python3 setup.py --help
+```
+
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
-- ✅ Prompts for your NVIDIA NGC API key
+- ✅ Prompts for your NVIDIA NGC API key (backend only)
 - ✅ Configures directories and ports
-- ✅ Sets up backend (Vista3D AI server)
-- ✅ Sets up frontend (Web interface + Image server)
+- ✅ Sets up backend (Vista3D AI server) - if selected
+- ✅ Sets up frontend (Web interface + Image server) - if selected
 - ✅ Creates management scripts
 
 ## Step 2: Start All Services
@@ -180,6 +208,7 @@ sudo systemctl stop conflicting-service
 ## 🆘 Need Help?
 
 - Check the full [README.md](README.md) for detailed documentation
+- See the [docs/SETUP_OPTIONS.md](docs/SETUP_OPTIONS.md) for setup scenarios and options
 - See the [docs/SETUP_SCRIPTS.md](docs/SETUP_SCRIPTS.md) for comprehensive setup guide
 - Check the troubleshooting section above for common issues
 

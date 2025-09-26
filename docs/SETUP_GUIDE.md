@@ -5,6 +5,8 @@ Get up and running with the HPE GreenLake Medical AI Platform with NVIDIA Vista3
 ## 📋 Prerequisites
 
 ### System Requirements
+
+#### For Backend Setup (Vista3D Server):
 - **Ubuntu Linux** (18.04+) or **macOS**
 - **NVIDIA GPU** with CUDA support (8GB+ VRAM recommended)
 - **16GB+ RAM** for large medical imaging datasets
@@ -12,9 +14,16 @@ Get up and running with the HPE GreenLake Medical AI Platform with NVIDIA Vista3
 - **Docker and NVIDIA Container Toolkit** (for Docker deployment)
 - **Internet connection** for downloading packages and Docker images
 
+#### For Frontend Setup (Web Interface):
+- **Ubuntu Linux** (18.04+) or **macOS**
+- **8GB+ RAM** (minimum)
+- **5GB+ free disk space**
+- **Docker** (required)
+- **Internet connection** for downloading packages and Docker images
+
 ### NVIDIA Requirements
 - **NVIDIA NGC account** (free at [ngc.nvidia.com](https://ngc.nvidia.com/))
-- **NVIDIA API Key** (starts with `nvapi-`)
+- **NVIDIA API Key** (starts with `nvapi-`) - **Required for backend setup only**
 
 ## 🎯 What This Platform Does
 
@@ -43,11 +52,32 @@ cd HPE-Nvidia-Vista-3D
 python3 setup.py
 ```
 
+**Setup Options:**
+```bash
+# Setup everything (default)
+python3 setup.py
+
+# Setup only frontend (for non-GPU systems)
+python3 setup.py --setup frontend
+
+# Setup only backend (for GPU-enabled systems)
+python3 setup.py --setup backend
+
+# Check system requirements only
+python3 setup.py --check-only
+
+# Non-interactive setup with defaults
+python3 setup.py --non-interactive
+
+# Get help
+python3 setup.py --help
+```
+
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
 - ✅ Sets up separate Python environments for frontend and backend
 - ✅ Configures environment variables and Docker settings
-- ✅ Prompts for your NVIDIA NGC API key
+- ✅ Prompts for your NVIDIA NGC API key (backend only)
 - ✅ Creates all necessary directories and files
 
 ### Step 2: Start Vista3D Server (GPU-Enabled Machine)

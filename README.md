@@ -31,11 +31,18 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 
 ## System Requirements
 
+### For Backend Setup (Vista3D Server):
 - **OS**: Ubuntu Linux (18.04+) or macOS
 - **GPU**: NVIDIA GPU with CUDA support (8GB+ VRAM recommended)
 - **Memory**: 16GB+ RAM for large medical imaging datasets
 - **Docker**: Docker and NVIDIA Container Toolkit (required)
 - **NVIDIA NGC**: Account for Vista3D access
+
+### For Frontend Setup (Web Interface):
+- **OS**: Ubuntu Linux (18.04+) or macOS
+- **Memory**: 8GB+ RAM (minimum)
+- **Docker**: Docker (required)
+- **NVIDIA NGC**: Not required (connects to remote Vista3D server)
 
 ## 🚀 Quick Start
 
@@ -51,11 +58,32 @@ cd HPE-Nvidia-Vista-3D
 python3 setup.py
 ```
 
+**Setup Options:**
+```bash
+# Setup everything (default)
+python3 setup.py
+
+# Setup only frontend (for non-GPU systems)
+python3 setup.py --setup frontend
+
+# Setup only backend (for GPU-enabled systems)
+python3 setup.py --setup backend
+
+# Check system requirements only
+python3 setup.py --check-only
+
+# Non-interactive setup with defaults
+python3 setup.py --non-interactive
+
+# Get help
+python3 setup.py --help
+```
+
 The setup script will:
 - ✅ Check system requirements (Ubuntu/macOS, Python 3.11+, GPU, Docker)
 - ✅ Set up Python environment with all dependencies
 - ✅ Configure environment variables and Docker settings
-- ✅ Guide you through configuration (NVIDIA NGC API key)
+- ✅ Guide you through configuration (NVIDIA NGC API key for backend)
 - ✅ Create all necessary directories and files
 
 ### Step 2: Start Vista3D Server (GPU-Enabled Machine)
@@ -122,11 +150,44 @@ python start_backend.py
 
 See [DEVELOPMENT_ENVIRONMENTS.md](DEVELOPMENT_ENVIRONMENTS.md) for detailed documentation.
 
-## 🌐 Remote Server Setup
+## 🌐 Deployment Scenarios
 
+The platform supports multiple deployment configurations based on your infrastructure:
+
+### Scenario 1: Single GPU Machine (Full Stack)
+```bash
+# Setup everything on one GPU-enabled machine
+python3 setup.py
+
+# Start all services
+./start_all.sh
+```
+**Best for**: Development, testing, small-scale deployments
+
+### Scenario 2: Frontend-Only (Non-GPU Machine)
+```bash
+# Setup only frontend on non-GPU machine
+python3 setup.py --setup frontend
+
+# Start frontend services
+cd frontend && ./start_frontend.sh
+```
+**Best for**: Web interfaces on non-GPU systems, connecting to remote Vista3D
+
+### Scenario 3: Backend-Only (GPU Machine)
+```bash
+# Setup only backend on GPU machine
+python3 setup.py --setup backend
+
+# Start backend services
+cd backend && ./start_backend.sh
+```
+**Best for**: GPU servers providing Vista3D API to multiple frontends
+
+### Scenario 4: Distributed (Remote Vista3D)
 For remote Vista3D server deployments, you'll need to set up port forwarding:
 
-### SSH Port Forwarding
+#### SSH Port Forwarding
 ```bash
 # Forward local ports to remote Vista3D server
 ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
@@ -136,16 +197,17 @@ ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
 # - Remote port 8888 → Local image server port 8888
 ```
 
-### Configuration for Remote Vista3D
+#### Configuration for Remote Vista3D
 ```bash
 # Edit .env file to point to remote server
 VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
 IMAGE_SERVER="http://localhost:8888"    # Local image server
 ```
 
-### Deployment Options
+### Deployment Options Summary
 - **Same Machine**: Run both Vista3D and frontend on the same GPU-enabled machine
-- **Remote Vista3D**: Run Vista3D on remote GPU server, frontend locally
+- **Frontend-Only**: Run frontend on any machine, connect to remote Vista3D
+- **Backend-Only**: Run Vista3D on GPU server, provide API to multiple frontends
 - **Distributed**: Run Vista3D and frontend on different machines with proper networking
 
 ## 🛠️ Using the Tools Page
@@ -173,35 +235,46 @@ After running the setup and start scripts, you'll have:
 
 ## 🔧 Management Commands
 
-### Vista3D Server Management
+### Master Platform Management
 ```bash
-# Start Vista3D server
-python3 start_backend.py
+# Start all services (if both frontend and backend were set up)
+./start_all.sh
 
-# Stop Vista3D server
-docker stop vista3d
+# Stop all services
+./stop_all.sh
 
-# View Vista3D logs
-docker logs -f vista3d
-
-# Restart Vista3D server
-docker restart vista3d
+# Check service status
+./status.sh
 ```
 
-### Frontend Services Management
+### Individual Service Management
+
+#### Backend (Vista3D Server) Management
+```bash
+# Start Vista3D server
+cd backend && ./start_backend.sh
+
+# Stop Vista3D server
+cd backend && docker-compose down
+
+# View Vista3D logs
+cd backend && docker logs -f vista3d-server-standalone
+
+# Restart Vista3D server
+cd backend && docker-compose restart
+```
+
+#### Frontend Services Management
 ```bash
 # Start frontend services
-python3 start_frontend.py
+cd frontend && ./start_frontend.sh
 
 # Stop frontend services
-docker compose down
+cd frontend && ./stop_frontend.sh
 
 # View frontend logs
-docker compose logs -f
-
-# View specific service logs
-docker logs -f hpe-nvidia-vista3d-app
-docker logs -f vista3d-image-server
+cd frontend && docker logs -f vista3d-frontend-standalone
+cd frontend && docker logs -f vista3d-image-server-standalone
 ```
 
 ### Systemd Service Management (Production)
@@ -359,6 +432,7 @@ sudo ufw allow 8000
 
 ## 📚 Additional Resources
 
+- **Setup Options Guide**: See [docs/SETUP_OPTIONS.md](docs/SETUP_OPTIONS.md) for detailed setup scenarios
 - **Full Documentation**: See `docs/` directory for detailed guides
 - **API Reference**: Check `utils/` directory for script documentation
 - **HPE GreenLake**: Learn about HPE infrastructure integration
