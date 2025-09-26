@@ -156,13 +156,9 @@ class ViewerConfig:
         try:
             color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
         except ValueError:
-            # If current color map is not in the list, use 'bone' as fallback
-            if 'bone' in AVAILABLE_COLOR_MAPS:
-                color_map_index = AVAILABLE_COLOR_MAPS.index('bone')
-                self._settings['color_map'] = 'bone'
-            else:
-                color_map_index = 0
-                self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
+            # If current color map is not in the list, use first available (gray)
+            color_map_index = 0
+            self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
         
         self._settings['color_map'] = st.selectbox(
             "Select Color Map",

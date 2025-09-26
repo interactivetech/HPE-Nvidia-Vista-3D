@@ -1,14 +1,14 @@
 {
   "name": "Plasma Colormap",
-  "description": "Perceptually uniform colormap from dark purple to bright pink",
+  "description": "Perceptually uniform colormap from dark purple to bright pink with transparency",
   "colormaps": {
     "plasma": {
       "R": [13, 62, 99, 135, 166, 192, 213, 231, 248, 253, 240, 204],
       "G": [8, 16, 18, 15, 9, 8, 7, 5, 4, 2, 1, 0],
       "B": [135, 75, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      "A": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255],
       "I": [0, 23, 46, 69, 92, 115, 138, 161, 184, 207, 230, 255],
-      "labels": ["Dark Purple", "Purple", "Magenta", "Pink", "Orange", "Yellow-Orange", "Yellow", "Bright Yellow", "White-Yellow", "White", "Pink-White", "Pink"]
+      "labels": ["Transparent", "Purple", "Magenta", "Pink", "Orange", "Yellow-Orange", "Yellow", "Bright Yellow", "White-Yellow", "White", "Pink-White", "Pink"]
     }
   }
 }

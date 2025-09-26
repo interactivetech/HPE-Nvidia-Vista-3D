@@ -176,6 +176,37 @@ def load_colormaps():
         colormap_list.insert(0, 'gray')
     return colormap_list
 
+def load_colormap_data(colormap_name):
+    """Load colormap data from JSON files for a specific colormap name."""
+    import json
+    import os
+    import glob
+    
+    # Get all available colormaps from the JSON files
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    colormaps_dir = os.path.join(current_dir, '..', 'assets', 'colormaps')
+    colormaps_dir = os.path.abspath(colormaps_dir)
+    
+    if not os.path.exists(colormaps_dir):
+        raise FileNotFoundError(f"Colormaps directory not found: {colormaps_dir}")
+    
+    colormap_files = glob.glob(os.path.join(colormaps_dir, '*.json'))
+    
+    for colormap_file in colormap_files:
+        try:
+            with open(colormap_file, 'r') as cf:
+                data = json.load(cf)
+                if 'colormaps' in data and isinstance(data['colormaps'], dict):
+                    if colormap_name in data['colormaps']:
+                        return data['colormaps'][colormap_name]
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
+            continue
+    
+    # Fallback to gray colormap if not found
+    print(f"Warning: Colormap '{colormap_name}' not found, falling back to 'gray'")
+    return load_colormap_data('gray')
+
 AVAILABLE_COLOR_MAPS = load_colormaps()
 
 # Voxel selection modes

@@ -43,6 +43,12 @@
                 console.log('Custom segmentation colormap added');
             }
 
+            // Add the main volume colormap
+            const mainColormapData = {{ color_map_data_js|safe }};
+            const mainColormapName = {{ color_map_js|safe }};
+            nv.addColormap(mainColormapName, mainColormapData);
+            console.log('Main volume colormap added:', mainColormapName);
+
             // For "all segmentation" mode, use the same colormap as individual voxels
             // This ensures consistent colors between individual voxels and all segmentation mode
 

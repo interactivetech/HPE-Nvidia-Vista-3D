@@ -13,7 +13,8 @@ from utils.viewer_config import ViewerConfig
 from utils.template_renderer import TemplateRenderer
 from utils.constants import (
     NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
-    VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data
+    VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data,
+    load_colormap_data
 )
 
 # Import badge components
@@ -149,8 +150,8 @@ def render_sidebar():
                     # Apply appropriate colormap for the detected modality
                     modality = detect_modality_from_data(min_val, max_val, mean_val)
                     if modality == 'MRI':
-                        # Use bone colormap for MRI (works great without cube artifacts)
-                        viewer_config._settings['color_map'] = 'bone'
+                        # Use blues colormap for MRI (works great without cube artifacts)
+                        viewer_config._settings['color_map'] = 'blues'
                     
                 except Exception:
                     # Fallback to None if parsing fails
@@ -307,7 +308,8 @@ def render_viewer(selected_patient: str, selected_file: str):
         image_server_url=EXTERNAL_IMAGE_SERVER_URL,
         main_is_nifti=True,
         main_vol=True,
-        color_map_js=json.dumps(settings.get('color_map', 'grayscale')),
+        color_map_js=json.dumps(settings.get('color_map', 'gray')),
+        color_map_data_js=json.dumps(load_colormap_data(settings.get('color_map', 'gray'))),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
         nifti_opacity=settings.get('nifti_opacity', 1.0),
         window_center=window_center,

@@ -1,14 +1,14 @@
 {
   "name": "Gray Colormap",
-  "description": "Linear grayscale colormap from black to white",
+  "description": "Linear grayscale colormap from black to white with transparency",
   "colormaps": {
     "gray": {
-      "R": [0, 255],
-      "G": [0, 255],
-      "B": [0, 255],
-      "A": [255, 255],
-      "I": [0, 255],
-      "labels": ["Black", "White"]
+      "R": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+      "G": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+      "B": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+      "I": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+      "labels": ["Transparent", "Very Dark Gray", "Dark Gray", "Medium Dark Gray", "Medium Gray", "Medium Light Gray", "Light Gray", "Very Light Gray", "White"]
     }
   }
 }

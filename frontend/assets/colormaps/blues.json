@@ -1,13 +1,14 @@
 {
-  "name": "Bone Colormap",
-  "description": "Bone colormap for medical imaging",
+  "name": "Blues Colormap",
+  "description": "Blue-green tinted X-ray colormap for medical imaging",
   "colormaps": {
-    "bone": {
-      "R": [0, 32, 64, 96, 128, 160, 192, 224, 255],
-      "G": [0, 28, 56, 84, 112, 140, 168, 196, 224],
-      "B": [0, 24, 48, 72, 96, 120, 144, 168, 192],
-      "A": [255, 255, 255, 255, 255, 255, 255, 255, 255],
-      "labels": ["Black", "Dark Bone", "Bone", "Light Bone", "Medium", "Light", "Lighter", "Very Light", "White"]
+    "blues": {
+      "R": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "G": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+      "B": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+      "I": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+      "labels": ["Transparent", "Very Dark Blue", "Dark Blue", "Blue", "Medium Blue", "Light Blue", "Cyan", "Bright Cyan", "White"]
     }
   }
 }
