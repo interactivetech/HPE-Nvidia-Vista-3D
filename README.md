@@ -2,7 +2,7 @@
 
 A medical imaging AI platform that combines HPE High Performance Compute infrastructure with NVIDIA's Vista3D technology for automated vessel segmentation on DICOM medical imaging data.
 
-<img src="assets/images/1.png" height=200 > <img src="assets/images/2.png" height=200 > <img src="assets/images/3.png" height=200 >
+<img src="frontend/assets/images/1.png" height=200 > <img src="frontend/assets/images/2.png" height=200 > <img src="frontend/assets/images/3.png" height=200 >
 
 ## Overview
 
