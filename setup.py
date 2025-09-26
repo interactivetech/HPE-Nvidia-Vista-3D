@@ -23,6 +23,7 @@ class Colors:
     RED = '\033[91m'
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
+    BRIGHT_YELLOW = '\033[93m'  # Bright yellow for important instructions
     BLUE = '\033[94m'
     MAGENTA = '\033[95m'
     CYAN = '\033[96m'
@@ -53,7 +54,11 @@ def print_info(text: str) -> None:
     """Print info message"""
     print(f"{Colors.BLUE}ℹ️  {text}{Colors.END}")
 
-def run_command(command: str, check: bool = True, capture_output: bool = False) -> subprocess.CompletedProcess:
+def print_highlight(text: str) -> None:
+    """Print highlighted instruction in bright yellow"""
+    print(f"{Colors.BOLD}{Colors.BRIGHT_YELLOW}{text}{Colors.END}")
+
+def run_command(command: str, check: bool = True, capture_output: bool = False, env: dict = None) -> subprocess.CompletedProcess:
     """Run a shell command and return the result"""
     try:
         result = subprocess.run(
@@ -61,7 +66,8 @@ def run_command(command: str, check: bool = True, capture_output: bool = False) 
             shell=True, 
             check=check, 
             capture_output=capture_output,
-            text=True
+            text=True,
+            env=env
         )
         return result
     except subprocess.CalledProcessError as e:
@@ -235,13 +241,11 @@ def load_config_from_file(config_file: str) -> Dict[str, str]:
         print_error(f"Failed to load config file {config_file}: {e}")
         sys.exit(1)
 
-def get_user_input_non_interactive() -> Dict[str, str]:
+def get_user_input_non_interactive(setup_choice: str = 'both') -> Dict[str, str]:
     """Get configuration using defaults for non-interactive mode"""
     print_info("Running in non-interactive mode with defaults")
     
     config = {
-        'NGC_API_KEY': 'nvapi-REPLACE_WITH_YOUR_API_KEY',
-        'NGC_ORG_ID': '',
         'DICOM_FOLDER': os.path.join(os.getcwd(), "dicom"),
         'OUTPUT_FOLDER': os.path.join(os.getcwd(), "output"),
         'VISTA3D_SERVER': 'http://localhost:8000',
@@ -250,7 +254,17 @@ def get_user_input_non_interactive() -> Dict[str, str]:
         'VESSELS_OF_INTEREST': 'all'
     }
     
-    print_warning("Using default configuration. Please update .env file with your actual API key.")
+    # Only add NVIDIA credentials for backend setups
+    if setup_choice in ['backend', 'both']:
+        config['NGC_API_KEY'] = 'nvapi-REPLACE_WITH_YOUR_API_KEY'
+        config['NGC_ORG_ID'] = ''
+        print_warning("Using default configuration. Please update .env file with your actual API key.")
+    else:
+        # Frontend-only setup - no NVIDIA credentials needed
+        config['NGC_API_KEY'] = ''
+        config['NGC_ORG_ID'] = ''
+        print_info("Frontend-only setup - no NVIDIA API key needed.")
+    
     return config
 
 def check_docker_hub_images(setup_choice: str = 'both') -> Dict[str, bool]:
@@ -412,12 +426,14 @@ def check_system_requirements(setup_choice: str = 'both') -> Dict[str, bool]:
                 if line.strip():
                     parts = line.split()
                     if len(parts) >= 4:
-                        available = parts[3]
-                        # Handle both 'G' and 'Gi' formats (Linux vs macOS)
+                        available = parts[3]  # Available space is in 4th column
+                        # Handle different formats: '43Gi', '43G', '43GB', etc.
                         if 'G' in available:
                             # Extract numeric value and convert to GB
                             if 'Gi' in available:
                                 gb = float(available.replace('Gi', ''))
+                            elif 'GB' in available:
+                                gb = float(available.replace('GB', ''))
                             else:
                                 gb = float(available.replace('G', ''))
                             
@@ -427,8 +443,15 @@ def check_system_requirements(setup_choice: str = 'both') -> Dict[str, bool]:
                             else:
                                 print_warning(f"Disk space: {available} (Recommended: {min_disk_gb}+ GB)")
                             break
-    except:
-        print_warning("Could not check disk space")
+        else:
+            print_warning("Could not check disk space - df command failed")
+    except Exception as e:
+        print_warning(f"Could not check disk space: {e}")
+    
+    # For frontend-only setups, disk space is less critical
+    if setup_choice == 'frontend' and not requirements['disk_space']:
+        print_info("Disk space check failed, but frontend-only setup requires minimal space")
+        requirements['disk_space'] = True  # Mark as satisfied for frontend-only
     
     return requirements
 
@@ -438,7 +461,7 @@ def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
     
     config = {}
     
-    # Get NVIDIA NGC API key (required for backend, optional for frontend)
+    # Get NVIDIA NGC API key (required for backend, not needed for frontend-only)
     if setup_choice in ['backend', 'both']:
         print_info("NVIDIA NGC API Key is required for Vista3D backend access")
         print_info("Get your free API key at: https://ngc.nvidia.com/")
@@ -450,19 +473,20 @@ def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
             else:
                 print_error("API key must start with 'nvapi-'")
     else:
+        # Frontend-only setup - no API key needed
         print_info("NVIDIA NGC API Key is not needed for frontend-only setup")
         print_info("The frontend will connect to a remote Vista3D server")
-        api_key = input("Enter your NVIDIA NGC API key (starts with 'nvapi-') or press Enter to skip: ").strip()
-        if api_key.startswith('nvapi-'):
-            config['NGC_API_KEY'] = api_key
-        else:
-            config['NGC_API_KEY'] = ""
+        config['NGC_API_KEY'] = ""
     
-    # Get NVIDIA Org ID
-    org_id = input("Enter your NVIDIA Org ID (optional, press Enter to skip): ").strip()
-    if not org_id:
-        org_id = ""
-    config['NGC_ORG_ID'] = org_id
+    # Get NVIDIA Org ID (only needed for backend)
+    if setup_choice in ['backend', 'both']:
+        org_id = input("Enter your NVIDIA Org ID (optional, press Enter to skip): ").strip()
+        if not org_id:
+            org_id = ""
+        config['NGC_ORG_ID'] = org_id
+    else:
+        # Frontend-only setup - no Org ID needed
+        config['NGC_ORG_ID'] = ""
     
     # Get data directories
     print_info("Data directories (use absolute paths for best results)")
@@ -498,11 +522,8 @@ def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
         frontend_port = "8501"
     config['FRONTEND_PORT'] = frontend_port
     
-    # Segmentation settings
-    vessels = input("Vessels of interest [all]: ").strip()
-    if not vessels:
-        vessels = "all"
-    config['VESSELS_OF_INTEREST'] = vessels
+    # Segmentation settings - always use "all" as default
+    config['VESSELS_OF_INTEREST'] = "all"
     
     return config
 
@@ -630,12 +651,14 @@ def run_frontend_setup() -> None:
     
     try:
         print_info("Running frontend setup...")
-        result = run_command(f"cd {frontend_dir} && python3 setup_frontend.py", capture_output=True)
+        # Set environment variable to indicate this is called from master setup
+        env = os.environ.copy()
+        env['MASTER_SETUP'] = 'true'
+        result = run_command(f"cd {frontend_dir} && python3 setup_frontend.py", capture_output=False, env=env)
         if result.returncode == 0:
             print_success("Frontend setup completed")
         else:
             print_error("Frontend setup failed")
-            print_error(result.stderr)
     except Exception as e:
         print_error(f"Failed to run frontend setup: {e}")
 
@@ -803,6 +826,26 @@ docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
     except Exception as e:
         print_error(f"Failed to create status.sh: {e}")
 
+def get_setup_choice_interactive() -> str:
+    """Get setup choice from user interactively"""
+    print_header("Setup Options")
+    print_info("What would you like to set up?")
+    print("1. Frontend only (Web Interface) - No GPU required")
+    print("2. Backend only (Vista3D Server) - Requires NVIDIA GPU")
+    print("3. Both frontend and backend - Full platform")
+    print("")
+    
+    while True:
+        choice = input("Enter your choice (1-3): ").strip()
+        if choice == '1':
+            return 'frontend'
+        elif choice == '2':
+            return 'backend'
+        elif choice == '3':
+            return 'both'
+        else:
+            print_error("Invalid choice. Please enter 1, 2, or 3.")
+
 def main():
     """Main setup function"""
     # Parse command line arguments
@@ -819,13 +862,23 @@ def main():
     
     print_header("HPE NVIDIA Vista3D Master Setup")
     
+    # Determine setup choice
+    setup_choice = args.setup
+    if not args.non_interactive and not args.check_only and not args.config_file:
+        # If no specific setup choice was provided via command line, ask the user
+        if args.setup == 'both':  # This is the default from argparse
+            setup_choice = get_setup_choice_interactive()
+    
     # Show what will be set up based on the choice
-    if args.setup == 'frontend':
+    if setup_choice == 'frontend':
         print_info("This script will set up the frontend (Web Interface) only")
-    elif args.setup == 'backend':
+        print_info("No NVIDIA GPU required - can run on any system")
+    elif setup_choice == 'backend':
         print_info("This script will set up the backend (Vista3D Server) only")
+        print_info("Requires NVIDIA GPU and NVIDIA Container Toolkit")
     else:
         print_info("This script will set up the entire Vista3D platform")
+        print_info("Backend requires NVIDIA GPU, frontend can run on any system")
     
     # Check if we're in the right directory
     if not os.path.exists('backend') or not os.path.exists('frontend'):
@@ -833,7 +886,7 @@ def main():
         sys.exit(1)
     
     # Check system requirements
-    requirements = check_system_requirements(args.setup)
+    requirements = check_system_requirements(setup_choice)
     
     # Check critical requirements
     critical_requirements = ['os', 'python', 'docker']
@@ -860,7 +913,7 @@ def main():
     
     # Check Docker Hub images (unless skipped)
     if not args.skip_docker_check:
-        image_status = check_docker_hub_images(args.setup)
+        image_status = check_docker_hub_images(setup_choice)
         
         # Warn if images couldn't be pulled
         failed_images = [service for service, status in image_status.items() if not status]
@@ -886,9 +939,9 @@ def main():
     if args.config_file:
         config = load_config_from_file(args.config_file)
     elif args.non_interactive:
-        config = get_user_input_non_interactive()
+        config = get_user_input_non_interactive(setup_choice)
     else:
-        config = get_user_input(args.setup)
+        config = get_user_input(setup_choice)
     
     # Create directories
     create_directories(config)
@@ -900,57 +953,122 @@ def main():
     copy_env_to_services(config)
     
     # Run setup based on user choice
-    if args.setup in ['backend', 'both']:
+    if setup_choice in ['backend', 'both']:
         run_backend_setup()
     
-    if args.setup in ['frontend', 'both']:
+    if setup_choice in ['frontend', 'both']:
         run_frontend_setup()
     
     # Create master management scripts
-    create_master_scripts(args.setup)
+    create_master_scripts(setup_choice)
     
     # Final instructions
-    print_header("Setup Complete!")
+    print_header("🎉 Setup Complete!")
     print_success("Platform setup completed successfully!")
     
     # Show what was set up
     setup_components = []
-    if args.setup in ['backend', 'both']:
+    if setup_choice in ['backend', 'both']:
         setup_components.append("Backend (Vista3D Server)")
-    if args.setup in ['frontend', 'both']:
+    if setup_choice in ['frontend', 'both']:
         setup_components.append("Frontend (Web Interface)")
     
-    print_info(f"Components set up: {', '.join(setup_components)}")
+    print_info(f"✅ Components set up: {', '.join(setup_components)}")
     
-    print_info("\nNext steps:")
-    if args.setup == 'both':
-        print_info("1. Start all services: ./start_all.sh")
-        print_info("2. Check status: ./status.sh")
-        print_info("3. Stop all services: ./stop_all.sh")
-        print_info(f"4. Open web interface: http://localhost:{config['FRONTEND_PORT']}")
-    else:
-        if args.setup == 'backend':
-            print_info("1. Start backend: cd backend && ./start_backend.sh")
-            print_info("2. Check backend status: cd backend && docker-compose ps")
-            print_info(f"3. Backend API: {config['VISTA3D_SERVER']}")
-        elif args.setup == 'frontend':
-            print_info("1. Start frontend: cd frontend && ./start_frontend.sh")
-            print_info("2. Check frontend status: cd frontend && docker-compose ps")
-            print_info(f"3. Web interface: http://localhost:{config['FRONTEND_PORT']}")
+    print_header("📁 Configuration Details")
+    print_info("Configuration saved to .env files:")
+    print_info(f"• DICOM folder: {config['DICOM_FOLDER']}")
+    print_info(f"• Output folder: {config['OUTPUT_FOLDER']}")
+    if setup_choice in ['backend', 'both']:
+        print_info(f"• Vista3D server: {config['VISTA3D_SERVER']}")
+    if setup_choice in ['frontend', 'both']:
+        print_info(f"• Image server: {config['IMAGE_SERVER']}")
     
-    print_info("\nIndividual service management:")
-    if args.setup in ['backend', 'both']:
-        print_info("• Backend: cd backend && ./start_backend.sh")
-    if args.setup in ['frontend', 'both']:
-        print_info("• Frontend (includes image server): cd frontend && ./start_frontend.sh")
+    print_header("🔧 Troubleshooting")
+    print_info("If you encounter issues:")
+    print_info("• Check service status: ./status.sh (or cd <service> && docker-compose ps)")
+    print_info("• View logs: cd <service> && docker-compose logs")
+    print_info("• Restart services: ./stop_all.sh && ./start_all.sh")
+    print_info("• Check Docker: docker ps")
     
-    print_info("\nConfiguration saved to .env files")
-    print_info(f"DICOM folder: {config['DICOM_FOLDER']}")
-    print_info(f"Output folder: {config['OUTPUT_FOLDER']}")
-    if args.setup in ['backend', 'both']:
-        print_info(f"Vista3D server: {config['VISTA3D_SERVER']}")
-    if args.setup in ['frontend', 'both']:
-        print_info(f"Image server: {config['IMAGE_SERVER']}")
+    print_header("📚 Additional Resources")
+    print_info("• Documentation: Check the docs/ folder")
+    print_info("• Quick Start Guide: QUICK_START.md")
+    print_info("• Setup Guide: docs/SETUP_GUIDE.md")
+    
+    # Provide specific next steps based on what was set up
+    print_header("🚀 Next Steps - How to Run Your Setup")
+    
+    if setup_choice == 'both':
+        print_info("🎉 You have set up the COMPLETE Vista3D platform!")
+        print_info("   This includes both the backend server and frontend web interface.")
+        print_info("")
+        print_highlight("📋 TO RUN EVERYTHING:")
+        print_highlight("1. Start frontend: cd frontend && docker-compose up -d")
+        print_highlight("2. Wait 30-60 seconds for services to start")
+        print_highlight("3. Check status: docker ps")
+        print_highlight(f"4. Open web interface: http://localhost:{config['FRONTEND_PORT']}")
+        print_info("")
+        print_info("🛑 TO STOP EVERYTHING: cd frontend && docker-compose down")
+        print_info("")
+        print_info("💡 Alternative: Use convenience scripts:")
+        print_info("   • Start: ./start_all.sh")
+        print_info("   • Status: ./status.sh") 
+        print_info("   • Stop: ./stop_all.sh")
+        print_info("")
+        print_info("📊 WHAT YOU'LL HAVE RUNNING:")
+        print_info(f"• Web Interface: http://localhost:{config['FRONTEND_PORT']}")
+        print_info(f"• Vista3D API: {config['VISTA3D_SERVER']}")
+        print_info(f"• Image Server: {config['IMAGE_SERVER']}")
+        
+    elif setup_choice == 'backend':
+        print_info("🎉 You have set up the VISTA3D BACKEND SERVER!")
+        print_info("   This provides the AI processing and API endpoints.")
+        print_info("")
+        print_highlight("📋 TO RUN THE BACKEND:")
+        print_highlight("1. Start backend: cd backend && docker-compose up -d")
+        print_highlight("2. Wait 30-60 seconds for the server to start")
+        print_highlight("3. Check status: docker ps")
+        print_info("")
+        print_info("🛑 TO STOP THE BACKEND: cd backend && docker-compose down")
+        print_info("")
+        print_info("💡 Alternative: Use convenience script:")
+        print_info("   • Start: cd backend && ./start_backend.sh")
+        print_info("")
+        print_info("📊 WHAT YOU'LL HAVE RUNNING:")
+        print_info(f"• Vista3D API: {config['VISTA3D_SERVER']}")
+        print_info("• API Documentation: http://localhost:8000/docs")
+        print_info("")
+        print_info("💡 This backend can be used by:")
+        print_info("   • Frontend applications (like the Vista3D web interface)")
+        print_info("   • Direct API calls for processing DICOM files")
+        print_info("   • Other applications that need AI-powered medical imaging")
+        
+    elif setup_choice == 'frontend':
+        print_info("🎉 You have set up the VISTA3D FRONTEND WEB INTERFACE!")
+        print_info("   This provides the user-friendly web interface for Vista3D.")
+        print_info("")
+        print_highlight("📋 TO RUN THE FRONTEND:")
+        print_highlight("1. Start frontend: cd frontend && docker-compose up -d")
+        print_highlight("2. Wait 30-60 seconds for services to start")
+        print_highlight("3. Check status: docker ps")
+        print_highlight(f"4. Open web interface: http://localhost:{config['FRONTEND_PORT']}")
+        print_info("")
+        print_info("🛑 TO STOP THE FRONTEND: cd frontend && docker-compose down")
+        print_info("")
+        print_info("💡 Alternative: Use convenience script:")
+        print_info("   • Start: cd frontend && ./start_frontend.sh")
+        print_info("")
+        print_info("📊 WHAT YOU'LL HAVE RUNNING:")
+        print_info(f"• Web Interface: http://localhost:{config['FRONTEND_PORT']}")
+        print_info(f"• Image Server: {config['IMAGE_SERVER']}")
+        print_info("")
+        print_info("💡 IMPORTANT: This frontend needs a Vista3D backend server to work!")
+        print_info("   • Connect to a remote Vista3D server, OR")
+        print_info("   • Set up the backend separately using: python3 setup.py --setup backend")
+        print_info("   • Update the Vista3D server URL in the .env file if needed")
+    
+    print_success("🎉 You're all set! Run the commands above to start using Vista3D.")
 
 if __name__ == "__main__":
     main()

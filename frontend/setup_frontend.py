@@ -210,8 +210,15 @@ def check_system_requirements() -> Dict[str, bool]:
                         parts = line.split()
                         if len(parts) >= 4:
                             available = parts[3]
+                            # Handle different formats: '43Gi', '43G', '43GB', etc.
                             if 'G' in available:
-                                gb = float(available.replace('G', ''))
+                                if 'Gi' in available:
+                                    gb = float(available.replace('Gi', ''))
+                                elif 'GB' in available:
+                                    gb = float(available.replace('GB', ''))
+                                else:
+                                    gb = float(available.replace('G', ''))
+                                
                                 if gb >= 5:
                                     requirements['disk_space'] = True
                                     print_success(f"Disk space: {available} available")
@@ -221,7 +228,53 @@ def check_system_requirements() -> Dict[str, bool]:
     except:
         print_warning("Could not check disk space")
     
+    # For frontend setup, disk space is less critical
+    if not requirements['disk_space']:
+        print_info("Disk space check failed, but frontend setup requires minimal space")
+        requirements['disk_space'] = True  # Mark as satisfied for frontend
+    
     return requirements
+
+def load_config_from_env() -> Dict[str, str]:
+    """Load configuration from .env file created by master setup"""
+    print_info("Loading configuration from .env file...")
+    
+    config = {}
+    env_file = '.env'
+    
+    if not os.path.exists(env_file):
+        print_error(f".env file not found: {env_file}")
+        sys.exit(1)
+    
+    try:
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    # Remove quotes from value
+                    value = value.strip().strip('"\'')
+                    config[key.strip()] = value
+        print_success("Configuration loaded from .env file")
+        
+        # Extract port from IMAGE_SERVER URL for compatibility
+        if 'IMAGE_SERVER' in config and 'IMAGE_SERVER_PORT' not in config:
+            try:
+                from urllib.parse import urlparse
+                parsed_url = urlparse(config['IMAGE_SERVER'])
+                if parsed_url.port:
+                    config['IMAGE_SERVER_PORT'] = str(parsed_url.port)
+                else:
+                    # Default port if not specified in URL
+                    config['IMAGE_SERVER_PORT'] = '8888'
+            except Exception as e:
+                print_warning(f"Could not extract port from IMAGE_SERVER URL: {e}")
+                config['IMAGE_SERVER_PORT'] = '8888'
+        
+        return config
+    except Exception as e:
+        print_error(f"Failed to load .env file: {e}")
+        sys.exit(1)
 
 def get_user_input() -> Dict[str, str]:
     """Get configuration from user"""
@@ -633,6 +686,11 @@ def main():
         print_error("docker-compose.yml not found. Please run this script from the frontend directory.")
         sys.exit(1)
     
+    # Check if called from master setup
+    is_master_setup = os.environ.get('MASTER_SETUP', '').lower() == 'true'
+    if is_master_setup:
+        print_info("Called from master setup - using existing configuration")
+    
     # Check system requirements
     requirements = check_system_requirements()
     
@@ -662,7 +720,11 @@ def main():
     image_status = check_docker_hub_images()
     
     # Get user configuration
-    config = get_user_input()
+    if is_master_setup:
+        # Load configuration from .env file created by master setup
+        config = load_config_from_env()
+    else:
+        config = get_user_input()
     
     # Create directories
     create_directories(config)
