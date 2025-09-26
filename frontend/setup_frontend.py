@@ -275,12 +275,7 @@ def create_directories(config: Dict[str, str]) -> None:
     
     directories = [
         config['DICOM_FOLDER'],
-        config['OUTPUT_FOLDER'],
-        os.path.join(config['OUTPUT_FOLDER'], 'nifti'),
-        os.path.join(config['OUTPUT_FOLDER'], 'scans'),
-        os.path.join(config['OUTPUT_FOLDER'], 'voxels'),
-        os.path.join(config['OUTPUT_FOLDER'], 'models'),
-        os.path.join(config['OUTPUT_FOLDER'], 'logs')
+        config['OUTPUT_FOLDER']
     ]
     
     for directory in directories:
