@@ -34,33 +34,13 @@
         "description": "Medical image viewer interface"
       },
       {
-        "key": "ply_viewer",
-        "label": "Open3d Viewer",
-        "page_key": "ply_viewer",
-        "icon": "🔺",
-        "is_image": false,
-        "enabled": false,
-        "order": 4,
-        "description": "3D mesh and point cloud viewer"
-      },
-      {
-        "key": "dicom",
-        "label": "DICOM Inspector",
-        "page_key": "dicom",
-        "icon": "📋",
-        "is_image": false,
-        "enabled": false,
-        "order": 5,
-        "description": "DICOM file inspection and analysis"
-      },
-      {
         "key": "tools",
         "label": "Tools",
         "page_key": "tools",
         "icon": "🛠️",
         "is_image": false,
         "enabled": true,
-        "order": 6,
+        "order": 4,
         "description": "Tools and utilities for medical image processing"
       }
     ],

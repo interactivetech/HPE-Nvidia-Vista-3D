@@ -299,7 +299,6 @@ st.checkbox("Show Debug Info", value=False, key="debug_info")
 
 ## 📚 Related Documentation
 
-- [DICOM Inspector](DICOM_INSPECTOR.md): Raw DICOM file inspection and analysis
 - [Image Server](IMAGE_SERVER.md): HTTP server for medical imaging files
 - [Vista3D Setup](VISTA3D_SETUP.md): AI segmentation pipeline configuration
 - [DICOM to NIFTI](DICOM2NIFTI.md): Medical image format conversion

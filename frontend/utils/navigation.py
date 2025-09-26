@@ -87,7 +87,6 @@ class Navigation:
         self.items = [
             NavigationItem("about", "About", "home"),
             NavigationItem("niivue", "NiiVue Viewer", "niivue"),
-            NavigationItem("ply_viewer", "Open3d Viewer", "ply_viewer", "🔺"),
         ]
         self.config = {
             'settings': {
