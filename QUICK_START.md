@@ -30,8 +30,11 @@ python3 setup.py
 
 **Setup Options:**
 ```bash
-# Setup everything (default)
+# Interactive setup (recommended) - will ask what to set up
 python3 setup.py
+
+# Setup everything (frontend + backend)
+python3 setup.py --setup both
 
 # Setup only frontend (for non-GPU systems)
 python3 setup.py --setup frontend
@@ -51,14 +54,18 @@ python3 setup.py --help
 
 **What the setup script does:**
 - ✅ Checks system requirements (OS, Python, GPU, Docker)
+- ✅ Asks what to set up (frontend, backend, or both)
 - ✅ Prompts for your NVIDIA NGC API key (backend only)
 - ✅ Configures directories and ports
 - ✅ Sets up backend (Vista3D AI server) - if selected
 - ✅ Sets up frontend (Web interface + Image server) - if selected
 - ✅ Creates Docker configurations
 
-## Step 2: Start All Services
+## Step 2: Start Services
 
+**The commands depend on what you set up in Step 1:**
+
+### If you set up both frontend and backend:
 ```bash
 # Start Vista3D AI Server (GPU-enabled machine)
 cd backend
@@ -72,14 +79,33 @@ cd ../image_server && docker-compose up -d
 cd ../frontend && docker-compose up -d
 ```
 
+### If you set up only the backend:
+```bash
+# Start Vista3D AI Server
+cd backend
+docker-compose up -d
+```
+
+### If you set up only the frontend:
+```bash
+# Start Frontend Services
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
+```
+
 **This starts:**
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
-- 🌐 **Streamlit Web Interface** (http://localhost:8501)
-- 🖼️ **Image Server** (http://localhost:8888)
+- 🧠 **Vista3D AI Server** (http://localhost:8000) - if backend was set up
+- 🌐 **Streamlit Web Interface** (http://localhost:8501) - if frontend was set up
+- 🖼️ **Image Server** (http://localhost:8888) - if frontend was set up
 
 **Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
 
 ## Step 3: Process Your Images
+
+**Note**: This step requires the frontend web interface to be running.
 
 ```bash
 # Add your medical images
@@ -98,6 +124,8 @@ mkdir -p output/nifti
 # - Run AI segmentation
 # - View 3D visualizations
 ```
+
+**If you only set up the backend**: You can use the API directly or set up the frontend later.
 
 ## 🎉 You're Done!
 
