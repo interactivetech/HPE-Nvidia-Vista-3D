@@ -204,7 +204,7 @@
                     nv.drawScene();
                 }, 500);
                 {% elif actual_slice_type == 4 %}
-                // 3D Render mode - full 3D view
+                // 3D Render mode - full 3D view with enhanced quality
                 nv.opts.multiplanarShowRender = false;
                 nv.opts.multiplanarForceRender = false;
                 nv.opts.showCrosshairs = false;
@@ -212,6 +212,13 @@
                 nv.opts.isOrientCube = false;
                 nv.opts.isRuler = false;
                 nv.opts.isRadiologicalConvention = false;
+                
+                // Enhanced 3D rendering quality settings - loaded from config
+                const renderConfig = {{ render_config_js|safe }};
+                Object.keys(renderConfig).forEach(key => {
+                    nv.opts[key] = renderConfig[key];
+                });
+                
                 // Enable 3D rendering
                 setTimeout(() => {
                     nv.drawScene();

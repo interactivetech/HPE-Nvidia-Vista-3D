@@ -255,6 +255,37 @@ def load_colormap_data(colormap_name):
     print(f"Warning: Colormap '{colormap_name}' not found, falling back to 'gray'")
     return load_colormap_data('gray')
 
+def load_3d_render_config(config_name='3d_render_quality'):
+    """Load 3D rendering configuration from JSON file."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    config_file = os.path.join(current_dir, '..', CONFIG_FILES['3d_render_config'])
+    config_file = os.path.abspath(config_file)
+    
+    if not os.path.exists(config_file):
+        raise FileNotFoundError(f"3D render config file not found: {config_file}")
+    
+    try:
+        with open(config_file, 'r') as f:
+            data = json.load(f)
+            if config_name in data:
+                return data[config_name]['settings']
+            else:
+                # Fallback to quality config if specified config not found
+                return data['3d_render_quality']['settings']
+    except Exception as e:
+        print(f"Error loading 3D render config: {e}")
+        # Return default settings if config loading fails
+        return {
+            'antiAlias': True,
+            'smoothVoxels': True,
+            'volumeRenderQuality': 'high',
+            'volumeRenderSteps': 256,
+            'lighting': True,
+            'ambientLight': 0.3,
+            'directionalLight': 0.7,
+            'backColor': [0, 0, 0, 1]
+        }
+
 AVAILABLE_COLOR_MAPS = load_colormaps()
 
 # Voxel selection modes
@@ -285,7 +316,8 @@ MIN_FILE_SIZE_MB = 3.5  # Minimum file size in MB for processing
 CONFIG_FILES = {
     'label_colors': 'conf/vista3d_label_colors.json',
     'label_dict': 'conf/vista3d_label_dict.json',
-    'label_sets': 'conf/vista3d_label_sets.json'
+    'label_sets': 'conf/vista3d_label_sets.json',
+    '3d_render_config': 'conf/niivue_3d_render_config.json'
 }
 
 # Template paths

@@ -14,7 +14,7 @@ from utils.template_renderer import TemplateRenderer
 from utils.constants import (
     NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
     VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data,
-    load_colormap_data, SLICE_TYPE_MAP
+    load_colormap_data, SLICE_TYPE_MAP, load_3d_render_config
 )
 
 # Import badge components
@@ -314,6 +314,9 @@ def render_viewer(selected_patient: str, selected_file: str):
     with open(niivue_lib_path, 'r') as f:
         niivue_lib_content = f.read()
     
+    # Load 3D render configuration
+    render_config = load_3d_render_config('3d_render_quality')
+    
     # Render the viewer using our template
     html_content = template_renderer.render_template(
         'niivue_viewer.html',
@@ -333,7 +336,8 @@ def render_viewer(selected_patient: str, selected_file: str):
         actual_slice_type=actual_slice_type,
         overlay_start_index=1,  # NIfTI is always at index 0, overlays start at 1
         segment_opacity=segment_opacity,
-        segment_gamma=segment_gamma
+        segment_gamma=segment_gamma,
+        render_config_js=json.dumps(render_config)
     )
 
     # Display the viewer

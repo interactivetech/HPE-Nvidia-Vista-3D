@@ -1,0 +1,74 @@
+{
+  "3d_render_quality": {
+    "description": "Maximum quality 3D rendering settings for NiiVue viewer",
+    "version": "1.0",
+    "settings": {
+      "antiAlias": true,
+      "smoothVoxels": true,
+      "volumeRenderQuality": "ultra",
+      "volumeRenderSteps": 512,
+      "volumeRenderBlendMode": "composite",
+      "volumeRenderInterpolation": "linear",
+      "lighting": true,
+      "ambientLight": 0.2,
+      "directionalLight": 0.8,
+      "lightPosition": [1, 1, 1],
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.05,
+      "backColor": [0, 0, 0, 1],
+      "showBoundingBox": true,
+      "crosshairWidth": 2,
+      "crosshairColor": [1, 0, 0, 1],
+      "crosshairDepth": true
+    }
+  },
+  "3d_render_balanced": {
+    "description": "Balanced quality/performance 3D rendering settings",
+    "version": "1.0",
+    "settings": {
+      "antiAlias": true,
+      "smoothVoxels": true,
+      "volumeRenderQuality": "high",
+      "volumeRenderSteps": 256,
+      "volumeRenderBlendMode": "composite",
+      "volumeRenderInterpolation": "linear",
+      "lighting": true,
+      "ambientLight": 0.3,
+      "directionalLight": 0.7,
+      "lightPosition": [1, 1, 1],
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.1,
+      "backColor": [0, 0, 0, 1],
+      "showBoundingBox": true,
+      "crosshairWidth": 2,
+      "crosshairColor": [1, 0, 0, 1],
+      "crosshairDepth": true
+    }
+  },
+  "3d_render_performance": {
+    "description": "Performance-optimized 3D rendering settings",
+    "version": "1.0",
+    "settings": {
+      "antiAlias": false,
+      "smoothVoxels": false,
+      "volumeRenderQuality": "medium",
+      "volumeRenderSteps": 128,
+      "volumeRenderBlendMode": "composite",
+      "volumeRenderInterpolation": "nearest",
+      "lighting": true,
+      "ambientLight": 0.4,
+      "directionalLight": 0.6,
+      "lightPosition": [1, 1, 1],
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.1,
+      "backColor": [0, 0, 0, 1],
+      "showBoundingBox": false,
+      "crosshairWidth": 1,
+      "crosshairColor": [1, 0, 0, 1],
+      "crosshairDepth": false
+    }
+  }
+}

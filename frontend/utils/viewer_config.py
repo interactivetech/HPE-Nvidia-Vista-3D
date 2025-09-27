@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional, Tuple
 from .constants import (
     DEFAULT_VIEWER_SETTINGS, SLICE_TYPE_MAP, WINDOW_PRESETS,
     WINDOW_PRESETS_CT, WINDOW_PRESETS_MRI, get_optimal_window_settings,
-    detect_modality_from_data, AVAILABLE_COLOR_MAPS, VOXEL_MODES, MESSAGES
+    detect_modality_from_data, AVAILABLE_COLOR_MAPS, VOXEL_MODES, MESSAGES,
+    load_3d_render_config
 )
 
 
