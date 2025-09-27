@@ -37,7 +37,7 @@ DEFAULT_VIEWER_SETTINGS = {
     'nifti_opacity': 0.5,  # Default CT scan opacity (will be reduced when voxels are shown)
     'nifti_gamma': 1.0,
     'show_overlay': False,
-    'segment_opacity': 0.9,  # Much brighter voxels
+    'segment_opacity': 1.0,  # Maximum voxel visibility
     'segment_gamma': 0.7,   # Lower gamma = brighter voxels
     'window_center': 0,
     'window_width': 1000,
