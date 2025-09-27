@@ -197,6 +197,186 @@ class ViewerConfig:
                 key="nifti_gamma"
             )
 
+        # 3D Render Quality Settings
+        with st.expander("3D Render Quality", expanded=False):
+            # 3D Render Quality Preset
+            quality_presets = ["3d_render_ultra", "3d_render_quality", "3d_render_balanced", "3d_render_performance"]
+            preset_labels = ["Ultra Quality", "High Quality", "Balanced", "Performance"]
+            
+            current_preset = self._settings.get('3d_render_preset', '3d_render_quality')
+            try:
+                preset_index = quality_presets.index(current_preset)
+            except ValueError:
+                preset_index = 1  # Default to high quality
+            
+            selected_preset = st.selectbox(
+                "Render Quality Preset",
+                preset_labels,
+                index=preset_index,
+                help="Choose rendering quality preset. Ultra for best quality, Performance for speed."
+            )
+            
+            # Map back to preset name
+            self._settings['3d_render_preset'] = quality_presets[preset_labels.index(selected_preset)]
+            
+            # Depth and Transparency Controls
+            st.markdown("**Depth & Transparency**")
+            
+            self._settings['alpha_test'] = st.slider(
+                "Alpha Test Threshold",
+                0.01, 0.5,
+                self._settings.get('alpha_test', 0.1),
+                step=0.01,
+                help="Lower values show more transparent voxels"
+            )
+            
+            self._settings['transparency_quality'] = st.selectbox(
+                "Transparency Quality",
+                ["low", "medium", "high", "ultra"],
+                index=2,  # Default to high
+                help="Quality of transparency rendering"
+            )
+            
+            self._settings['depth_precision'] = st.selectbox(
+                "Depth Precision",
+                ["low", "medium", "high", "ultra"],
+                index=2,  # Default to high
+                help="Precision of depth testing"
+            )
+            
+            # Lighting Controls
+            st.markdown("**Lighting**")
+            
+            self._settings['ambient_light'] = st.slider(
+                "Ambient Light",
+                0.0, 1.0,
+                self._settings.get('ambient_light', 0.2),
+                step=0.05,
+                help="Base lighting level (0.0 = dark, 1.0 = bright)"
+            )
+            
+            self._settings['directional_light'] = st.slider(
+                "Directional Light",
+                0.0, 1.0,
+                self._settings.get('directional_light', 0.8),
+                step=0.05,
+                help="Main light source intensity (0.0 = no shadows, 1.0 = strong shadows)"
+            )
+            
+            # Light position controls
+            st.markdown("**Light Position**")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                self._settings['light_x'] = st.slider(
+                    "X", -2.0, 2.0, 
+                    self._settings.get('light_x', 1.0), 
+                    step=0.1, key="light_x"
+                )
+            with col2:
+                self._settings['light_y'] = st.slider(
+                    "Y", -2.0, 2.0, 
+                    self._settings.get('light_y', 1.0), 
+                    step=0.1, key="light_y"
+                )
+                with col3:
+                    self._settings['light_z'] = st.slider(
+                        "Z", -2.0, 2.0, 
+                        self._settings.get('light_z', 1.0), 
+                        step=0.1, key="light_z"
+                    )
+            
+            # Advanced Shader Effects
+            st.markdown("**Advanced Shader Effects**")
+            
+            # Ambient Occlusion
+            self._settings['ambient_occlusion'] = st.checkbox(
+                "Ambient Occlusion",
+                value=self._settings.get('ambient_occlusion', True),
+                help="Adds soft shadows in crevices and corners"
+            )
+            
+            if self._settings['ambient_occlusion']:
+                col1, col2 = st.columns(2)
+                with col1:
+                    self._settings['ao_intensity'] = st.slider(
+                        "AO Intensity", 0.0, 1.0,
+                        self._settings.get('ao_intensity', 0.8),
+                        step=0.1, help="Shadow intensity"
+                    )
+                with col2:
+                    self._settings['ao_radius'] = st.slider(
+                        "AO Radius", 0.5, 3.0,
+                        self._settings.get('ao_radius', 2.0),
+                        step=0.1, help="Shadow radius"
+                    )
+            
+            # Bloom Effect
+            self._settings['bloom'] = st.checkbox(
+                "Bloom",
+                value=self._settings.get('bloom', True),
+                help="Adds glow around bright areas"
+            )
+            
+            if self._settings['bloom']:
+                col1, col2 = st.columns(2)
+                with col1:
+                    self._settings['bloom_intensity'] = st.slider(
+                        "Bloom Intensity", 0.0, 1.0,
+                        self._settings.get('bloom_intensity', 0.3),
+                        step=0.05, help="Glow intensity"
+                    )
+                with col2:
+                    self._settings['bloom_threshold'] = st.slider(
+                        "Bloom Threshold", 0.0, 1.0,
+                        self._settings.get('bloom_threshold', 0.7),
+                        step=0.05, help="Brightness threshold for glow"
+                    )
+            
+            # Depth of Field
+            self._settings['depth_of_field'] = st.checkbox(
+                "Depth of Field",
+                value=self._settings.get('depth_of_field', True),
+                help="Blurs out-of-focus areas"
+            )
+            
+            if self._settings['depth_of_field']:
+                col1, col2 = st.columns(2)
+                with col1:
+                    self._settings['dof_focus'] = st.slider(
+                        "Focus Distance", 0.0, 1.0,
+                        self._settings.get('dof_focus', 0.5),
+                        step=0.05, help="Focus point"
+                    )
+                with col2:
+                    self._settings['dof_blur'] = st.slider(
+                        "Blur Amount", 0.0, 1.0,
+                        self._settings.get('dof_blur', 0.2),
+                        step=0.05, help="Blur intensity"
+                    )
+            
+            # Vignette
+            self._settings['vignette'] = st.checkbox(
+                "Vignette",
+                value=self._settings.get('vignette', True),
+                help="Darkens edges for cinematic effect"
+            )
+            
+            if self._settings['vignette']:
+                col1, col2 = st.columns(2)
+                with col1:
+                    self._settings['vignette_intensity'] = st.slider(
+                        "Vignette Intensity", 0.0, 1.0,
+                        self._settings.get('vignette_intensity', 0.3),
+                        step=0.05, help="Edge darkening amount"
+                    )
+                with col2:
+                    self._settings['vignette_radius'] = st.slider(
+                        "Vignette Radius", 0.0, 1.0,
+                        self._settings.get('vignette_radius', 0.8),
+                        step=0.05, help="Edge effect radius"
+                    )
+
             # Window/Level settings (CT/MRI adaptive)
             st.markdown("**Window/Level Settings**")
             

@@ -314,8 +314,58 @@ def render_viewer(selected_patient: str, selected_file: str):
     with open(niivue_lib_path, 'r') as f:
         niivue_lib_content = f.read()
     
-    # Load 3D render configuration
-    render_config = load_3d_render_config('3d_render_quality')
+    # Load 3D render configuration based on user selection
+    selected_preset = settings.get('3d_render_preset', '3d_render_quality')
+    render_config = load_3d_render_config(selected_preset)
+    
+    # Override with user-selected values
+    if 'alpha_test' in settings:
+        render_config['alphaTest'] = settings['alpha_test']
+    if 'transparency_quality' in settings:
+        render_config['transparencyQuality'] = settings['transparency_quality']
+    if 'depth_precision' in settings:
+        render_config['depthPrecision'] = settings['depth_precision']
+    
+    # Override lighting settings
+    if 'ambient_light' in settings:
+        render_config['ambientLight'] = settings['ambient_light']
+    if 'directional_light' in settings:
+        render_config['directionalLight'] = settings['directional_light']
+    if all(key in settings for key in ['light_x', 'light_y', 'light_z']):
+        render_config['lightPosition'] = [
+            settings['light_x'], 
+            settings['light_y'], 
+            settings['light_z']
+        ]
+    
+    # Override shader effects settings
+    if 'ambient_occlusion' in settings:
+        render_config['ambientOcclusion'] = settings['ambient_occlusion']
+    if 'ao_intensity' in settings:
+        render_config['ambientOcclusionIntensity'] = settings['ao_intensity']
+    if 'ao_radius' in settings:
+        render_config['ambientOcclusionRadius'] = settings['ao_radius']
+    
+    if 'bloom' in settings:
+        render_config['bloom'] = settings['bloom']
+    if 'bloom_intensity' in settings:
+        render_config['bloomIntensity'] = settings['bloom_intensity']
+    if 'bloom_threshold' in settings:
+        render_config['bloomThreshold'] = settings['bloom_threshold']
+    
+    if 'depth_of_field' in settings:
+        render_config['depthOfField'] = settings['depth_of_field']
+    if 'dof_focus' in settings:
+        render_config['depthOfFieldFocus'] = settings['dof_focus']
+    if 'dof_blur' in settings:
+        render_config['depthOfFieldBlur'] = settings['dof_blur']
+    
+    if 'vignette' in settings:
+        render_config['vignette'] = settings['vignette']
+    if 'vignette_intensity' in settings:
+        render_config['vignetteIntensity'] = settings['vignette_intensity']
+    if 'vignette_radius' in settings:
+        render_config['vignetteRadius'] = settings['vignette_radius']
     
     # Render the viewer using our template
     html_content = template_renderer.render_template(
