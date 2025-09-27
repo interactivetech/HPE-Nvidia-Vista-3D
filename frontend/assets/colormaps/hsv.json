@@ -1,13 +1,13 @@
 {
   "name": "HSV Colormap",
-  "description": "HSV color space colormap",
+  "description": "HSV color space colormap with transparency",
   "colormaps": {
     "hsv": {
       "R": [255, 255, 128, 0, 0, 128, 255, 255, 255, 255],
       "G": [0, 128, 255, 255, 128, 0, 0, 64, 128, 192],
       "B": [0, 0, 0, 128, 255, 255, 128, 0, 0, 0],
-      "A": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      "labels": ["Red", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Magenta", "Pink", "Red"]
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255],
+      "labels": ["Transparent", "Orange", "Yellow", "Green", "Cyan", "Blue", "Purple", "Magenta", "Pink", "Red"]
     }
   }
 }

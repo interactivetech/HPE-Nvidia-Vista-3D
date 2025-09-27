@@ -1,13 +1,13 @@
 {
   "name": "Jet Colormap",
-  "description": "Classic jet colormap for scientific visualization",
+  "description": "Classic jet colormap for scientific visualization with transparency",
   "colormaps": {
     "jet": {
       "R": [0, 0, 0, 64, 128, 192, 255, 255, 192, 128],
       "G": [0, 64, 128, 192, 255, 255, 192, 128, 64, 0],
       "B": [128, 192, 255, 255, 192, 128, 64, 0, 0, 0],
-      "A": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      "labels": ["Min", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255],
+      "labels": ["Transparent", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
     }
   }
 }
