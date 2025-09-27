@@ -136,11 +136,12 @@ class VoxelManager:
         base_url = external_url if external_url else self.data.image_server_url
 
         if voxel_mode == "all":
-            # Show complete base segmentation file
+            # Show complete base segmentation file stored as voxels/<scan>/all.nii.gz
+            ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
             overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{filename}",
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
                 'is_all_segmentation': True
             }]
 
@@ -167,10 +168,11 @@ class VoxelManager:
 
         elif voxel_mode == "individual_voxels" and not selected_voxels:
             # No individual voxels selected, show base segmentation
+            ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
             overlays = [{
                 'label_id': 'all',
                 'label_name': 'All Segmentation',
-                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{filename}",
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
                 'is_all_segmentation': True
             }]
 

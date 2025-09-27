@@ -357,6 +357,9 @@ IMAGE_SERVER="{config['IMAGE_SERVER']}"
 FRONTEND_PORT="{config['FRONTEND_PORT']}"
 IMAGE_SERVER_PORT="{config['IMAGE_SERVER_PORT']}"
 
+# Vessel Configuration
+VESSELS_OF_INTEREST="all"
+
 # Docker Configuration
 COMPOSE_PROJECT_NAME=vista3d-frontend
 """

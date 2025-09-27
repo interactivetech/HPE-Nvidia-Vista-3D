@@ -244,8 +244,12 @@ def main():
             # The NIfTI file is already in its final destination.
             # The copy step is no longer needed.
             
-            # Define segmentation output path in voxels directory
-            segmentation_output_path = patient_dirs['voxels'] / nifti_file_path.name
+            # Define segmentation output path in voxels directory:
+            # Save into per-scan folder as 'all.nii.gz'
+            ct_scan_folder_name = nifti_file_path.name.replace('.nii.gz', '').replace('.nii', '')
+            ct_voxels_dir = patient_dirs['voxels'] / ct_scan_folder_name
+            ct_voxels_dir.mkdir(parents=True, exist_ok=True)
+            segmentation_output_path = ct_voxels_dir / 'all.nii.gz'
 
             if not args.force and segmentation_output_path.exists():
                 print(f"\n  Skipping {nifti_file_path.name} as segmentation already exists. Use --force to overwrite.")
