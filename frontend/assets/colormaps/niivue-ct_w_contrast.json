@@ -1,0 +1,15 @@
+{
+  "name": "NiiVue CT With Contrast Colormap",
+  "description": "CT with contrast colormap with NiiVue naming",
+  "colormaps": {
+    "niivue-ct_w_contrast": {
+      "R": [98, 210, 169, 128, 255],
+      "G": [94, 26, 77, 128, 255],
+      "B": [45, 21, 74, 128, 255],
+      "A": [0, 25, 0, 4, 168],
+      "labels": ["Background", "Soft Tissue", "Enhanced", "Vessels", "Contrast"]
+    }
+  }
+}
+
+

@@ -46,8 +46,12 @@
             // Add the main volume colormap
             const mainColormapData = {{ color_map_data_js|safe }};
             const mainColormapName = {{ color_map_js|safe }};
-            nv.addColormap(mainColormapName, mainColormapData);
-            console.log('Main volume colormap added:', mainColormapName);
+            if (mainColormapData && !mainColormapData.__builtin__) {
+                nv.addColormap(mainColormapName, mainColormapData);
+                console.log('Added main volume colormap:', mainColormapName);
+            } else if (mainColormapData && mainColormapData.__builtin__) {
+                console.log('Using built-in colormap:', mainColormapName);
+            }
 
             // For "all segmentation" mode, use the same colormap as individual voxels
             // This ensures consistent colors between individual voxels and all segmentation mode
@@ -165,8 +169,6 @@
                             
                             console.log(`Applied custom color to overlay ${overlayIndex}: ${labelName} (ID: ${labelId})`, color);
                             console.log(`Set volume range: ${overlayVol.cal_min} to ${overlayVol.cal_max}`);
-                            console.log(`Custom colormap for ${labelName}:`, customColormap);
-                            console.log(`Volume data range check - min: ${Math.min(...overlayVol.img.slice())}, max: ${Math.max(...overlayVol.img.slice())}`);
                         } else {
                             // Fallback to generic segmentation colormap
                             if (typeof customSegmentationColormap !== 'undefined') {
@@ -185,8 +187,10 @@
                 }
                 {% endif %}
 
-                // Honor requested slice type
-                nv.setSliceType({{ actual_slice_type }});
+                // Enforce requested slice type pre- and post-opts to avoid regressions
+                const requestedSliceType = {{ actual_slice_type }};
+                nv.setSliceType(requestedSliceType);
+                console.log('Applied slice type index:', {{ actual_slice_type }});
                 {% if actual_slice_type == 3 %}
                 // Multiplanar view with 4 panes
                 nv.opts.multiplanarShowRender = true;
@@ -216,15 +220,39 @@
                 // Ensure multiplanar flags are disabled when not in multiplanar mode
                 nv.opts.multiplanarShowRender = false;
                 nv.opts.multiplanarForceRender = false;
-                nv.opts.showCrosshairs = false;
+                nv.opts.showCrosshairs = true;
                 nv.opts.show3Dcrosshair = false;
+                // Defensive re-apply in case prior state forced multiplanar
+                nv.setSliceType({{ actual_slice_type }});
                 {% endif %}
+                // Final enforcement after opts toggles
+                nv.setSliceType(requestedSliceType);
                 nv.drawScene();
 
                 // Final redraw to ensure colormap is applied
                 setTimeout(() => {
                     nv.drawScene();
                 }, 100);
+
+                // Lightweight guard: re-apply requested slice type after short delays
+                // This protects against any late state changes from future edits
+                [0, 250, 1000].forEach((ms) => {
+                    setTimeout(() => {
+                        if (nv.getSliceType && typeof nv.getSliceType === 'function') {
+                            const current = nv.getSliceType();
+                            if (current !== requestedSliceType) {
+                                nv.setSliceType(requestedSliceType);
+                                nv.drawScene();
+                            }
+                        } else {
+                            // Fallback if API is unavailable
+                            nv.setSliceType(requestedSliceType);
+                            nv.drawScene();
+                        }
+                    }, ms);
+                });
+
+                // Removed label readout handler per request
 
             }).catch((error) => {
                 console.error('Error loading volumes:', error);

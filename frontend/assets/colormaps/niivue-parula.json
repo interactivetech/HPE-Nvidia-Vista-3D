@@ -1,0 +1,16 @@
+{
+  "name": "NiiVue Parula Colormap",
+  "description": "Parula colormap with NiiVue naming for easy selection",
+  "colormaps": {
+    "niivue-parula": {
+      "R": [53, 42, 31, 21, 11, 8, 4, 0, 0, 0, 0, 0],
+      "G": [42, 74, 110, 147, 184, 220, 255, 255, 255, 255, 255, 255],
+      "B": [135, 135, 135, 135, 135, 135, 135, 135, 135, 135, 135, 135],
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255],
+      "I": [0, 23, 46, 69, 92, 115, 138, 161, 184, 207, 230, 255],
+      "labels": ["Transparent", "Blue", "Cyan-Blue", "Cyan", "Green-Cyan", "Green", "Yellow-Green", "Yellow", "Orange", "Red-Orange", "Red", "Dark Red"]
+    }
+  }
+}
+
+

@@ -41,6 +41,11 @@ DEFAULT_VIEWER_SETTINGS = {
     'segment_gamma': 1.0,
     'window_center': 0,
     'window_width': 1000,
+    'volume_rendering': False,
+    'volume_opacity': 0.8,
+    'volume_gamma': 1.0,
+    'lighting_enabled': True,
+    'material_shininess': 0.5,
 }
 
 # Slice type mappings
@@ -52,14 +57,25 @@ SLICE_TYPE_MAP = {
     "3D Render": 4
 }
 
-# Window presets for CT imaging
+# Window presets for CT imaging - Enhanced for better tissue visualization
 WINDOW_PRESETS_CT = {
     "Custom": (0, 1000),
     "Standard (W:1000, L:0)": (0, 1000),
     "Soft Tissue (W:400, L:40)": (40, 400),
     "Bone (W:1500, L:300)": (300, 1500),
     "Lung (W:1500, L:-600)": (-600, 1500),
-    "Air/Background (W:500, L:-1000)": (-1000, 500)
+    "Air/Background (W:500, L:-1000)": (-1000, 500),
+    "CT Brain (W:80, L:40)": (40, 80),
+    "CT Brain Soft (W:100, L:30)": (30, 100),
+    "CT Brain Bone (W:2000, L:300)": (300, 2000),
+    "CT Chest (W:350, L:50)": (50, 350),
+    "CT Abdomen (W:350, L:40)": (40, 350),
+    "CT Pelvis (W:350, L:40)": (40, 350),
+    "CT Angiography (W:600, L:300)": (300, 600),
+    "CT Liver (W:150, L:50)": (50, 150),
+    "CT Kidney (W:350, L:40)": (40, 350),
+    "CT Spine (W:1800, L:400)": (400, 1800),
+    "CT Skull (W:4000, L:700)": (700, 4000)
 }
 
 # Window presets for MRI imaging
@@ -135,6 +151,34 @@ def get_optimal_window_settings(min_value: float, max_value: float, mean_value: 
     
     return int(window_center), int(window_width)
 
+# Built-in NiiVue colormaps (as described in issue #83)
+BUILTIN_NIIVUE_COLORMAPS = {
+    'gray': {'__builtin__': True},
+    'jet': {'__builtin__': True},
+    'hot': {'__builtin__': True},
+    'cool': {'__builtin__': True},
+    'warm': {'__builtin__': True},
+    'spring': {'__builtin__': True},
+    'summer': {'__builtin__': True},
+    'autumn': {'__builtin__': True},
+    'winter': {'__builtin__': True},
+    'rainbow': {'__builtin__': True},
+    'viridis': {'__builtin__': True},
+    'plasma': {'__builtin__': True},
+    'magma': {'__builtin__': True},
+    'inferno': {'__builtin__': True},
+    'parula': {'__builtin__': True},
+    'turbo': {'__builtin__': True},
+    'hsv': {'__builtin__': True},
+    'bone': {'__builtin__': True},
+    'copper': {'__builtin__': True},
+    'cubehelix': {'__builtin__': True},
+    'cividis': {'__builtin__': True},
+    'linspecer': {'__builtin__': True},
+    'batlow': {'__builtin__': True},
+    'blues': {'__builtin__': True}
+}
+
 # Color maps available for NIfTI images
 def load_colormaps():
     """Load colormap names from JSON files."""
@@ -181,6 +225,10 @@ def load_colormap_data(colormap_name):
     import json
     import os
     import glob
+    
+    # Check if this is a built-in colormap first
+    if colormap_name in BUILTIN_NIIVUE_COLORMAPS:
+        return BUILTIN_NIIVUE_COLORMAPS[colormap_name]
     
     # Get all available colormaps from the JSON files
     current_dir = os.path.dirname(os.path.abspath(__file__))

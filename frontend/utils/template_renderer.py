@@ -61,6 +61,7 @@ class TemplateRenderer:
                 'main_is_nifti': kwargs.get('main_is_nifti', True),
                 'main_vol': kwargs.get('main_vol', True),
                 'color_map_js': kwargs.get('color_map_js', '"gray"'),
+                'color_map_data_js': kwargs.get('color_map_data_js', '{}'),
                 'nifti_gamma': kwargs.get('nifti_gamma', 1.0),
                 'nifti_opacity': kwargs.get('nifti_opacity', 1.0),
                 'window_center': kwargs.get('window_center', 0),

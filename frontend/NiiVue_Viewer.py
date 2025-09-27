@@ -14,7 +14,7 @@ from utils.template_renderer import TemplateRenderer
 from utils.constants import (
     NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
     VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data,
-    load_colormap_data
+    load_colormap_data, SLICE_TYPE_MAP
 )
 
 # Import badge components
@@ -230,8 +230,8 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
                 viewer_config.voxel_mode = "individual_voxels"
                 viewer_config.selected_individual_voxels = selected_voxels
 
-        # Update session state
-        viewer_config.to_session_state()
+        # Update only voxel-related session state to avoid changing view mode
+        viewer_config.to_session_state_voxels_only()
 
     # Display current voxel selection status
     status_message = viewer_config.get_status_message()
@@ -288,7 +288,23 @@ def render_viewer(selected_patient: str, selected_file: str):
     # Get viewer settings
     settings = viewer_config.settings
     window_center, window_width = viewer_config.get_window_settings()
-    actual_slice_type = viewer_config.get_slice_type_index()
+    # Robustly compute slice type using session state as source of truth
+    try:
+        slice_type_setting = st.session_state.get('slice_type', settings.get('slice_type', 'Multiplanar'))
+        orientation_setting = st.session_state.get('orientation', settings.get('orientation', 'Axial'))
+        if slice_type_setting == "Single View":
+            actual_slice_type = SLICE_TYPE_MAP.get(orientation_setting, 3)
+        else:
+            actual_slice_type = SLICE_TYPE_MAP.get(slice_type_setting, 3)
+    except Exception:
+        # Fallback to existing method
+        actual_slice_type = viewer_config.get_slice_type_index()
+
+    print(f"DEBUG (NiiVue_Viewer): slice_type={slice_type_setting} orientation={orientation_setting} actual_slice_type={actual_slice_type}")
+
+    # Persist back to viewer_config settings so template sees the intended values
+    viewer_config._settings['slice_type'] = slice_type_setting
+    viewer_config._settings['orientation'] = orientation_setting
     segment_opacity = settings.get('segment_opacity', 0.5)
     segment_gamma = settings.get('segment_gamma', 1.0)
     

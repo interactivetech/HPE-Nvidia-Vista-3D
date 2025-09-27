@@ -120,6 +120,15 @@ class ViewerConfig:
         st.session_state.slice_type = self._settings.get('slice_type', 'Multiplanar')
         st.session_state.orientation = self._settings.get('orientation', 'Axial')
 
+    def to_session_state_voxels_only(self):
+        """Update only voxel-related fields in session state.
+
+        This avoids unintentionally overwriting the user's current
+        slice/orientation selections when interacting with voxel UI.
+        """
+        st.session_state.voxel_mode = self._voxel_mode
+        st.session_state.selected_individual_voxels = self._selected_individual_voxels
+
     def from_session_state(self):
         """Load settings from Streamlit session state."""
         self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
@@ -136,7 +145,8 @@ class ViewerConfig:
             "Slice Type",
             slice_options,
             index=slice_options.index(self._settings['slice_type']) if self._settings['slice_type'] in slice_options else 0,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key="slice_type_select"
         )
         self._settings['slice_type'] = current_slice
 
@@ -146,7 +156,8 @@ class ViewerConfig:
             self._settings['orientation'] = st.selectbox(
                 "Orientation",
                 orientations,
-                index=orientations.index(self._settings.get('orientation', 'Axial'))
+                index=orientations.index(self._settings.get('orientation', 'Axial')),
+                key="orientation_select"
             )
 
         # Color Map Selection - moved above NIfTI Image Settings
