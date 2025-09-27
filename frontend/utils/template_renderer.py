@@ -63,7 +63,7 @@ class TemplateRenderer:
                 'color_map_js': kwargs.get('color_map_js', '"gray"'),
                 'color_map_data_js': kwargs.get('color_map_data_js', '{}'),
                 'nifti_gamma': kwargs.get('nifti_gamma', 1.0),
-                'nifti_opacity': kwargs.get('nifti_opacity', 1.0),
+                'nifti_opacity': kwargs.get('nifti_opacity', 1.0),  # This will be set dynamically by the caller
                 'window_center': kwargs.get('window_center', 0),
                 'window_width': kwargs.get('window_width', 1000),
                 'overlay_start_index': kwargs.get('overlay_start_index', 0),

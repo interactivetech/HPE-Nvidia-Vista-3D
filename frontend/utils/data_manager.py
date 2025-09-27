@@ -161,7 +161,8 @@ class DataManager:
         self,
         patient_id: str,
         filename: str,
-        filename_to_id_mapping: Dict[str, int]
+        filename_to_id_mapping: Dict[str, int],
+        selected_effect: Optional[str] = None
     ) -> Tuple[Set[int], Dict[int, str]]:
         """
         Query image server for available voxel files.
@@ -172,13 +173,20 @@ class DataManager:
 
         try:
             # Try to find the correct voxel directory
-            voxels_folder_url = self._find_voxel_directory(patient_id, filename)
-            
-            if not voxels_folder_url:
-                print(f"DEBUG: No suitable voxel directory found for patient {patient_id}, file {filename}")
-                return set(), {}
+            if selected_effect:
+                # For effect-based folders, construct the path directly
+                ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
+                effect_folder_name = f"{ct_scan_folder_name}_{selected_effect}"
+                voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{effect_folder_name}/"
+                print(f"DEBUG: Using effect-based voxel directory: {voxels_folder_url}")
+            else:
+                voxels_folder_url = self._find_voxel_directory(patient_id, filename)
+                
+                if not voxels_folder_url:
+                    print(f"DEBUG: No suitable voxel directory found for patient {patient_id}, file {filename}")
+                    return set(), {}
 
-            print(f"DEBUG: Using voxel directory: {voxels_folder_url}")
+                print(f"DEBUG: Using voxel directory: {voxels_folder_url}")
 
             resp = requests.get(voxels_folder_url, timeout=SERVER_TIMEOUT)
             print(f"DEBUG: Response status: {resp.status_code}")

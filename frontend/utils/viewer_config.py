@@ -25,6 +25,7 @@ class ViewerConfig:
         self._selected_file: Optional[str] = None
         self._voxel_mode: str = "all"
         self._selected_individual_voxels: list = []
+        self._selected_effect: Optional[str] = None
 
     @property
     def settings(self) -> Dict[str, Any]:
@@ -71,6 +72,16 @@ class ViewerConfig:
         """Set selected individual voxels."""
         self._selected_individual_voxels = voxels.copy()
 
+    @property
+    def selected_effect(self) -> Optional[str]:
+        """Get selected effect."""
+        return self._selected_effect
+
+    @selected_effect.setter
+    def selected_effect(self, effect: Optional[str]):
+        """Set selected effect."""
+        self._selected_effect = effect
+
     def get_slice_type_index(self) -> int:
         """Get the numeric slice type index for NiiVue."""
         slice_type = self._settings.get('slice_type', 'Multiplanar')
@@ -93,6 +104,17 @@ class ViewerConfig:
             self._settings.get('window_center', 0),
             self._settings.get('window_width', 1000)
         )
+    
+    def get_dynamic_nifti_opacity(self) -> float:
+        """Get CT scan opacity adjusted based on whether voxels are being displayed."""
+        base_opacity = self._settings.get('nifti_opacity', 0.5)
+        show_voxels = self._settings.get('show_overlay', False)
+        
+        # If voxels are being displayed, make CT scan more transparent to highlight voxels
+        if show_voxels:
+            return min(base_opacity * 0.6, 0.4)  # Reduce to 60% of base opacity, max 0.4
+        else:
+            return base_opacity  # Use full opacity when no voxels
 
     def apply_optimal_window_settings(self, min_value: float, max_value: float, mean_value: float):
         """Apply optimal window settings based on data characteristics."""
@@ -113,11 +135,13 @@ class ViewerConfig:
         self._settings = DEFAULT_VIEWER_SETTINGS.copy()
         self._voxel_mode = "all"
         self._selected_individual_voxels = []
+        self._selected_effect = None
 
     def to_session_state(self):
         """Update Streamlit session state with current settings."""
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
+        st.session_state.selected_effect = self._selected_effect
         st.session_state.slice_type = self._settings.get('slice_type', 'Multiplanar')
         st.session_state.orientation = self._settings.get('orientation', 'Axial')
 
@@ -129,11 +153,13 @@ class ViewerConfig:
         """
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
+        st.session_state.selected_effect = self._selected_effect
 
     def from_session_state(self):
         """Load settings from Streamlit session state."""
         self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         self._selected_individual_voxels = getattr(st.session_state, 'selected_individual_voxels', [])
+        self._selected_effect = getattr(st.session_state, 'selected_effect', None)
         self._settings['slice_type'] = getattr(st.session_state, 'slice_type', 'Multiplanar')
         self._settings['orientation'] = getattr(st.session_state, 'orientation', 'Axial')
 
@@ -183,11 +209,12 @@ class ViewerConfig:
         self._settings['show_nifti'] = True
         
         with st.expander("Image Settings", expanded=False):
+            st.info("💡 **Smart Opacity**: CT scan automatically becomes more transparent when voxels are displayed to improve visibility.")
             self._settings['nifti_opacity'] = st.slider(
-                "NIfTI Opacity",
+                "CT Scan Base Opacity",
                 0.0, 1.0,
                 self._settings['nifti_opacity'],
-                key="nifti_opacity"
+                help="Base opacity for CT scan. When voxels are shown, this is automatically reduced to 40% for better visibility."
             )
             self._settings['nifti_gamma'] = st.slider(
                 "NIfTI Gamma",
@@ -421,6 +448,8 @@ class ViewerConfig:
         else:
             # If no voxels available, ensure show_overlay is False
             self._settings['show_overlay'] = False
+        
+        # Show Scan setting removed - CT scan is now always shown with dynamic opacity
         
         # Save settings to session state
         self.to_session_state()

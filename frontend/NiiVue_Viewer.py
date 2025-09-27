@@ -188,6 +188,37 @@ def render_sidebar():
 def render_voxel_selection(selected_patient: str, selected_file: str):
     """Render the voxel selection interface."""
     with st.expander("Select Voxels", expanded=False):
+        # Effect selection (if available)
+        available_effects = voxel_manager.detect_effect_folders(selected_patient, selected_file)
+        selected_effect = None
+        
+        if available_effects:
+            effect_options = ["None"] + available_effects
+            effect_display_names = ["None"] + [voxel_manager.get_effect_display_name(effect) for effect in available_effects]
+            
+            # Get current selection from session state
+            current_effect = st.session_state.get('selected_effect', None)
+            default_index = 0
+            if current_effect and current_effect in available_effects:
+                default_index = available_effects.index(current_effect) + 1
+            
+            selected_effect_index = st.selectbox(
+                "Select Effect:",
+                range(len(effect_options)),
+                index=default_index,
+                format_func=lambda x: effect_display_names[x],
+                help="Choose an effect to apply to the voxel data"
+            )
+            
+            if selected_effect_index > 0:
+                selected_effect = available_effects[selected_effect_index - 1]
+                st.info(f"Using effect: {voxel_manager.get_effect_display_name(selected_effect)}")
+            else:
+                selected_effect = None
+            
+            # Store in viewer_config
+            viewer_config.selected_effect = selected_effect
+        
         # Voxel selection mode
         voxel_mode = st.radio(
             "Choose voxel selection mode:",
@@ -198,7 +229,7 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
 
         # Get available voxel information
         available_ids, id_to_name_map, available_voxel_names = voxel_manager.get_available_voxels(
-            selected_patient, selected_file, voxel_mode
+            selected_patient, selected_file, voxel_mode, selected_effect
         )
 
         # Handle voxel mode selection
@@ -260,11 +291,14 @@ def render_viewer(selected_patient: str, selected_file: str):
             selected_file,
             viewer_config.voxel_mode,
             viewer_config.selected_individual_voxels,
-            external_url=EXTERNAL_IMAGE_SERVER_URL
+            external_url=EXTERNAL_IMAGE_SERVER_URL,
+            selected_effect=viewer_config.selected_effect
         )
 
-    # Build volume list for NiiVue - always include NIfTI
+    # Build volume list for NiiVue
     volume_list_entries = []
+    
+    # Always include base CT scan (opacity will be adjusted dynamically based on voxel visibility)
     volume_list_entries.append({"url": base_file_url})
 
     # Add overlay volumes
@@ -380,11 +414,11 @@ def render_viewer(selected_patient: str, selected_file: str):
         color_map_js=json.dumps(settings.get('color_map', 'gray')),
         color_map_data_js=json.dumps(load_colormap_data(settings.get('color_map', 'gray'))),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
-        nifti_opacity=settings.get('nifti_opacity', 1.0),
+        nifti_opacity=viewer_config.get_dynamic_nifti_opacity(),
         window_center=window_center,
         window_width=window_width,
         actual_slice_type=actual_slice_type,
-        overlay_start_index=1,  # NIfTI is always at index 0, overlays start at 1
+        overlay_start_index=1,  # CT scan is always at index 0, overlays start at index 1
         segment_opacity=segment_opacity,
         segment_gamma=segment_gamma,
         render_config_js=json.dumps(render_config)

@@ -25,12 +25,12 @@ class VoxelManager:
         self.effects_config = self._load_effects_config()
 
     def _load_effects_config(self) -> Dict[str, Any]:
-        """Load effects configuration from voxel_effects.json file."""
+        """Load effects configuration from effects.json file."""
         try:
             # Get the path to the effects config file
             script_dir = os.path.dirname(os.path.abspath(__file__))
             conf_dir = os.path.join(os.path.dirname(script_dir), 'conf')
-            effects_config_path = os.path.join(conf_dir, 'voxel_effects.json')
+            effects_config_path = os.path.join(conf_dir, 'effects.json')
             
             with open(effects_config_path, 'r') as f:
                 return json.load(f)
