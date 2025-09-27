@@ -300,9 +300,9 @@ def get_user_input() -> Dict[str, str]:
     config['OUTPUT_FOLDER'] = os.path.abspath(output_path)
     
     # Vista3D server URL (where frontend will connect to)
-    vista3d_url = input("Vista3D server URL [http://localhost:8000]: ").strip()
+    vista3d_url = input("Vista3D server URL [http://host.docker.internal:8000]: ").strip()
     if not vista3d_url:
-        vista3d_url = "http://localhost:8000"
+        vista3d_url = "http://host.docker.internal:8000"
     config['VISTA3D_SERVER'] = vista3d_url
     
     # Frontend port
@@ -352,6 +352,7 @@ OUTPUT_FOLDER="{config['OUTPUT_FOLDER']}"
 # Server URLs
 VISTA3D_SERVER="{config['VISTA3D_SERVER']}"
 IMAGE_SERVER="{config['IMAGE_SERVER']}"
+VISTA3D_IMAGE_SERVER_URL="{config['IMAGE_SERVER']}"
 
 # Ports
 FRONTEND_PORT="{config['FRONTEND_PORT']}"

@@ -248,7 +248,7 @@ def get_user_input_non_interactive(setup_choice: str = 'both') -> Dict[str, str]
     config = {
         'DICOM_FOLDER': os.path.join(os.getcwd(), "dicom"),
         'OUTPUT_FOLDER': os.path.join(os.getcwd(), "output"),
-        'VISTA3D_SERVER': 'http://localhost:8000',
+        'VISTA3D_SERVER': 'http://host.docker.internal:8000',
         'IMAGE_SERVER': 'http://localhost:8888',
         'FRONTEND_PORT': '8501',
         'VESSELS_OF_INTEREST': 'all'
@@ -506,9 +506,9 @@ def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
     config['OUTPUT_FOLDER'] = os.path.abspath(output_path)
     
     # Server URLs
-    vista3d_url = input("Vista3D server URL [http://localhost:8000]: ").strip()
+    vista3d_url = input("Vista3D server URL [http://host.docker.internal:8000]: ").strip()
     if not vista3d_url:
-        vista3d_url = "http://localhost:8000"
+        vista3d_url = "http://host.docker.internal:8000"
     config['VISTA3D_SERVER'] = vista3d_url
     
     image_server_url = input("Image server URL [http://localhost:8888]: ").strip()
@@ -561,6 +561,7 @@ OUTPUT_FOLDER="{config['OUTPUT_FOLDER']}"
 # Server URLs
 VISTA3D_SERVER="{config['VISTA3D_SERVER']}"
 IMAGE_SERVER="{config['IMAGE_SERVER']}"
+VISTA3D_IMAGE_SERVER_URL="{config['IMAGE_SERVER']}"
 
 # Ports
 FRONTEND_PORT="{config['FRONTEND_PORT']}"

@@ -28,6 +28,7 @@ dependencies = [
     # Medical imaging
     "nibabel>=5.1.0",
     "scikit-image>=0.21.0",
+    "dcm2niix>=1.0.0",
     
     # 3D processing and visualization (moved to open3d service)
     # "open3d>=0.18.0",  # Moved to open3d service
