@@ -2,13 +2,15 @@
 """
 Voxel Effects Processing Script for Vista3D
 
-This script applies high-quality MONAI-based post-processing effects to voxel files 
-in the Vista3D project. It can process both individual voxel files in scan 
-subdirectories and the main scan files themselves.
+This script applies MONAI-recommended post-processing effects to voxel files 
+in the Vista3D project. It uses only official MONAI transforms for medical imaging
+post-processing to ensure compatibility and best practices.
 
 Usage:
-    python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect monai_smooth
-    python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect surface_refinement --output-dir /custom/output
+    python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect gaussian_smooth
+    python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect median_smooth --output-dir /custom/output
+    python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect edge_enhancement
+    python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect surface_cleanup
 """
 
 import argparse
@@ -20,19 +22,19 @@ import numpy as np
 import nibabel as nib
 import torch
 import torch.nn.functional as F
-from scipy import ndimage
-from scipy.ndimage import gaussian_filter, median_filter, uniform_filter
-from skimage import morphology, filters, measure, segmentation
-from skimage.restoration import denoise_bilateral
 import logging
 
-# MONAI imports for high-quality post-processing
+# MONAI imports for medical imaging post-processing
 try:
     from monai.transforms import (
-        SobelGradients, FillHoles, RemoveSmallObjects, LabelToContour,
-        SpatialPad, RandGaussianNoise, GaussianSmooth, MedianSmooth,
-        RandGaussianSharpen, RandHistogramShift, RandAdjustContrast,
-        RandBiasField, RandGibbsNoise, RandCoarseDropout
+        # Smoothing transforms
+        GaussianSmooth, MedianSmooth,
+        # Enhancement transforms  
+        SobelGradients, GaussianSharpen, AdjustContrast, HistogramEqualize,
+        # Post-processing transforms
+        FillHoles, RemoveSmallObjects, KeepLargestConnectedComponent,
+        # Utility transforms
+        EnsureChannelFirst, SaveImage, Compose
     )
     from monai.data import MetaTensor
     MONAI_AVAILABLE = True
@@ -144,7 +146,6 @@ class VoxelEffectsProcessor:
         """Convert numpy array to torch tensor with proper dimensions for MONAI."""
         if len(data.shape) == 3:
             # MONAI expects (batch, channel, height, width, depth) for 3D data
-            # Ensure tensor is on CPU as MONAI transforms expect CPU tensors
             return torch.from_numpy(data).float().unsqueeze(0).unsqueeze(0).cpu()
         elif len(data.shape) == 4:
             # Already has batch dimension, just add channel
@@ -159,363 +160,229 @@ class VoxelEffectsProcessor:
             tensor = tensor.squeeze(0)
         return tensor.detach().cpu().numpy()
     
-    def _apply_edge_preserving_smoothing(self, data: np.ndarray, sigma: float) -> np.ndarray:
-        """Apply edge-preserving smoothing using 3D-compatible methods."""
-        # Use median filtering for edge preservation
-        median_smoothed = median_filter(data, size=max(3, int(sigma*2)))
+    def _apply_monai_transform(self, nifti_img: nib.Nifti1Image, transform, **kwargs) -> nib.Nifti1Image:
+        """Apply MONAI transform to NIfTI image."""
+        if not MONAI_AVAILABLE:
+            raise ImportError("MONAI is required for this operation. Install with: pip install monai")
         
-        # Combine with gaussian smoothing
-        gaussian_smoothed = gaussian_filter(data, sigma=sigma)
+        # Convert to tensor format expected by MONAI
+        data = nifti_img.get_fdata().astype(np.float32)
+        tensor = self._to_tensor(data)
         
-        # Create edge map to preserve important structures
-        edge_map = np.abs(gaussian_filter(data, sigma=sigma*0.5) - data)
-        edge_threshold = np.percentile(edge_map, 75)
-        edge_mask = edge_map > edge_threshold
+        # Apply MONAI transform
+        transformed_tensor = transform(tensor, **kwargs)
         
-        # Blend based on edge presence
-        result = np.where(edge_mask, 
-                         0.7 * data + 0.3 * median_smoothed,  # Preserve edges
-                         0.3 * data + 0.7 * gaussian_smoothed)  # Smooth non-edges
+        # Convert back to numpy
+        processed_data = self._to_numpy(transformed_tensor)
         
-        return result
+        # Create new NIfTI image with same metadata
+        processed_img = nib.Nifti1Image(processed_data, nifti_img.affine, nifti_img.header)
+        return processed_img
     
-    def apply_monai_smooth_effect(self, nifti_img: nib.Nifti1Image,
-                                 sigma: Union[float, tuple] = 1.0,
-                                 preserve_range: bool = True) -> nib.Nifti1Image:
+    def apply_gaussian_smooth_effect(self, nifti_img: nib.Nifti1Image,
+                                    sigma: Union[float, tuple] = 1.0) -> nib.Nifti1Image:
         """
-        Apply MONAI-based Gaussian smoothing for high-quality voxel smoothing.
+        Apply MONAI Gaussian smoothing to improve voxel visualization quality.
         
         Args:
             nifti_img: Input NIfTI image
             sigma: Standard deviation for Gaussian smoothing
-            preserve_range: Whether to preserve the original data range
             
         Returns:
-            Smoothed NIfTI image using MONAI transforms
+            Smoothly processed NIfTI image using MONAI GaussianSmooth transform
         """
-        logger.info(f"Applying MONAI smooth effect (sigma={sigma})")
+        logger.info(f"Applying MONAI Gaussian smooth effect (sigma={sigma})")
         
-        data = nifti_img.get_fdata().astype(np.float32)
-        original_min, original_max = data.min(), data.max()
+        # Create MONAI GaussianSmooth transform
+        gaussian_smooth = GaussianSmooth(sigma=sigma)
         
-        if MONAI_AVAILABLE:
-            try:
-                # Check MONAI version and availability
-                import monai
-                logger.info(f"MONAI version: {monai.__version__}")
-                logger.info(f"MONAI available: {MONAI_AVAILABLE}")
-                
-                # Convert to tensor for MONAI processing
-                tensor_data = self._to_tensor(data)
-                logger.info(f"Tensor shape before MONAI processing: {tensor_data.shape}")
-                logger.info(f"Tensor dtype: {tensor_data.dtype}")
-                logger.info(f"Tensor device: {tensor_data.device}")
-                
-                # Implement advanced multi-pass smoothing for realistic voxel appearance
-                logger.info("Applying advanced multi-pass smoothing for realistic voxel appearance")
-                
-                # Step 1: Multi-scale Gaussian smoothing for surface smoothness
-                logger.info("Step 1: Multi-scale Gaussian smoothing")
-                processed_data = data.copy()
-                
-                # Apply multiple smoothing passes with different scales
-                smoothing_scales = [sigma * 0.5, sigma, sigma * 1.5, sigma * 2.0]
-                for i, scale in enumerate(smoothing_scales):
-                    processed_data = gaussian_filter(processed_data, sigma=scale)
-                    logger.info(f"  Applied smoothing pass {i+1} with sigma={scale}")
-                
-                # Step 2: Edge-preserving smoothing using 3D-compatible methods
-                logger.info("Step 2: Edge-preserving smoothing using 3D-compatible methods")
-                
-                # Apply edge-preserving smoothing using median filtering
-                # This preserves edges while smoothing noise
-                edge_preserving_data = median_filter(processed_data, size=3)
-                processed_data = 0.7 * processed_data + 0.3 * edge_preserving_data
-                logger.info("Applied edge-preserving median filtering")
-                
-                # Apply anisotropic-like smoothing using multiple directional kernels
-                logger.info("Applying directional smoothing for structure preservation")
-                directional_processed = processed_data.copy()
-                
-                # Create different directional kernels
-                kernels = [
-                    np.array([[[1,1,1],[1,1,1],[1,1,1]]]) * 0.1,  # Z-direction
-                    np.array([[[1],[1],[1]]]) * 0.1,  # Y-direction  
-                    np.array([[1,1,1]]) * 0.1,  # X-direction
-                ]
-                
-                for i, kernel in enumerate(kernels):
-                    directional_smoothed = ndimage.convolve(processed_data, kernel, mode='constant')
-                    directional_processed = 0.8 * directional_processed + 0.2 * directional_smoothed
-                
-                processed_data = directional_processed
-                logger.info("Applied directional structure-preserving smoothing")
-                
-                # Step 3: Anisotropic diffusion for structure-preserving smoothing
-                logger.info("Step 3: Anisotropic diffusion smoothing")
-                from skimage.filters import gaussian
-                from skimage.segmentation import watershed
-                from skimage.feature import peak_local_maxima
-                
-                # Create a mask for the main structures
-                threshold = np.percentile(processed_data, 75)  # Use 75th percentile as threshold
-                mask = processed_data > threshold
-                
-                # Apply anisotropic diffusion-like smoothing
-                # Simulate anisotropic diffusion with multiple directional gaussians
-                directions = [
-                    (1, 0, 0), (0, 1, 0), (0, 0, 1),  # Axial directions
-                    (1, 1, 0), (1, 0, 1), (0, 1, 1),  # Diagonal directions
-                    (1, 1, 1)  # Full diagonal
-                ]
-                
-                smoothed_data = processed_data.copy()
-                for direction in directions:
-                    # Apply directional smoothing
-                    directional_sigma = [sigma * d for d in direction]
-                    directional_smoothed = gaussian_filter(processed_data, sigma=directional_sigma)
-                    smoothed_data = 0.8 * smoothed_data + 0.2 * directional_smoothed
-                
-                processed_data = smoothed_data
-                
-                # Step 4: Final surface refinement
-                logger.info("Step 4: Final surface refinement")
-                # Apply morphological opening and closing for surface cleanup
-                kernel = morphology.ball(1)  # Small kernel for fine details
-                processed_data = morphology.opening(processed_data, kernel)
-                processed_data = morphology.closing(processed_data, kernel)
-                
-                # Final gentle smoothing
-                processed_data = gaussian_filter(processed_data, sigma=sigma * 0.3)
-                
-                logger.info("Advanced multi-pass smoothing completed successfully")
-            except Exception as e:
-                logger.error(f"MONAI processing failed: {e}")
-                logger.error(f"Exception type: {type(e).__name__}")
-                logger.error(f"Exception args: {e.args}")
-                import traceback
-                logger.error(f"Full traceback: {traceback.format_exc()}")
-                logger.warning("Falling back to scipy")
-                processed_data = gaussian_filter(data, sigma=sigma)
-        else:
-            # Fallback to scipy if MONAI not available
-            logger.warning("MONAI not available, using scipy fallback")
-            processed_data = gaussian_filter(data, sigma=sigma)
+        # Apply MONAI transform
+        processed_img = self._apply_monai_transform(nifti_img, gaussian_smooth)
         
-        # Preserve original data range if requested
-        if preserve_range and original_max > original_min:
-            processed_data = np.clip(processed_data, original_min, original_max)
-        
-        processed_img = nib.Nifti1Image(processed_data, nifti_img.affine, nifti_img.header)
-        logger.info("MONAI smooth effect applied successfully")
+        logger.info("MONAI Gaussian smooth effect applied successfully")
         return processed_img
     
-    def apply_surface_refinement_effect(self, nifti_img: nib.Nifti1Image,
-                                      threshold: float = 0.5,
-                                      min_size: int = 100,
-                                      kernel_size: int = 3) -> nib.Nifti1Image:
+    def apply_median_smooth_effect(self, nifti_img: nib.Nifti1Image,
+                                  radius: Union[float, tuple] = 1.0) -> nib.Nifti1Image:
         """
-        Apply surface refinement using MONAI morphological operations.
+        Apply MONAI median smoothing for improved medical visualization quality.
         
-        This effect:
-        1. Uses MONAI's FillHoles to smooth surfaces
-        2. Removes small objects for cleaner appearance
-        3. Applies edge detection for better surface definition
+        Median smoothing is particularly effective for removing noise while preserving edges.
         
         Args:
             nifti_img: Input NIfTI image
-            threshold: Threshold for binary operations
+            radius: Radius for median filtering
+            
+        Returns:
+            Smoothly processed NIfTI image using MONAI MedianSmooth transform
+        """
+        logger.info(f"Applying MONAI median smooth effect (radius={radius})")
+        
+        # Create MONAI MedianSmooth transform
+        median_smooth = MedianSmooth(radius=radius)
+        
+        # Apply MONAI transform
+        processed_img = self._apply_monai_transform(nifti_img, median_smooth)
+        
+        logger.info("MONAI median smooth effect applied successfully")
+        return processed_img
+    
+    def apply_surface_cleanup_effect(self, nifti_img: nib.Nifti1Image,
+                                    min_size: int = 100,
+                                    connectivity: int = 1) -> nib.Nifti1Image:
+        """
+        Apply MONAI surface cleanup for improved voxel visualization.
+        
+        This effect uses MONAI post-processing transforms to clean up surface artifacts
+        and remove small objects while maintaining anatomical accuracy.
+        
+        Args:
+            nifti_img: Input NIfTI image
             min_size: Minimum size for objects to keep
-            kernel_size: Kernel size for morphological operations
+            connectivity: Connectivity for morphological operations
             
         Returns:
-            Surface-refined NIfTI image
+            Cleaned NIfTI image with improved surface quality using MONAI transforms
         """
-        logger.info(f"Applying surface refinement effect (threshold={threshold}, min_size={min_size})")
+        logger.info(f"Applying MONAI surface cleanup effect (min_size={min_size})")
         
+        # Convert to tensor format
         data = nifti_img.get_fdata().astype(np.float32)
-        original_min, original_max = data.min(), data.max()
+        tensor = self._to_tensor(data)
         
-        # Normalize data for processing
-        if original_max > original_min:
-            data_normalized = (data - original_min) / (original_max - original_min)
-        else:
-            data_normalized = data.copy()
+        # Create MONAI transforms pipeline
+        # Step 1: Fill holes
+        fill_holes = FillHoles()
+        filled_tensor = fill_holes(tensor)
         
-        # Create binary mask
-        binary_mask = data_normalized > threshold
+        # Step 2: Remove small objects
+        remove_small = RemoveSmallObjects(min_size=min_size, connectivity=connectivity)
+        cleaned_tensor = remove_small(filled_tensor)
         
-        # Use scipy/skimage for reliable morphological operations
-        # MONAI's morphological transforms have compatibility issues
-        logger.info("Using scipy/skimage for morphological operations (more reliable than MONAI)")
+        # Step 3: Keep largest connected component
+        keep_largest = KeepLargestConnectedComponent()
+        final_tensor = keep_largest(cleaned_tensor)
         
-        # Apply morphological operations using scipy/skimage
-        kernel = morphology.ball(kernel_size)
-        processed_mask = morphology.binary_closing(binary_mask, kernel)
-        processed_mask = morphology.remove_small_objects(processed_mask, min_size=min_size)
+        # Convert back to numpy
+        processed_data = self._to_numpy(final_tensor)
         
-        logger.info(f"Applied morphological operations: closing with ball({kernel_size}) and remove_small_objects({min_size})")
-        
-        # Apply distance transform for smooth surface
-        distance = ndimage.distance_transform_edt(processed_mask)
-        
-        # Create smooth surface by combining distance transform with original data
-        if distance.max() > 0:
-            distance_normalized = distance / distance.max()
-            # Blend original data with distance-based surface
-            processed_data = 0.8 * data_normalized + 0.2 * distance_normalized
-        else:
-            processed_data = data_normalized
-        
-        # Denormalize back to original range
-        if original_max > original_min:
-            processed_data = processed_data * (original_max - original_min) + original_min
-        
+        # Create new NIfTI image
         processed_img = nib.Nifti1Image(processed_data, nifti_img.affine, nifti_img.header)
-        logger.info("Surface refinement effect applied successfully")
+        logger.info("MONAI surface cleanup applied successfully")
         return processed_img
     
-    def apply_texture_enhancement_effect(self, nifti_img: nib.Nifti1Image,
-                                       edge_strength: float = 1.5,
-                                       contrast_factor: float = 1.2,
-                                       noise_level: float = 0.02) -> nib.Nifti1Image:
+    def apply_edge_enhancement_effect(self, nifti_img: nib.Nifti1Image,
+                                     kernel_size: int = 3,
+                                     normalize_kernels: bool = True) -> nib.Nifti1Image:
         """
-        Apply texture enhancement using MONAI edge detection and contrast adjustment.
+        Apply MONAI edge enhancement for improved voxel visualization.
+        
+        This effect uses MONAI SobelGradients to enhance edges and improve
+        anatomical structure visibility.
         
         Args:
             nifti_img: Input NIfTI image
-            edge_strength: Strength of edge enhancement
+            kernel_size: Size of the Sobel kernel
+            normalize_kernels: Whether to normalize the gradient kernels
+            
+        Returns:
+            Edge-enhanced NIfTI image using MONAI SobelGradients transform
+        """
+        logger.info(f"Applying MONAI edge enhancement effect (kernel_size={kernel_size})")
+        
+        # Create MONAI SobelGradients transform
+        sobel_gradients = SobelGradients(kernel_size=kernel_size, normalize_kernels=normalize_kernels)
+        
+        # Apply MONAI transform
+        processed_img = self._apply_monai_transform(nifti_img, sobel_gradients)
+        
+        logger.info("MONAI edge enhancement applied successfully")
+        return processed_img
+
+    def apply_contrast_enhancement_effect(self, nifti_img: nib.Nifti1Image,
+                                         contrast_factor: float = 1.5,
+                                         gamma: float = 1.0) -> nib.Nifti1Image:
+        """
+        Apply MONAI contrast enhancement for improved voxel visualization.
+        
+        This effect uses MONAI AdjustContrast to enhance contrast and improve
+        anatomical structure visibility.
+        
+        Args:
+            nifti_img: Input NIfTI image
             contrast_factor: Factor for contrast adjustment
-            noise_level: Level of noise to add for texture
+            gamma: Gamma correction factor
             
         Returns:
-            Texture-enhanced NIfTI image
+            Contrast-enhanced NIfTI image using MONAI AdjustContrast transform
         """
-        logger.info(f"Applying texture enhancement effect (edge_strength={edge_strength}, contrast={contrast_factor})")
+        logger.info(f"Applying MONAI contrast enhancement effect (contrast_factor={contrast_factor})")
         
-        data = nifti_img.get_fdata().astype(np.float32)
-        original_min, original_max = data.min(), data.max()
+        # Create MONAI AdjustContrast transform
+        adjust_contrast = AdjustContrast(gamma=gamma)
         
-        # Convert to tensor for MONAI processing
-        tensor_data = self._to_tensor(data)
+        # Apply MONAI transform
+        processed_img = self._apply_monai_transform(nifti_img, adjust_contrast)
         
-        # Use scipy/skimage for reliable edge detection and contrast adjustment
-        # MONAI's transforms have compatibility issues with 3D data
-        logger.info("Using scipy/skimage for texture enhancement (more reliable than MONAI)")
+        # Apply additional contrast scaling if needed
+        if contrast_factor != 1.0:
+            data = processed_img.get_fdata().astype(np.float32)
+            # Simple contrast scaling
+            data_mean = np.mean(data)
+            enhanced_data = (data - data_mean) * contrast_factor + data_mean
+            processed_img = nib.Nifti1Image(enhanced_data, processed_img.affine, processed_img.header)
         
-        # Apply edge detection using scipy/skimage
-        edges_np = filters.sobel(data)
-        logger.info("Applied Sobel edge detection")
-        
-        # Apply contrast adjustment
-        enhanced_np = np.power(data, contrast_factor)
-        logger.info(f"Applied contrast adjustment with factor {contrast_factor}")
-        
-        # Combine enhanced data with edge information
-        processed_data = enhanced_np + edge_strength * edges_np
-        
-        # Add subtle noise for texture
-        if noise_level > 0:
-            noise = np.random.normal(0, noise_level * (original_max - original_min), data.shape)
-            processed_data += noise
-        
-        # Ensure data stays within original range
-        processed_data = np.clip(processed_data, original_min, original_max)
-        
-        processed_img = nib.Nifti1Image(processed_data, nifti_img.affine, nifti_img.header)
-        logger.info("Texture enhancement effect applied successfully")
+        logger.info("MONAI contrast enhancement applied successfully")
         return processed_img
-    
-    def apply_realistic_rendering_effect(self, nifti_img: nib.Nifti1Image,
-                                       smoothness: float = 1.5,
-                                       surface_quality: float = 0.8,
-                                       material_roughness: float = 0.3) -> nib.Nifti1Image:
+
+    def apply_histogram_equalization_effect(self, nifti_img: nib.Nifti1Image,
+                                           num_bins: int = 256,
+                                           min: float = 0.0,
+                                           max: float = 1.0) -> nib.Nifti1Image:
         """
-        Apply comprehensive realistic rendering effect combining multiple techniques.
+        Apply MONAI histogram equalization for improved voxel visualization.
         
-        This effect creates a more realistic appearance by:
-        1. Advanced smoothing with multiple passes
-        2. Surface quality enhancement
-        3. Material property simulation
+        This effect uses MONAI HistogramEqualize to improve contrast distribution
+        and enhance anatomical structure visibility.
         
         Args:
             nifti_img: Input NIfTI image
-            smoothness: Overall smoothness factor
-            surface_quality: Quality of surface refinement
-            material_roughness: Simulated material roughness
+            num_bins: Number of histogram bins
+            min: Minimum value for normalization
+            max: Maximum value for normalization
             
         Returns:
-            Realistically rendered NIfTI image
+            Histogram-equalized NIfTI image using MONAI HistogramEqualize transform
         """
-        logger.info(f"Applying realistic rendering effect (smoothness={smoothness}, surface_quality={surface_quality})")
+        logger.info(f"Applying MONAI histogram equalization effect (num_bins={num_bins})")
         
-        data = nifti_img.get_fdata().astype(np.float32)
-        original_min, original_max = data.min(), data.max()
+        # Create MONAI HistogramEqualize transform
+        histogram_equalize = HistogramEqualize(num_bins=num_bins, min=min, max=max)
         
-        # Step 1: Multi-pass smoothing for realistic surfaces
-        logger.info("Applying multi-pass smoothing...")
-        smoothed_data = data.copy()
+        # Apply MONAI transform
+        processed_img = self._apply_monai_transform(nifti_img, histogram_equalize)
         
-        # Apply advanced multi-scale smoothing for ultra-realistic appearance
-        logger.info("Applying advanced multi-scale smoothing for ultra-realistic appearance")
+        logger.info("MONAI histogram equalization applied successfully")
+        return processed_img
+
+    def apply_no_processing_effect(self, nifti_img: nib.Nifti1Image) -> nib.Nifti1Image:
+        """
+        Apply no processing - return the original voxel exactly as it is.
         
-        # Multi-scale smoothing with different approaches (3D-compatible)
-        smoothing_approaches = [
-            ("Gaussian", lambda x, s: gaussian_filter(x, sigma=s)),
-            ("Median", lambda x, s: median_filter(x, size=max(3, int(s*2)))),
-            ("Uniform", lambda x, s: uniform_filter(x, size=max(3, int(s*2)))),
-            ("Edge-Preserving", lambda x, s: self._apply_edge_preserving_smoothing(x, s))
-        ]
+        This effect is useful for comparison and ensures the original voxel
+        appearance is completely preserved without any modifications.
         
-        smoothing_scales = [smoothness * 0.3, smoothness * 0.7, smoothness, smoothness * 1.5, smoothness * 2.0]
-        
-        for i, scale in enumerate(smoothing_scales):
-            approach_name, approach_func = smoothing_approaches[i % len(smoothing_approaches)]
-            try:
-                smoothed_data = approach_func(smoothed_data, scale)
-                logger.info(f"Applied {approach_name} smoothing pass {i+1} with scale={scale}")
-            except Exception as e:
-                logger.warning(f"{approach_name} smoothing failed for scale {scale}: {e}")
-                # Fallback to gaussian
-                smoothed_data = gaussian_filter(smoothed_data, sigma=scale)
-                logger.info(f"Applied Gaussian fallback for pass {i+1} with sigma={scale}")
-        
-        # Step 2: Surface quality enhancement
-        logger.info("Enhancing surface quality...")
-        if surface_quality > 0:
-            # Apply median filtering to reduce noise while preserving edges using scipy
-            logger.info("Using scipy median_filter for surface enhancement")
-            surface_enhanced = median_filter(smoothed_data, size=3)
-            logger.info("Applied median filtering for noise reduction")
+        Args:
+            nifti_img: Input NIfTI image
             
-            # Blend with smoothed data
-            smoothed_data = (1 - surface_quality) * smoothed_data + surface_quality * surface_enhanced
+        Returns:
+            Original NIfTI image unchanged
+        """
+        logger.info("Applying no processing effect - returning original voxel unchanged")
         
-        # Step 3: Material property simulation
-        logger.info("Simulating material properties...")
-        if material_roughness > 0:
-            # Add subtle variations to simulate material properties
-            # Create a noise field that varies slowly
-            noise_field = np.random.randn(*data.shape)
-            noise_field = gaussian_filter(noise_field, sigma=3.0)  # Smooth noise
-            noise_field = (noise_field - noise_field.min()) / (noise_field.max() - noise_field.min())
-            
-            # Apply material roughness
-            material_variation = material_roughness * (original_max - original_min) * noise_field
-            smoothed_data += material_variation
-        
-        # Step 4: Final surface polish
-        logger.info("Applying final surface polish...")
-        # Apply one final smoothing pass for polish using scipy
-        final_sigma = smoothness * 0.3
-        logger.info(f"Applying final smoothing pass with sigma={final_sigma}")
-        processed_data = gaussian_filter(smoothed_data, sigma=final_sigma)
-        
-        # Ensure data stays within original range
-        processed_data = np.clip(processed_data, original_min, original_max)
-        
-        processed_img = nib.Nifti1Image(processed_data, nifti_img.affine, nifti_img.header)
-        logger.info("Realistic rendering effect applied successfully")
+        # Simply return the original image without any processing
+        processed_img = nib.Nifti1Image(nifti_img.get_fdata(), nifti_img.affine, nifti_img.header)
+        logger.info("No processing effect applied successfully - original voxel preserved exactly")
         return processed_img
     
     def process_files(self, patient_id: str, scan_name: str, effect_name: str, 
@@ -563,15 +430,21 @@ class VoxelEffectsProcessor:
                 # Load NIfTI image
                 nifti_img = nib.load(file_path)
                 
-                # Apply effect based on name
-                if effect_name == "monai_smooth":
-                    processed_img = self.apply_monai_smooth_effect(nifti_img, **effect_params)
-                elif effect_name == "surface_refinement":
-                    processed_img = self.apply_surface_refinement_effect(nifti_img, **effect_params)
-                elif effect_name == "texture_enhancement":
-                    processed_img = self.apply_texture_enhancement_effect(nifti_img, **effect_params)
-                elif effect_name == "realistic_rendering":
-                    processed_img = self.apply_realistic_rendering_effect(nifti_img, **effect_params)
+                # Apply MONAI-based effect
+                if effect_name == "gaussian_smooth":
+                    processed_img = self.apply_gaussian_smooth_effect(nifti_img, **effect_params)
+                elif effect_name == "median_smooth":
+                    processed_img = self.apply_median_smooth_effect(nifti_img, **effect_params)
+                elif effect_name == "surface_cleanup":
+                    processed_img = self.apply_surface_cleanup_effect(nifti_img, **effect_params)
+                elif effect_name == "edge_enhancement":
+                    processed_img = self.apply_edge_enhancement_effect(nifti_img, **effect_params)
+                elif effect_name == "contrast_enhancement":
+                    processed_img = self.apply_contrast_enhancement_effect(nifti_img, **effect_params)
+                elif effect_name == "histogram_equalization":
+                    processed_img = self.apply_histogram_equalization_effect(nifti_img, **effect_params)
+                elif effect_name == "no_processing":
+                    processed_img = self.apply_no_processing_effect(nifti_img)
                 else:
                     raise ValueError(f"Unknown effect: {effect_name}")
                 
@@ -603,21 +476,30 @@ class VoxelEffectsProcessor:
 def main():
     """Main command-line interface."""
     parser = argparse.ArgumentParser(
-        description="Apply effects to voxel files in Vista3D",
+        description="Apply MONAI-recommended post-processing effects to voxel files in Vista3D",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Apply MONAI-based smoothing for realistic voxels
-  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect monai_smooth
+  # Apply MONAI Gaussian smoothing
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect gaussian_smooth --sigma 1.0
   
-  # Apply surface refinement with custom parameters
-  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect surface_refinement --threshold 0.3 --min-size 50
+  # Apply MONAI median smoothing for noise reduction
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect median_smooth --radius 1.0
   
-  # Apply texture enhancement for better surface details
-  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect texture_enhancement --edge-strength 2.0 --contrast-factor 1.5
+  # Apply MONAI surface cleanup (fill holes, remove small objects)
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect surface_cleanup --min-size 100
   
-  # Apply comprehensive realistic rendering
-  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect realistic_rendering --smoothness 2.0 --surface-quality 0.9
+  # Apply MONAI edge enhancement using Sobel gradients
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect edge_enhancement --kernel-size 3
+  
+  # Apply MONAI contrast enhancement
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect contrast_enhancement --contrast-factor 1.5 --gamma 1.0
+  
+  # Apply MONAI histogram equalization
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect histogram_equalization --num-bins 256
+  
+  # Return original voxel without any processing (for comparison)
+  python voxel_effects.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 --effect no_processing
         """
     )
     
@@ -625,22 +507,35 @@ Examples:
     parser.add_argument("--patient", required=True, help="Patient ID (e.g., PA00000002)")
     parser.add_argument("--scan", required=True, help="Scan name (e.g., 2.5MM_ARTERIAL_3)")
     parser.add_argument("--effect", required=True, 
-                       choices=["monai_smooth", "surface_refinement", "texture_enhancement", "realistic_rendering"],
-                       help="Effect to apply")
+                       choices=["gaussian_smooth", "median_smooth", "surface_cleanup", "edge_enhancement", "contrast_enhancement", "histogram_equalization", "no_processing"],
+                       help="MONAI-based effect to apply")
     
     # Optional arguments
     parser.add_argument("--output-dir", type=Path, help="Custom output directory")
+    
+    # Gaussian smooth parameters
     parser.add_argument("--sigma", type=float, default=1.0, help="Gaussian smoothing sigma (default: 1.0)")
-    parser.add_argument("--threshold", type=float, default=0.5, help="Threshold for binary operations (default: 0.5)")
+    
+    # Median smooth parameters
+    parser.add_argument("--radius", type=float, default=1.0, help="Median smoothing radius (default: 1.0)")
+    
+    # Surface cleanup parameters
     parser.add_argument("--min-size", type=int, default=100, help="Minimum size for objects to keep (default: 100)")
-    parser.add_argument("--edge-strength", type=float, default=1.5, help="Strength of edge enhancement (default: 1.5)")
-    parser.add_argument("--contrast-factor", type=float, default=1.2, help="Contrast adjustment factor (default: 1.2)")
-    parser.add_argument("--noise-level", type=float, default=0.02, help="Noise level for texture (default: 0.02)")
-    parser.add_argument("--smoothness", type=float, default=1.5, help="Overall smoothness factor (default: 1.5)")
-    parser.add_argument("--surface-quality", type=float, default=0.8, help="Surface quality factor (default: 0.8)")
-    parser.add_argument("--material-roughness", type=float, default=0.3, help="Material roughness simulation (default: 0.3)")
-    parser.add_argument("--preserve-range", action="store_true", default=True,
-                       help="Whether to preserve original data range (default: True)")
+    parser.add_argument("--connectivity", type=int, default=1, help="Connectivity for morphological operations (default: 1)")
+    
+    # Edge enhancement parameters
+    parser.add_argument("--kernel-size", type=int, default=3, help="Size of Sobel kernel (default: 3)")
+    parser.add_argument("--normalize-kernels", action="store_true", default=True, help="Normalize gradient kernels (default: True)")
+    
+    # Contrast enhancement parameters
+    parser.add_argument("--contrast-factor", type=float, default=1.5, help="Contrast adjustment factor (default: 1.5)")
+    parser.add_argument("--gamma", type=float, default=1.0, help="Gamma correction factor (default: 1.0)")
+    
+    # Histogram equalization parameters
+    parser.add_argument("--num-bins", type=int, default=256, help="Number of histogram bins (default: 256)")
+    parser.add_argument("--min", type=float, default=0.0, help="Minimum value for normalization (default: 0.0)")
+    parser.add_argument("--max", type=float, default=1.0, help="Maximum value for normalization (default: 1.0)")
+    
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     
     args = parser.parse_args()
@@ -653,33 +548,42 @@ Examples:
         # Create processor
         processor = VoxelEffectsProcessor()
         
-        # Prepare effect parameters
+        # Prepare effect parameters based on MONAI-based effects
         effect_params = {
+            # Gaussian smooth parameters
             "sigma": args.sigma,
-            "threshold": args.threshold,
+            # Median smooth parameters
+            "radius": args.radius,
+            # Surface cleanup parameters
             "min_size": args.min_size,
-            "edge_strength": args.edge_strength,
+            "connectivity": args.connectivity,
+            # Edge enhancement parameters
+            "kernel_size": args.kernel_size,
+            "normalize_kernels": args.normalize_kernels,
+            # Contrast enhancement parameters
             "contrast_factor": args.contrast_factor,
-            "noise_level": args.noise_level,
-            "smoothness": args.smoothness,
-            "surface_quality": args.surface_quality,
-            "material_roughness": args.material_roughness,
-            "preserve_range": args.preserve_range
+            "gamma": args.gamma,
+            # Histogram equalization parameters
+            "num_bins": args.num_bins,
+            "min": args.min,
+            "max": args.max,
         }
         
         # Filter parameters based on effect
-        if args.effect == "monai_smooth":
-            effect_params = {k: v for k, v in effect_params.items() 
-                           if k in ["sigma", "preserve_range"]}
-        elif args.effect == "surface_refinement":
-            effect_params = {k: v for k, v in effect_params.items() 
-                           if k in ["threshold", "min_size"]}
-        elif args.effect == "texture_enhancement":
-            effect_params = {k: v for k, v in effect_params.items() 
-                           if k in ["edge_strength", "contrast_factor", "noise_level"]}
-        elif args.effect == "realistic_rendering":
-            effect_params = {k: v for k, v in effect_params.items() 
-                           if k in ["smoothness", "surface_quality", "material_roughness"]}
+        if args.effect == "gaussian_smooth":
+            effect_params = {k: v for k, v in effect_params.items() if k in ["sigma"]}
+        elif args.effect == "median_smooth":
+            effect_params = {k: v for k, v in effect_params.items() if k in ["radius"]}
+        elif args.effect == "surface_cleanup":
+            effect_params = {k: v for k, v in effect_params.items() if k in ["min_size", "connectivity"]}
+        elif args.effect == "edge_enhancement":
+            effect_params = {k: v for k, v in effect_params.items() if k in ["kernel_size", "normalize_kernels"]}
+        elif args.effect == "contrast_enhancement":
+            effect_params = {k: v for k, v in effect_params.items() if k in ["contrast_factor", "gamma"]}
+        elif args.effect == "histogram_equalization":
+            effect_params = {k: v for k, v in effect_params.items() if k in ["num_bins", "min", "max"]}
+        elif args.effect == "no_processing":
+            effect_params = {}  # No parameters needed for no processing
         
         # Process files
         processed_files = processor.process_files(

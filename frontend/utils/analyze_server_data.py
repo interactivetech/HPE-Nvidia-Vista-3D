@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 
 # Add current directory to path for imports
 sys.path.append(str(Path(__file__).parent))
-from data_manager import DataManager
+sys.path.append(str(Path(__file__).parent.parent))
+
+from utils.data_manager import DataManager
 
 def load_environment_config():
     """Load environment configuration from .env file."""
@@ -70,10 +72,36 @@ def get_scan_voxel_counts(data_manager: DataManager, patient_id: str) -> dict:
         for item in voxels_folder_contents:
             if item['is_directory']:
                 scan_name = item['name']
-                # Count .nii.gz files in this scan's subfolder
-                voxel_files = data_manager.get_server_data(f"{patient_id}/voxels/{scan_name}", 'files', ('.nii.gz',))
-                if voxel_files:
-                    scan_voxels[scan_name] = len(voxel_files)
+                # Check if this scan has enhancement subfolders
+                enhancement_folders = data_manager.get_folder_contents(f"{patient_id}/voxels/{scan_name}")
+                
+                if enhancement_folders:
+                    # This scan has enhancement subfolders
+                    enhancement_counts = {}
+                    total_voxels = 0
+                    
+                    for enhancement_item in enhancement_folders:
+                        if enhancement_item['is_directory']:
+                            enhancement_name = enhancement_item['name']
+                            # Count .nii.gz files in this enhancement subfolder
+                            voxel_files = data_manager.get_server_data(f"{patient_id}/voxels/{scan_name}/{enhancement_name}", 'files', ('.nii.gz',))
+                            if voxel_files:
+                                enhancement_counts[enhancement_name] = len(voxel_files)
+                                total_voxels += len(voxel_files)
+                    
+                    if enhancement_counts:
+                        scan_voxels[scan_name] = {
+                            'total_voxels': total_voxels,
+                            'enhancements': enhancement_counts
+                        }
+                else:
+                    # This scan is a simple folder with direct .nii.gz files
+                    voxel_files = data_manager.get_server_data(f"{patient_id}/voxels/{scan_name}", 'files', ('.nii.gz',))
+                    if voxel_files:
+                        scan_voxels[scan_name] = {
+                            'total_voxels': len(voxel_files),
+                            'enhancements': {}
+                        }
     except Exception as e:
         print(f"Error getting voxel counts for {patient_id}: {e}")
     
@@ -214,7 +242,7 @@ def get_patient_cards_data():
             ply_count = count_ply_files(data_manager, folder_info['name'])
             
             # Count total voxel files across all scans
-            total_voxels = sum(folder_info['scan_voxels'].values()) if folder_info['scan_voxels'] else 0
+            total_voxels = sum(scan_info['total_voxels'] for scan_info in folder_info['scan_voxels'].values()) if folder_info['scan_voxels'] else 0
             
             # Create patient card
             card = {
@@ -228,9 +256,10 @@ def get_patient_cards_data():
                 'ct_scan_details': [
                     {
                         'name': scan_name,
-                        'voxel_count': voxel_count
+                        'voxel_count': scan_info['total_voxels'],
+                        'enhancements': scan_info['enhancements']
                     }
-                    for scan_name, voxel_count in folder_info['scan_voxels'].items()
+                    for scan_name, scan_info in folder_info['scan_voxels'].items()
                 ] if folder_info['scan_voxels'] else []
             }
             
@@ -299,9 +328,14 @@ def main():
             
             # Show voxel counts for each scan
             if folder_info['scan_voxels']:
-                for scan_name, voxel_count in folder_info['scan_voxels'].items():
-                    print(f"    └─ {scan_name:<30} {voxel_count:>3} voxels")
-                    total_voxels += voxel_count
+                for scan_name, scan_info in folder_info['scan_voxels'].items():
+                    print(f"    └─ {scan_name:<30} {scan_info['total_voxels']:>3} voxels")
+                    total_voxels += scan_info['total_voxels']
+                    
+                    # Show enhancement details if available
+                    if scan_info['enhancements']:
+                        for enhancement_name, enhancement_count in scan_info['enhancements'].items():
+                            print(f"        ├─ {enhancement_name:<25} {enhancement_count:>3} files")
             else:
                 print("    └─ No voxel data found")
             

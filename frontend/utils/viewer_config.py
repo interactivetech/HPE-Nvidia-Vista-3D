@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Tuple
 from .constants import (
     DEFAULT_VIEWER_SETTINGS, SLICE_TYPE_MAP, WINDOW_PRESETS,
     WINDOW_PRESETS_CT, WINDOW_PRESETS_MRI, get_optimal_window_settings,
-    detect_modality_from_data, AVAILABLE_COLOR_MAPS, VOXEL_MODES, MESSAGES,
+    detect_modality_from_data, load_colormaps, VOXEL_MODES, MESSAGES,
     load_3d_render_config
 )
 
@@ -142,8 +142,8 @@ class ViewerConfig:
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
         st.session_state.selected_effect = self._selected_effect
-        st.session_state.slice_type = self._settings.get('slice_type', 'Multiplanar')
-        st.session_state.orientation = self._settings.get('orientation', 'Axial')
+        # Note: slice_type, orientation, and color_map are now managed by widgets
+        # and should not be manually set here to avoid StreamlitAPIException
 
     def to_session_state_voxels_only(self):
         """Update only voxel-related fields in session state.
@@ -151,9 +151,27 @@ class ViewerConfig:
         This avoids unintentionally overwriting the user's current
         slice/orientation selections when interacting with voxel UI.
         """
+        # Preserve current slice view settings before updating voxel settings
+        self._preserve_slice_view_settings()
+        
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
         st.session_state.selected_effect = self._selected_effect
+
+    def _preserve_slice_view_settings(self):
+        """Preserve current slice view settings in session state.
+        
+        This ensures that when voxel operations occur, the user's
+        selected slice view mode (Single View, Multiplanar, 3D Render)
+        and orientation are not lost.
+        """
+        # Only preserve if the settings exist in session state
+        if 'slice_type' in st.session_state:
+            self._settings['slice_type'] = st.session_state.slice_type
+        if 'orientation' in st.session_state:
+            self._settings['orientation'] = st.session_state.orientation
+        if 'color_map' in st.session_state:
+            self._settings['color_map'] = st.session_state.color_map
 
     def from_session_state(self):
         """Load settings from Streamlit session state."""
@@ -162,6 +180,7 @@ class ViewerConfig:
         self._selected_effect = getattr(st.session_state, 'selected_effect', None)
         self._settings['slice_type'] = getattr(st.session_state, 'slice_type', 'Multiplanar')
         self._settings['orientation'] = getattr(st.session_state, 'orientation', 'Axial')
+        self._settings['color_map'] = getattr(st.session_state, 'color_map', 'niivue-ct_translucent')
 
     def render_sidebar_settings(self, min_value: float = None, max_value: float = None, mean_value: float = None, has_voxels: bool = False):
         """Render the viewer settings in the sidebar."""
@@ -173,7 +192,7 @@ class ViewerConfig:
             slice_options,
             index=slice_options.index(self._settings['slice_type']) if self._settings['slice_type'] in slice_options else 0,
             label_visibility="collapsed",
-            key="slice_type_select"
+            key="slice_type"
         )
         self._settings['slice_type'] = current_slice
 
@@ -184,26 +203,30 @@ class ViewerConfig:
                 "Orientation",
                 orientations,
                 index=orientations.index(self._settings.get('orientation', 'Axial')),
-                key="orientation_select"
+                key="orientation"
             )
 
         # Color Map Selection - moved above NIfTI Image Settings
         st.markdown("Color Map")
+        # Load colormaps dynamically to get the updated list
+        available_colormaps = load_colormaps()
         # Get current color map index, with fallback to 0 if not found
         current_color_map = self._settings['color_map']
         try:
-            color_map_index = AVAILABLE_COLOR_MAPS.index(current_color_map)
+            color_map_index = available_colormaps.index(current_color_map)
         except ValueError:
-            # If current color map is not in the list, use first available (gray)
+            # If current color map is not in the list, use first available (niivue-ct_translucent)
             color_map_index = 0
-            self._settings['color_map'] = AVAILABLE_COLOR_MAPS[0]
+            self._settings['color_map'] = available_colormaps[0]
         
-        self._settings['color_map'] = st.selectbox(
+        selected_color_map = st.selectbox(
             "Select Color Map",
-            AVAILABLE_COLOR_MAPS,
+            available_colormaps,
             index=color_map_index,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key="color_map"
         )
+        self._settings['color_map'] = selected_color_map
 
         # NIfTI display settings - always show NIfTI
         self._settings['show_nifti'] = True
@@ -217,18 +240,25 @@ class ViewerConfig:
                 help="Base opacity for CT scan. When voxels are shown, this is automatically reduced to 40% for better visibility."
             )
             self._settings['nifti_gamma'] = st.slider(
-                "NIfTI Gamma",
+                "Scan Gamma",
                 0.1, 3.0,
                 self._settings['nifti_gamma'],
                 step=0.1,
                 key="nifti_gamma"
             )
+            self._settings['view_fit_zoom'] = st.slider(
+                "View Fit Zoom",
+                1.0, 5.0,
+                self._settings.get('view_fit_zoom', 3.0),
+                step=0.1,
+                help="Controls how much of the CT scan is visible. Higher values show more of the scan, lower values zoom in closer."
+            )
 
         # 3D Render Quality Settings
         with st.expander("3D Render Quality", expanded=False):
             # 3D Render Quality Preset
-            quality_presets = ["3d_render_ultra", "3d_render_quality", "3d_render_balanced", "3d_render_performance"]
-            preset_labels = ["Ultra Quality", "High Quality", "Balanced", "Performance"]
+            quality_presets = ["3d_render_ultra", "3d_render_quality", "3d_render_balanced", "3d_render_performance", "3d_render_medical_realistic"]
+            preset_labels = ["Ultra Quality", "High Quality", "Balanced", "Performance", "Medical Realistic"]
             
             current_preset = self._settings.get('3d_render_preset', '3d_render_quality')
             try:
@@ -240,7 +270,7 @@ class ViewerConfig:
                 "Render Quality Preset",
                 preset_labels,
                 index=preset_index,
-                help="Choose rendering quality preset. Ultra for best quality, Performance for speed."
+                help="Choose rendering quality preset. Medical Realistic for enhanced anatomical visualization, Ultra for best quality, Performance for speed."
             )
             
             # Map back to preset name

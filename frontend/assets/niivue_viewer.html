@@ -59,6 +59,45 @@
             nv.loadVolumes(volumeList).then(() => {
                 console.log('Volumes loaded successfully');
                 console.log('Number of volumes loaded:', nv.volumes.length);
+                
+                // Fit view to show more of the CT scan after volumes are loaded
+                setTimeout(() => {
+                    if (nv.volumes && nv.volumes.length > 0) {
+                        const mainVol = nv.volumes[0];
+                        if (mainVol && mainVol.img) {
+                            // Calculate volume dimensions and spacing
+                            const dims = mainVol.dims;
+                            const mm = mainVol.mm;
+                            
+                            // Calculate the physical size of the volume
+                            const physicalSize = [
+                                dims[0] * mm[0],  // width in mm
+                                dims[1] * mm[1],  // height in mm  
+                                dims[2] * mm[2]   // depth in mm
+                            ];
+                            
+                            // Find the largest dimension
+                            const maxPhysicalSize = Math.max(...physicalSize);
+                            
+                            // Set camera distance to show more of the volume
+                            if (nv.scene && nv.scene.cameras && nv.scene.cameras.length > 0) {
+                                const camera = nv.scene.cameras[0];
+                                if (camera) {
+                                    // Set distance to fit the volume with configurable padding
+                                    const zoomFactor = {{ view_fit_zoom|default(3.0) }};
+                                    camera.distance = maxPhysicalSize * zoomFactor;
+                                    console.log('Set camera distance to:', camera.distance, 'for volume size:', maxPhysicalSize, 'with zoom factor:', zoomFactor);
+                                }
+                            }
+                            
+                            // Reset clip planes to show the full volume
+                            nv.clipPlane = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+                            
+                            // Force a redraw
+                            nv.drawScene();
+                        }
+                    }
+                }, 200);
                 nv.volumes.forEach((vol, idx) => {
                     console.log(`Volume ${idx}:`, {
                         id: vol.id,
@@ -234,6 +273,34 @@
                 {% endif %}
                 // Final enforcement after opts toggles
                 nv.setSliceType(requestedSliceType);
+                
+                // Fit view to show more of the CT scan
+                setTimeout(() => {
+                    if (nv.volumes && nv.volumes.length > 0) {
+                        // Get the main volume bounds and fit the view
+                        const mainVol = nv.volumes[0];
+                        if (mainVol && mainVol.img) {
+                            // Calculate the bounding box of the volume
+                            const dims = mainVol.dims;
+                            const mm = mainVol.mm;
+                            
+                            // Set clip planes to show more of the volume
+                            nv.clipPlane = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+                            
+                            // Adjust zoom to fit more of the volume
+                            if (nv.scene && nv.scene.cameras) {
+                                const camera = nv.scene.cameras[0];
+                                if (camera) {
+                                    // Calculate distance to fit the volume
+                                    const maxDim = Math.max(dims[0] * mm[0], dims[1] * mm[1], dims[2] * mm[2]);
+                                    const zoomFactor = {{ view_fit_zoom|default(3.0) }};
+                                    camera.distance = maxDim * zoomFactor; // Show more of the volume
+                                }
+                            }
+                        }
+                    }
+                }, 100);
+                
                 nv.drawScene();
 
                 // Final redraw to ensure colormap is applied

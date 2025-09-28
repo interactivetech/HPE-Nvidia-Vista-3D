@@ -167,26 +167,21 @@ class DataManager:
         """
         Query image server for available voxel files.
         Returns (available_label_ids, id_to_name_map).
+        New structure: output/patient/voxels/scan_name/effect_name/
         """
         if not patient_id or not filename:
             return set(), {}
 
         try:
-            # Try to find the correct voxel directory
-            if selected_effect:
-                # For effect-based folders, construct the path directly
-                ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
-                effect_folder_name = f"{ct_scan_folder_name}_{selected_effect}"
-                voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{effect_folder_name}/"
-                print(f"DEBUG: Using effect-based voxel directory: {voxels_folder_url}")
-            else:
-                voxels_folder_url = self._find_voxel_directory(patient_id, filename)
-                
-                if not voxels_folder_url:
-                    print(f"DEBUG: No suitable voxel directory found for patient {patient_id}, file {filename}")
-                    return set(), {}
-
-                print(f"DEBUG: Using voxel directory: {voxels_folder_url}")
+            # New structure: /output/patient/voxels/scan_name/effect_name/
+            ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
+            
+            # Default to no_processing if no effect is selected
+            if not selected_effect:
+                selected_effect = 'no_processing'
+            
+            voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/{selected_effect}/"
+            print(f"DEBUG: Using new structure voxel directory: {voxels_folder_url}")
 
             resp = requests.get(voxels_folder_url, timeout=SERVER_TIMEOUT)
             print(f"DEBUG: Response status: {resp.status_code}")

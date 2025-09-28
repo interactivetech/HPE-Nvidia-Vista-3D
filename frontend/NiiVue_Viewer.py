@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import json
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 
 # Import our new modules
@@ -152,6 +152,8 @@ def render_sidebar():
                     if modality == 'MRI':
                         # Use blues colormap for MRI (works great without cube artifacts)
                         viewer_config._settings['color_map'] = 'blues'
+                        # Update session state to reflect the change
+                        st.session_state.color_map = 'blues'
                     
                 except Exception:
                     # Fallback to None if parsing fails
@@ -165,9 +167,37 @@ def render_sidebar():
 
         # Only show voxel settings if there are voxels available for this patient
         if has_voxels:
+            # Check for available effects even when overlay is disabled (only if both patient and file are selected)
+            available_effects = []
+            if selected_patient and selected_file:
+                available_effects = voxel_manager.detect_effect_folders(selected_patient, selected_file)
+            
+            # Default to no_processing if it's available, otherwise use the first available effect
+            if available_effects:
+                if 'no_processing' in available_effects:
+                    default_effect = 'no_processing'
+                else:
+                    default_effect = available_effects[0]
+            else:
+                default_effect = None
+            
+            # Set default effect in viewer config
+            if default_effect and not hasattr(viewer_config, 'selected_effect'):
+                viewer_config.selected_effect = default_effect
+            
+            # Show hint about available effects if overlay is disabled
+            if available_effects and not viewer_config.settings.get('show_overlay', False):
+                effect_names = [voxel_manager.get_effect_display_name(effect) for effect in available_effects]
+                st.info(f"✨ Enhanced voxel effects available: {', '.join(effect_names)}. Enable 'Show Voxels' to use them.")
+            
             # Voxel selection (after show_overlay is set)
             if viewer_config.settings.get('show_overlay', False):
+                # Effect selection (available for both All Voxels and Individual Voxels modes)
+                render_voxel_effect_selection(selected_patient, selected_file, available_effects)
+                
+                # Voxel selection mode and individual voxel selection
                 render_voxel_selection(selected_patient, selected_file)
+                
                 # Voxel image settings (after voxel selection)
                 viewer_config.render_voxel_image_settings()
 
@@ -185,39 +215,53 @@ def render_sidebar():
     return selected_patient, selected_file
 
 
+def render_voxel_effect_selection(selected_patient: str, selected_file: str, available_effects: List[str]):
+    """Render the voxel effect selection interface."""
+    if available_effects:
+        st.subheader("🎨 Voxel Effects")
+        
+        # Sort effects with no_processing first if available
+        sorted_effects = []
+        if 'no_processing' in available_effects:
+            sorted_effects.append('no_processing')
+        for effect in available_effects:
+            if effect != 'no_processing':
+                sorted_effects.append(effect)
+        
+        effect_display_names = [voxel_manager.get_effect_display_name(effect) for effect in sorted_effects]
+        
+        # Get current selection from session state or default to no_processing
+        current_effect = st.session_state.get('selected_effect', None)
+        if not current_effect and 'no_processing' in sorted_effects:
+            current_effect = 'no_processing'
+        elif not current_effect and sorted_effects:
+            current_effect = sorted_effects[0]
+        
+        default_index = 0
+        if current_effect and current_effect in sorted_effects:
+            default_index = sorted_effects.index(current_effect)
+        
+        selected_effect_index = st.selectbox(
+            "Select Effect:",
+            range(len(sorted_effects)),
+            index=default_index,
+            format_func=lambda x: effect_display_names[x],
+            help="Choose an effect to apply to the voxel data (works with both All Voxels and Individual Voxels modes)"
+        )
+        
+        selected_effect = sorted_effects[selected_effect_index]
+        st.info(f"✨ Using effect: {voxel_manager.get_effect_display_name(selected_effect)}")
+        
+        # Store in viewer_config
+        viewer_config.selected_effect = selected_effect
+    else:
+        # No effects available, clear selection
+        viewer_config.selected_effect = None
+
+
 def render_voxel_selection(selected_patient: str, selected_file: str):
     """Render the voxel selection interface."""
     with st.expander("Select Voxels", expanded=False):
-        # Effect selection (if available)
-        available_effects = voxel_manager.detect_effect_folders(selected_patient, selected_file)
-        selected_effect = None
-        
-        if available_effects:
-            effect_options = ["None"] + available_effects
-            effect_display_names = ["None"] + [voxel_manager.get_effect_display_name(effect) for effect in available_effects]
-            
-            # Get current selection from session state
-            current_effect = st.session_state.get('selected_effect', None)
-            default_index = 0
-            if current_effect and current_effect in available_effects:
-                default_index = available_effects.index(current_effect) + 1
-            
-            selected_effect_index = st.selectbox(
-                "Select Effect:",
-                range(len(effect_options)),
-                index=default_index,
-                format_func=lambda x: effect_display_names[x],
-                help="Choose an effect to apply to the voxel data"
-            )
-            
-            if selected_effect_index > 0:
-                selected_effect = available_effects[selected_effect_index - 1]
-                st.info(f"Using effect: {voxel_manager.get_effect_display_name(selected_effect)}")
-            else:
-                selected_effect = None
-            
-            # Store in viewer_config
-            viewer_config.selected_effect = selected_effect
         
         # Voxel selection mode
         voxel_mode = st.radio(
@@ -229,7 +273,7 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
 
         # Get available voxel information
         available_ids, id_to_name_map, available_voxel_names = voxel_manager.get_available_voxels(
-            selected_patient, selected_file, voxel_mode, selected_effect
+            selected_patient, selected_file, voxel_mode, viewer_config.selected_effect
         )
 
         # Handle voxel mode selection
@@ -411,8 +455,8 @@ def render_viewer(selected_patient: str, selected_file: str):
         image_server_url=EXTERNAL_IMAGE_SERVER_URL,
         main_is_nifti=True,
         main_vol=True,
-        color_map_js=json.dumps(settings.get('color_map', 'gray')),
-        color_map_data_js=json.dumps(load_colormap_data(settings.get('color_map', 'gray'))),
+        color_map_js=json.dumps(settings.get('color_map', 'niivue-ct_translucent')),
+        color_map_data_js=json.dumps(load_colormap_data(settings.get('color_map', 'niivue-ct_translucent'))),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
         nifti_opacity=viewer_config.get_dynamic_nifti_opacity(),
         window_center=window_center,
@@ -421,6 +465,7 @@ def render_viewer(selected_patient: str, selected_file: str):
         overlay_start_index=1,  # CT scan is always at index 0, overlays start at index 1
         segment_opacity=segment_opacity,
         segment_gamma=segment_gamma,
+        view_fit_zoom=settings.get('view_fit_zoom', 3.0),
         render_config_js=json.dumps(render_config)
     )
 

@@ -69,6 +69,7 @@ class TemplateRenderer:
                 'overlay_start_index': kwargs.get('overlay_start_index', 0),
                 'actual_slice_type': kwargs.get('actual_slice_type', 3),
                 'segment_opacity': kwargs.get('segment_opacity', 0.5),
+                'view_fit_zoom': kwargs.get('view_fit_zoom', 3.0),
             }
 
             return template.render(**template_vars)

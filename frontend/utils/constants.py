@@ -33,7 +33,7 @@ NIFTI_DIR = "nifti"
 DEFAULT_VIEWER_SETTINGS = {
     'slice_type': 'Multiplanar',
     'orientation': 'Axial',
-    'color_map': 'gray',
+    'color_map': 'niivue-ct_translucent',
     'nifti_opacity': 0.5,  # Default CT scan opacity (will be reduced when voxels are shown)
     'nifti_gamma': 1.0,
     'show_overlay': False,
@@ -46,6 +46,8 @@ DEFAULT_VIEWER_SETTINGS = {
     'volume_gamma': 1.0,
     'lighting_enabled': True,
     'material_shininess': 0.5,
+    'view_fit_zoom': 3.0,  # Zoom factor for fitting view to show more of CT scan
+    'auto_fit_view': True,  # Automatically fit view to show more of the volume
 }
 
 # Slice type mappings
@@ -213,12 +215,58 @@ def load_colormaps():
     if not available_colormaps:
         raise ValueError("No valid colormaps found in JSON files")
     
-    # Return sorted list with gray first, then rest alphabetically
+    # Return sorted list with medical imaging colormaps first, then rest alphabetically
     colormap_list = sorted(list(available_colormaps))
-    if 'gray' in colormap_list:
-        colormap_list.remove('gray')
-        colormap_list.insert(0, 'gray')
-    return colormap_list
+    
+    # Prioritize medical imaging colormaps
+    medical_colormaps = [
+        'mri_brain_clear',
+        'mri_anatomy',
+        'fixed_anatomy',
+        'working_anatomy',
+        'distinct_anatomy',
+        'vivid_anatomy',
+        'clear_anatomy',
+        'medical_anatomy',
+        'brain_vessels_eyes',
+        'enhanced_brain_anatomy',
+        'brain_vessels_clear',
+        'niivue-ct_translucent',
+        'niivue-ct_soft_tissue', 
+        'niivue-ct_brain',
+        'niivue-ct_bones',
+        'niivue-ct_vessels',
+        'realistic_arteries',
+        'realistic_veins',
+        'realistic_vessels_unified',
+        'niivue-ct_liver',
+        'niivue-ct_kidneys',
+        'niivue-ct_lung',
+        'niivue-ct_muscles',
+        'niivue-ct_skull',
+        'niivue-ct_scalp',
+        'niivue-ct_soft',
+        'niivue-ct_w_contrast',
+        'niivue-ct_enhanced',
+        'niivue-ct_metallic',
+        'niivue-ct_brain_metallic',
+        'niivue-ct_artery',
+        'niivue-ct_air',
+        'niivue-gray',
+        'gray'
+    ]
+    
+    # Reorder to put medical colormaps first
+    reordered_list = []
+    for colormap in medical_colormaps:
+        if colormap in colormap_list:
+            reordered_list.append(colormap)
+            colormap_list.remove(colormap)
+    
+    # Add remaining colormaps alphabetically
+    reordered_list.extend(sorted(colormap_list))
+    
+    return reordered_list
 
 def load_colormap_data(colormap_name):
     """Load colormap data from JSON files for a specific colormap name."""
