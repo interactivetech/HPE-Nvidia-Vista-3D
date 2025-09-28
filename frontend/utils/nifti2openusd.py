@@ -33,11 +33,14 @@ from datetime import datetime
 
 # OpenUSD imports
 try:
-    from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, UsdLux, Vt
+    from pxr import Usd, UsdGeom, Gf, Sdf, UsdShade, UsdLux, Vt, UsdVol
     USD_AVAILABLE = True
 except ImportError:
     USD_AVAILABLE = False
-    logging.warning("OpenUSD not available. Install with: pip install usd-core")
+    logging.warning(
+        "OpenUSD (usd-core) not available. Install with: pip install 'usd-core>=25.8'\n"
+        "Note: usd-core may not be available on ARM64 Linux platforms."
+    )
 
 # Medical imaging processing
 try:
@@ -87,8 +90,104 @@ class NIfTI2OpenUSDConverter:
             'pointcloud': self._convert_to_pointcloud
         }
         
+        # Load Vista3D label colors
+        self.label_colors = self._load_vista3d_label_colors()
+        
         if not USD_AVAILABLE:
-            raise ImportError("OpenUSD (usd-core) is required but not installed. Install with: pip install usd-core")
+            raise ImportError(
+                "OpenUSD (usd-core) is required for USD export functionality but not installed.\n"
+                "Install with: pip install 'usd-core>=25.8'\n"
+                "Note: usd-core may not be available on ARM64 Linux platforms.\n"
+                "For ARM64 systems, consider using alternative export formats or running on x86_64."
+            )
+    
+    def _load_vista3d_label_colors(self) -> Dict[int, Tuple[float, float, float]]:
+        """
+        Load Vista3D label colors from JSON file.
+        
+        Returns:
+            Dictionary mapping label IDs to RGB colors (0-1 range)
+        """
+        # Try to find the Vista3D label colors file
+        script_dir = Path(__file__).parent
+        color_files = [
+            script_dir.parent / "conf" / "vista3d_label_colors.json",
+            script_dir.parent.parent / "frontend" / "conf" / "vista3d_label_colors.json",
+            script_dir / "vista3d_label_colors.json"
+        ]
+        
+        label_colors = {}
+        
+        for color_file in color_files:
+            if color_file.exists():
+                try:
+                    with open(color_file, 'r') as f:
+                        color_data = json.load(f)
+                    
+                    # Convert to dictionary with normalized RGB values
+                    for item in color_data:
+                        label_id = item['id']
+                        rgb = item['color']  # RGB values 0-255
+                        # Convert to 0-1 range for USD
+                        normalized_rgb = (rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+                        label_colors[label_id] = normalized_rgb
+                    
+                    logger.info(f"Loaded {len(label_colors)} anatomical label colors from {color_file}")
+                    break
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to load color file {color_file}: {e}")
+                    continue
+        
+        if not label_colors:
+            logger.warning("No Vista3D label colors found. Using default colors.")
+            # Fallback to default colors
+            label_colors = {
+                1: (0.133, 0.545, 0.133),  # Liver - Forest Green
+                3: (1.0, 0.549, 0.0),      # Spleen - Orange
+                5: (0.0, 0.749, 1.0),      # Right Kidney - Deep Sky Blue
+                6: (0.863, 0.078, 0.235),  # Aorta - Crimson
+                115: (0.863, 0.078, 0.235), # Heart - Crimson
+                120: (0.941, 0.941, 0.941), # Skull - White Smoke
+            }
+        
+        return label_colors
+    
+    def _get_anatomical_color(self, label_id: int) -> Tuple[float, float, float]:
+        """
+        Get anatomical color for a given label ID.
+        
+        Args:
+            label_id: Anatomical structure ID
+            
+        Returns:
+            RGB color tuple (0-1 range)
+        """
+        return self.label_colors.get(label_id, (0.8, 0.8, 0.9))  # Default light blue-gray
+    
+    def _detect_anatomical_labels(self, data: np.ndarray) -> Dict[int, str]:
+        """
+        Detect anatomical labels present in the NIfTI data.
+        
+        Args:
+            data: 3D numpy array from NIfTI
+            
+        Returns:
+            Dictionary mapping label IDs to anatomical names
+        """
+        # Get unique values in the data (excluding 0)
+        unique_values = np.unique(data)
+        unique_values = unique_values[unique_values > 0]  # Remove background
+        
+        detected_labels = {}
+        for label_id in unique_values:
+            if int(label_id) in self.label_colors:
+                # Find the anatomical name from the loaded color data
+                # We'll store this info for better naming
+                detected_labels[int(label_id)] = f"structure_{int(label_id)}"
+        
+        logger.info(f"Detected {len(detected_labels)} anatomical structures: {list(detected_labels.keys())}")
+        return detected_labels
     
     def convert_file(self, input_path: Path, output_path: Optional[Path] = None, 
                     method: str = 'isosurface', **kwargs) -> Path:
@@ -165,9 +264,17 @@ class NIfTI2OpenUSDConverter:
         Returns:
             Generated output path
         """
+        # Clean the input filename by removing .nii.gz extension and any existing method suffixes
+        clean_stem = input_path.stem
+        # Remove common method suffixes if they exist
+        for existing_method in ['isosurface', 'volume', 'mesh', 'pointcloud']:
+            if clean_stem.endswith(f'_{existing_method}'):
+                clean_stem = clean_stem[:-len(f'_{existing_method}')]
+                break
+        
         # If using custom output directory, use it
         if self.output_dir:
-            return self.output_dir / f"{input_path.stem}_{method}.usda"
+            return self.output_dir / f"{clean_stem}.usda"
         
         # Try to detect patient folder structure
         path_parts = input_path.parts
@@ -192,17 +299,12 @@ class NIfTI2OpenUSDConverter:
                     new_parts[i] = 'openusd'
                     break
             
-            # Create output filename with method suffix
-            filename = input_path.stem
-            if not filename.endswith(f'_{method}'):
-                filename = f"{filename}_{method}"
-            
-            # Remove the filename from the path parts and add the new filename
+            # Remove the filename from the path parts and add the clean filename
             new_parts = new_parts[:-1]  # Remove the original filename
-            output_path = Path(*new_parts) / f"{filename}.usda"
+            output_path = Path(*new_parts) / f"{clean_stem}.usda"
         else:
             # Fallback to same directory as input
-            output_path = input_path.parent / f"{input_path.stem}_{method}.usda"
+            output_path = input_path.parent / f"{clean_stem}.usda"
         
         return output_path
     
@@ -374,36 +476,47 @@ class NIfTI2OpenUSDConverter:
         # Define root transform
         root = UsdGeom.Xform.Define(stage, '/Root')
         
-        # Segment data into regions
-        segmented_data = self._segment_data(data, segmentation_threshold)
+        # Detect anatomical labels in the data
+        detected_labels = self._detect_anatomical_labels(data)
         
-        # Create mesh for each segment
-        for i, segment in enumerate(segmented_data):
-            if np.sum(segment) == 0:
+        # Create mesh for each anatomical structure
+        mesh_count = 0
+        for label_id, structure_name in detected_labels.items():
+            # Create binary mask for this label
+            binary_data = (data == label_id).astype(np.float32)
+            
+            if np.sum(binary_data) == 0:
                 continue
+            
+            try:
+                # Create mesh from segment
+                verts, faces = self._create_mesh_from_segment(binary_data, label_id)
                 
-            # Create mesh from segment
-            verts, faces = self._create_mesh_from_segment(segment, i)
-            
-            if len(verts) == 0:
+                if len(verts) == 0:
+                    continue
+                
+                # Define mesh with anatomical name
+                mesh_path = f'/Root/{structure_name}'
+                mesh = UsdGeom.Mesh.Define(stage, mesh_path)
+                
+                # Set mesh attributes
+                mesh.CreatePointsAttr(Vt.Vec3fArray.FromNumpy(verts.astype(np.float32)))
+                mesh.CreateFaceVertexIndicesAttr(Vt.IntArray.FromNumpy(faces.flatten().astype(np.int32)))
+                mesh.CreateFaceVertexCountsAttr(Vt.IntArray.FromNumpy(np.full(faces.shape[0], 3, dtype=np.int32)))
+                
+                # Apply anatomical material
+                self._create_anatomical_material(stage, mesh_path, label_id, structure_name)
+                mesh_count += 1
+                
+            except Exception as e:
+                logger.warning(f"Failed to create mesh for label {label_id}: {e}")
                 continue
-            
-            # Define mesh
-            mesh_path = f'/Root/Segment_{i}'
-            mesh = UsdGeom.Mesh.Define(stage, mesh_path)
-            
-            # Set mesh attributes
-            mesh.CreatePointsAttr(Vt.Vec3fArray.FromNumpy(verts.astype(np.float32)))
-            mesh.CreateFaceVertexIndicesAttr(Vt.IntArray.FromNumpy(faces.flatten().astype(np.int32)))
-            mesh.CreateFaceVertexCountsAttr(Vt.IntArray.FromNumpy(np.full(faces.shape[0], 3, dtype=np.int32)))
-            
-            # Apply material
-            self._create_segment_material(stage, mesh_path, i)
         
         # Add metadata
         self._add_metadata(stage, filename, 'mesh', {
             'segmentation_threshold': segmentation_threshold,
-            'segment_count': len(segmented_data)
+            'anatomical_structures': list(detected_labels.keys()),
+            'mesh_count': mesh_count
         })
         
         return stage
@@ -430,32 +543,84 @@ class NIfTI2OpenUSDConverter:
         # Define root transform
         root = UsdGeom.Xform.Define(stage, '/Root')
         
-        # Sample points
-        points, colors = self._sample_points(data, sampling_rate)
+        # Detect anatomical labels in the data
+        detected_labels = self._detect_anatomical_labels(data)
         
-        if len(points) == 0:
-            logger.warning("No points sampled from data")
-            return stage
-        
-        # Define points
-        points_path = '/Root/PointCloud'
-        points_prim = UsdGeom.Points.Define(stage, points_path)
-        
-        # Set point positions
-        points_prim.CreatePointsAttr().Set(Vt.Vec3fArray.FromNumpy(points.astype(np.float32)))
-        
-        # Set point colors
-        if colors is not None:
-            points_prim.CreateDisplayColorAttr().Set(Vt.Vec3fArray.FromNumpy(colors.astype(np.float32)))
-        
-        # Set point size
-        points_prim.CreateWidthsAttr().Set(Vt.FloatArray([1.0] * len(points)))
-        
-        # Add metadata
-        self._add_metadata(stage, filename, 'pointcloud', {
-            'sampling_rate': sampling_rate,
-            'point_count': len(points)
-        })
+        if detected_labels:
+            # Create separate point clouds for each anatomical structure
+            total_points = 0
+            for label_id, structure_name in detected_labels.items():
+                # Create binary mask for this label
+                binary_data = (data == label_id).astype(np.float32)
+                
+                if np.sum(binary_data) == 0:
+                    continue
+                
+                # Sample points for this structure
+                points, colors = self._sample_points(binary_data, sampling_rate)
+                
+                if len(points) == 0:
+                    continue
+                
+                # Use anatomical color for all points of this structure
+                anatomical_color = self._get_anatomical_color(label_id)
+                structure_colors = np.full((len(points), 3), anatomical_color, dtype=np.float32)
+                
+                # Define points for this structure
+                points_path = f'/Root/{structure_name}_PointCloud'
+                points_prim = UsdGeom.Points.Define(stage, points_path)
+                
+                # Set point positions
+                points_prim.CreatePointsAttr().Set(Vt.Vec3fArray.FromNumpy(points.astype(np.float32)))
+                
+                # Set anatomical colors
+                points_prim.CreateDisplayColorAttr().Set(Vt.Vec3fArray.FromNumpy(structure_colors.astype(np.float32)))
+                
+                # Set point size
+                points_prim.CreateWidthsAttr().Set(Vt.FloatArray([1.0] * len(points)))
+                
+                # Add anatomical metadata
+                points_prim.CreateAttribute('label_id', Sdf.ValueTypeNames.Int).Set(label_id)
+                points_prim.CreateAttribute('structure_name', Sdf.ValueTypeNames.String).Set(structure_name)
+                
+                total_points += len(points)
+                logger.info(f"Created {len(points)} points for {structure_name} (ID: {label_id}) with color {anatomical_color}")
+            
+            # Add metadata
+            self._add_metadata(stage, filename, 'pointcloud', {
+                'sampling_rate': sampling_rate,
+                'total_point_count': total_points,
+                'anatomical_structures': list(detected_labels.keys()),
+                'structure_count': len(detected_labels)
+            })
+        else:
+            # Fallback to intensity-based coloring for non-labeled data
+            points, colors = self._sample_points(data, sampling_rate)
+            
+            if len(points) == 0:
+                logger.warning("No points sampled from data")
+                return stage
+            
+            # Define points
+            points_path = '/Root/PointCloud'
+            points_prim = UsdGeom.Points.Define(stage, points_path)
+            
+            # Set point positions
+            points_prim.CreatePointsAttr().Set(Vt.Vec3fArray.FromNumpy(points.astype(np.float32)))
+            
+            # Set point colors based on intensity
+            if colors is not None:
+                points_prim.CreateDisplayColorAttr().Set(Vt.Vec3fArray.FromNumpy(colors.astype(np.float32)))
+            
+            # Set point size
+            points_prim.CreateWidthsAttr().Set(Vt.FloatArray([1.0] * len(points)))
+            
+            # Add metadata
+            self._add_metadata(stage, filename, 'pointcloud', {
+                'sampling_rate': sampling_rate,
+                'point_count': len(points),
+                'coloring_method': 'intensity_based'
+            })
         
         return stage
     
@@ -536,8 +701,40 @@ class NIfTI2OpenUSDConverter:
         volume = UsdGeom.Volume.Get(stage, volume_path)
         UsdShade.MaterialBindingAPI(volume).Bind(material)
     
+    def _create_anatomical_material(self, stage: Usd.Stage, mesh_path: str, label_id: int, structure_name: str):
+        """Create material for anatomical structure using Vista3D colors."""
+        material_path = f'{mesh_path}_Material'
+        material = UsdShade.Material.Define(stage, material_path)
+        
+        # Create shader
+        shader_path = f'{material_path}/Shader'
+        shader = UsdShade.Shader.Define(stage, shader_path)
+        shader.CreateIdAttr().Set('UsdPreviewSurface')
+        
+        # Get anatomical color from Vista3D color scheme
+        color = self._get_anatomical_color(label_id)
+        
+        # Set material properties
+        shader.CreateInput('diffuseColor', Sdf.ValueTypeNames.Color3f).Set(color)
+        shader.CreateInput('metallic', Sdf.ValueTypeNames.Float).Set(0.0)
+        shader.CreateInput('roughness', Sdf.ValueTypeNames.Float).Set(0.4)
+        shader.CreateInput('opacity', Sdf.ValueTypeNames.Float).Set(0.9)
+        
+        # Add anatomical metadata
+        material.CreateAttribute('label_id', Sdf.ValueTypeNames.Int).Set(label_id)
+        material.CreateAttribute('structure_name', Sdf.ValueTypeNames.String).Set(structure_name)
+        
+        # Connect shader to material (simplified)
+        # material.CreateSurfaceOutput().ConnectToSource(shader.GetOutput('surface'))
+        
+        # Bind material to mesh
+        mesh = UsdGeom.Mesh.Get(stage, mesh_path)
+        UsdShade.MaterialBindingAPI(mesh).Bind(material)
+        
+        logger.info(f"Created anatomical material for {structure_name} (ID: {label_id}) with color {color}")
+    
     def _create_segment_material(self, stage: Usd.Stage, mesh_path: str, segment_id: int):
-        """Create material for segmented mesh."""
+        """Create material for segmented mesh (fallback method)."""
         material_path = f'{mesh_path}_Material'
         material = UsdShade.Material.Define(stage, material_path)
         

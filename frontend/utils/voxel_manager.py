@@ -31,7 +31,6 @@ class VoxelManager:
             'no_processing': 'Original (No Processing)',
             'realistic_medical': 'Realistic Medical Visualization',
             'anatomical_enhancement': 'Anatomical Structure Enhancement',
-            'vessel_enhancement': 'Vascular Structure Enhancement',
             'monai_smooth': 'Subtle Smooth',
             'ultra_smooth_medical': 'Gentle Smooth',
             'surface_refinement': 'Minimal Refinement',

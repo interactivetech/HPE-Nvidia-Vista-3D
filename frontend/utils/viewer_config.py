@@ -112,7 +112,7 @@ class ViewerConfig:
         
         # If voxels are being displayed, make CT scan more transparent to highlight voxels
         if show_voxels:
-            return min(base_opacity * 0.6, 0.4)  # Reduce to 60% of base opacity, max 0.4
+            return min(base_opacity * 0.3, 0.2)  # Reduce to 30% of base opacity, max 0.2 for better voxel visibility
         else:
             return base_opacity  # Use full opacity when no voxels
 

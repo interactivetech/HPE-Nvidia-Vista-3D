@@ -146,11 +146,17 @@
                 if (nv.volumes.length > {{ overlay_start_index }}) {
                     for (let i = {{ overlay_start_index }}; i < nv.volumes.length; i++) {
                         const overlayVol = nv.volumes[i];
-                        // Set opacity to 50% for Single View mode, otherwise use slider value
+                        // Set opacity for voxel overlays - use higher opacity for better visibility
                         const isSingleView = {{ actual_slice_type }} !== 3 && {{ actual_slice_type }} !== 4;
-                        overlayVol.opacity = isSingleView ? 0.5 : {{ segment_opacity }};
+                        // Use high opacity (0.9) for single view, full opacity for 3D render to make voxels clearly visible
+                        overlayVol.opacity = isSingleView ? 0.9 : Math.max({{ segment_opacity }}, 0.9);
                         // Apply gamma to voxel overlays
                         nv.setGamma({{ segment_gamma }}, overlayVol.id);
+                        
+                        // Ensure voxels render on top with better visibility
+                        overlayVol.renderOnTop = true;
+                        overlayVol.alphaTest = 0.005; // Lower alpha test for better visibility
+                        overlayVol.depthTest = false; // Render on top of other volumes
 
                         // Get the corresponding overlay color info
                         const overlayIndex = i - {{ overlay_start_index }};

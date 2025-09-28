@@ -218,7 +218,7 @@ def render_sidebar():
 def render_voxel_effect_selection(selected_patient: str, selected_file: str, available_effects: List[str]):
     """Render the voxel effect selection interface."""
     if available_effects:
-        st.subheader("🎨 Voxel Effects")
+        st.subheader("Voxel Effects")
         
         # Sort effects with no_processing first if available
         sorted_effects = []

@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -1878,8 +1878,12 @@ dependencies = [
     { name = "streamlit-mermaid" },
     { name = "torch" },
     { name = "tqdm" },
-    { name = "usd-core" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+usd = [
+    { name = "usd-core" },
 ]
 
 [package.metadata]
@@ -1890,7 +1894,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.104.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "matplotlib", specifier = ">=3.7.0" },
-    { name = "monai", specifier = ">=1.3.0" },
+    { name = "monai", extras = ["data", "transforms"], specifier = ">=1.3.0" },
     { name = "nibabel", specifier = ">=5.1.0" },
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },
@@ -1904,9 +1908,10 @@ requires-dist = [
     { name = "streamlit-mermaid", specifier = ">=0.3.0" },
     { name = "torch", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.66.0" },
-    { name = "usd-core", specifier = ">=25.8" },
+    { name = "usd-core", marker = "extra == 'usd'", specifier = ">=25.8" },
     { name = "uvicorn", specifier = ">=0.24.0" },
 ]
+provides-extras = ["usd"]
 
 [[package]]
 name = "watchdog"

@@ -166,7 +166,7 @@ def main():
             # Create a summary section
             total_size = sum(folder['size_bytes'] for folder in patient_folders)
             total_scans = sum(folder['scan_count'] for folder in patient_folders)
-            total_voxels = sum(sum(folder['scan_voxels'].values()) for folder in patient_folders if folder['scan_voxels'])
+            total_voxels = sum(sum(scan_info['total_voxels'] for scan_info in folder['scan_voxels'].values()) for folder in patient_folders if folder['scan_voxels'])
             
             col1, col2, col3, col4 = st.columns(4)
             with col1:
