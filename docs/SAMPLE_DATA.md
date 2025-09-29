@@ -4,11 +4,11 @@ This guide explains how sample data is automatically installed and used in the H
 
 ## 📦 What's Included
 
-The `sample_data.tgz` file contains sample medical imaging data for patient **PA00000002**:
+The `sample_data.tgz` file contains sample medical imaging data for patient **SAMPLE_DATA_001**:
 
-- **DICOM Files**: 391 CT scan files in DICOM format
-- **Processed Output**: 262 processed files including NIFTI volumes and segmentation results
-- **Total Files**: 656 files across both DICOM and output directories
+- **DICOM Files**: CT scan files in DICOM format
+- **Processed Output**: Processed files including NIFTI volumes and segmentation results
+- **Total Files**: Multiple files across both DICOM and output directories
 
 ## 🚀 Automatic Installation
 
@@ -32,8 +32,8 @@ python3 setup.py
 # 2. Ask: "Install sample data? (Y/n):"
 # 3. If you choose Yes, it automatically:
 #    - Extracts the archive to a temporary location
-#    - Moves DICOM files to dicom/PA00000002/
-#    - Moves output files to output/PA00000002/
+#    - Moves DICOM files to dicom/SAMPLE_DATA_001/
+#    - Moves output files to output/SAMPLE_DATA_001/
 #    - Cleans up temporary files
 #    - Reports success
 ```
@@ -50,8 +50,8 @@ cd HPE-Nvidia-Vista-3D
 tar -xzf sample_data.tgz
 
 # Move the extracted data to the correct locations
-mv sample_data/dicom/PA00000002 dicom/
-mv sample_data/output/PA00000002 output/
+mv sample_data/dicom/SAMPLE_DATA_001 dicom/
+mv sample_data/output/SAMPLE_DATA_001 output/
 
 # Clean up the temporary extraction directory
 rm -rf sample_data
@@ -63,14 +63,14 @@ After automatic installation (or manual extraction), verify the data is in the c
 
 ```bash
 # Check DICOM files
-ls -la dicom/PA00000002/ | head -10
+ls -la dicom/SAMPLE_DATA_001/ | head -10
 
 # Check output files
-ls -la output/PA00000002/
+ls -la output/SAMPLE_DATA_001/
 
 # Count files to verify
-echo "DICOM files: $(find dicom/PA00000002 -type f | wc -l)"
-echo "Output files: $(find output/PA00000002 -type f | wc -l)"
+echo "DICOM files: $(find dicom/SAMPLE_DATA_001 -type f | wc -l)"
+echo "Output files: $(find output/SAMPLE_DATA_001 -type f | wc -l)"
 ```
 
 Expected output:

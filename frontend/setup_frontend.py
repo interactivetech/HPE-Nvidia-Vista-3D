@@ -388,7 +388,7 @@ def install_sample_data(config: Dict[str, str]) -> bool:
                             else:
                                 os.remove(item_path)
                     
-                    # Copy new content
+                    # Copy new content from sample data archive
                     for item in os.listdir(source_dicom):
                         if item != '.DS_Store':
                             src_path = os.path.join(source_dicom, item)
@@ -434,7 +434,7 @@ def install_sample_data(config: Dict[str, str]) -> bool:
                             else:
                                 os.remove(item_path)
                     
-                    # Copy new content
+                    # Copy new content from sample data archive
                     for item in os.listdir(source_output):
                         if item != '.DS_Store':
                             src_path = os.path.join(source_output, item)

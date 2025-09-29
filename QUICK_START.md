@@ -110,11 +110,11 @@ cd ../frontend && docker-compose up -d
 
 ```bash
 # Sample data is automatically installed during setup (if available)
-# The setup script installs sample medical imaging data for patient PA00000002
+# The setup script installs sample medical imaging data for patient SAMPLE_DATA_001
 
 # For your own data:
 # Option A: Place DICOM files in dicom/ folder
-# The dicom/ folder contains patient folders (e.g., PA00000001, PA00000002)
+# The dicom/ folder contains patient folders (e.g., SAMPLE_DATA_001, PA00000001)
 mkdir -p dicom
 # Copy your DICOM files to dicom/PA00000001/
 
@@ -140,7 +140,7 @@ Open your browser and navigate to: **http://localhost:8501**
 
 ### 2. Select the Sample Patient
 1. In the sidebar, you'll see a **"Select Patient"** dropdown
-2. Click on it and select **"PA00000002"** (the sample patient)
+2. Click on it and select **"SAMPLE_DATA_001"** (the sample patient)
 3. This will load the available scans for this patient
 
 ### 3. Select a Scan to View
