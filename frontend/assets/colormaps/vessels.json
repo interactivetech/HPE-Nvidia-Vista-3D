@@ -1,0 +1,10 @@
+{
+  "name": "Vessels Colormap",
+  "description": "Red-based colormap optimized for vessel visualization in CT and MRI scans, emphasizing blood vessels and vascular structures",
+  "min": 0,
+  "max": 0,
+  "R": [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 255, 255, 255],
+  "G": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "B": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255, 255, 255, 255, 255]
+}

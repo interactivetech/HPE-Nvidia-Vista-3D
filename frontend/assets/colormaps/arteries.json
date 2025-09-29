@@ -1,0 +1,10 @@
+{
+  "name": "Arteries Colormap",
+  "description": "Bright red colormap specifically designed for arterial structure visualization in CT angiography and MRI",
+  "min": 0,
+  "max": 0,
+  "R": [0, 40, 80, 120, 160, 200, 240, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+  "G": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "B": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "A": [0, 50, 100, 150, 200, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+}
