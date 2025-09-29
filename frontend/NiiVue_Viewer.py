@@ -172,10 +172,10 @@ def render_sidebar():
             if selected_patient and selected_file:
                 available_effects = voxel_manager.detect_effect_folders(selected_patient, selected_file)
             
-            # Default to no_processing if it's available, otherwise use the first available effect
+            # Default to original if it's available, otherwise use the first available effect
             if available_effects:
-                if 'no_processing' in available_effects:
-                    default_effect = 'no_processing'
+                if 'original' in available_effects:
+                    default_effect = 'original'
                 else:
                     default_effect = available_effects[0]
             else:
@@ -220,20 +220,20 @@ def render_voxel_effect_selection(selected_patient: str, selected_file: str, ava
     if available_effects:
         st.subheader("Voxel Effects")
         
-        # Sort effects with no_processing first if available
+        # Sort effects with original first if available
         sorted_effects = []
-        if 'no_processing' in available_effects:
-            sorted_effects.append('no_processing')
+        if 'original' in available_effects:
+            sorted_effects.append('original')
         for effect in available_effects:
-            if effect != 'no_processing':
+            if effect != 'original':
                 sorted_effects.append(effect)
         
         effect_display_names = [voxel_manager.get_effect_display_name(effect) for effect in sorted_effects]
         
-        # Get current selection from session state or default to no_processing
+        # Get current selection from session state or default to original
         current_effect = st.session_state.get('selected_effect', None)
-        if not current_effect and 'no_processing' in sorted_effects:
-            current_effect = 'no_processing'
+        if not current_effect and 'original' in sorted_effects:
+            current_effect = 'original'
         elif not current_effect and sorted_effects:
             current_effect = sorted_effects[0]
         

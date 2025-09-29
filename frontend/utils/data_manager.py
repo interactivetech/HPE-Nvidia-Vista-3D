@@ -176,9 +176,9 @@ class DataManager:
             # New structure: /output/patient/voxels/scan_name/effect_name/
             ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
             
-            # Default to no_processing if no effect is selected
+            # Default to original if no effect is selected
             if not selected_effect:
-                selected_effect = 'no_processing'
+                selected_effect = 'original'
             
             voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/{selected_effect}/"
             print(f"DEBUG: Using new structure voxel directory: {voxels_folder_url}")

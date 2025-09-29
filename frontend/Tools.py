@@ -204,6 +204,9 @@ def render_segmentation_tools():
             st.warning("⚠️ No patient folders with NIfTI files found. Please check your OUTPUT_FOLDER path in .env file and ensure patients have been processed through DICOM to NIfTI conversion.")
             return
         
+        # Get previously selected patients to detect changes
+        prev_selected_patients = st.session_state.get("segmentation_patients", [])
+        
         selected_patients = st.multiselect(
             "Select Patients",
             options=patient_folders,
@@ -211,6 +214,21 @@ def render_segmentation_tools():
             help="Select one or more patient folders to process. Leave empty or uncheck all to process no patients.",
             key="segmentation_patients"
         )
+        
+        # Check if patients were deselected and clear invalid scans
+        if selected_patients != prev_selected_patients:
+            # Patients changed, need to update available scans
+            if "segmentation_scans" in st.session_state:
+                # Get current available scans for selected patients
+                current_available_scans = []
+                for patient in selected_patients:
+                    scans = get_scans_for_patient(patient)
+                    current_available_scans.extend(scans)
+                current_available_scans = list(dict.fromkeys(current_available_scans))
+                
+                # Filter out scans that are no longer available
+                valid_scans = [scan for scan in st.session_state["segmentation_scans"] if scan in current_available_scans]
+                st.session_state["segmentation_scans"] = valid_scans
         
         # Scan selection - show available scans for selected patients
         selected_scans = []
@@ -228,15 +246,31 @@ def render_segmentation_tools():
             unique_scans = list(dict.fromkeys(all_available_scans))
             
             if unique_scans:
+                # Get previously selected scans from session state
+                prev_selected_scans = st.session_state.get("segmentation_scans", [])
+                
+                # Filter previously selected scans to only include those available for current patients
+                valid_prev_scans = [scan for scan in prev_selected_scans if scan in unique_scans]
+                
+                # If no valid previous selections, default to all scans
+                default_scans = valid_prev_scans if valid_prev_scans else unique_scans
+                
                 selected_scans = st.multiselect(
                     "Select Scans to Process",
                     options=unique_scans,
-                    default=unique_scans,  # Select all by default
+                    default=default_scans,
                     help="Select specific scans to process. Leave empty or uncheck all to process no scans.",
                     key="segmentation_scans"
                 )
             else:
                 st.warning("No scans found for selected patients.")
+                # Clear any previously selected scans if no scans available
+                if "segmentation_scans" in st.session_state:
+                    st.session_state["segmentation_scans"] = []
+        else:
+            # No patients selected, clear any previously selected scans
+            if "segmentation_scans" in st.session_state:
+                st.session_state["segmentation_scans"] = []
         
         # Force overwrite option
         force_overwrite = st.checkbox(

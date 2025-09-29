@@ -28,7 +28,7 @@ class VoxelManager:
         """Get display name for an effect."""
         # Convert effect name to display name
         display_names = {
-            'no_processing': 'Original (No Processing)',
+            'original': 'Original (No Processing)',
             'realistic_medical': 'Realistic Medical Visualization',
             'anatomical_enhancement': 'Anatomical Structure Enhancement',
             'monai_smooth': 'Subtle Smooth',
@@ -69,7 +69,7 @@ class VoxelManager:
                     href = link.get('href')
                     if href and not href.startswith('..') and href.endswith('/'):
                         # Extract effect folder name from the full path
-                        # href is like "/output/PA00000002/voxels/2.5MM_ARTERIAL_3/no_processing/"
+                        # href is like "/output/PA00000002/voxels/2.5MM_ARTERIAL_3/original/"
                         effect_folder_name = href.rstrip('/').split('/')[-1]
                         
                         # Verify this folder contains .nii.gz files
@@ -255,9 +255,9 @@ class VoxelManager:
         # Determine the folder structure based on whether an effect is selected
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
         
-        # Default to no_processing if no effect is selected
+        # Default to original if no effect is selected
         if not selected_effect:
-            selected_effect = 'no_processing'
+            selected_effect = 'original'
 
         if voxel_mode == "all":
             # Show complete base segmentation file stored as voxels/scan_name/effect_name/all.nii.gz
