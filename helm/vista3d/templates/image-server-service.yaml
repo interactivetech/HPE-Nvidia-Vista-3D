@@ -1,0 +1,23 @@
+{{- if .Values.imageServer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.imageServer.name }}
+  labels:
+    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: image-server
+    app.kubernetes.io/part-of: vista3d
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  type: {{ .Values.imageServer.service.type }}
+  ports:
+    - port: {{ .Values.imageServer.service.port }}
+      targetPort: {{ .Values.imageServer.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: image-server
+{{- end }}

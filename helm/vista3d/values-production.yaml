@@ -1,0 +1,248 @@
+# Production values for HPE NVIDIA Vista3D
+# This file contains production-ready configuration
+
+# Global configuration
+global:
+  imageRegistry: "your-registry.com"
+  imagePullSecrets:
+    - name: registry-secret
+
+# Backend configuration for production
+backend:
+  enabled: true
+  replicaCount: 1
+  
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+      memory: "32Gi"
+      cpu: "8"
+    requests:
+      nvidia.com/gpu: 1
+      memory: "16Gi"
+      cpu: "4"
+  
+  # Production node selector for GPU nodes
+  nodeSelector:
+    nvidia.com/gpu: "true"
+    node-type: "gpu"
+  
+  # Tolerations for GPU nodes
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: gpu-workload
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+  
+  # Production affinity rules
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: nvidia.com/gpu
+            operator: Exists
+          - key: node-type
+            operator: In
+            values: ["gpu"]
+
+# Frontend configuration for production
+frontend:
+  enabled: true
+  replicaCount: 3
+  
+  resources:
+    limits:
+      memory: "8Gi"
+      cpu: "4"
+    requests:
+      memory: "4Gi"
+      cpu: "2"
+  
+  # Production node selector
+  nodeSelector:
+    node-type: "compute"
+  
+  # Anti-affinity to spread across nodes
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/component
+              operator: In
+              values: ["frontend"]
+          topologyKey: kubernetes.io/hostname
+
+# Image server configuration for production
+imageServer:
+  enabled: true
+  replicaCount: 2
+  
+  resources:
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+    requests:
+      memory: "2Gi"
+      cpu: "1"
+  
+  # Anti-affinity for image server
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/component
+              operator: In
+              values: ["image-server"]
+          topologyKey: kubernetes.io/hostname
+
+# Production ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/client-max-body-size: "500m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: vista3d.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: vista3d-frontend
+        - path: /api/vista3d
+          pathType: Prefix
+          service: vista3d-backend
+        - path: /images
+          pathType: Prefix
+          service: vista3d-image-server
+  tls:
+    - secretName: vista3d-tls
+      hosts:
+        - vista3d.yourdomain.com
+
+# Production persistence configuration
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  accessMode: ReadWriteMany
+  
+  output:
+    enabled: true
+    storageClass: "fast-ssd"
+    accessMode: ReadWriteMany
+    size: 500Gi
+  
+  dicom:
+    enabled: true
+    storageClass: "standard"
+    accessMode: ReadOnlyMany
+    size: 200Gi
+
+# Production secrets configuration
+secrets:
+  create: true
+  # Use external secret management in production
+  # ngcApiKey: ""  # Set via external secret
+
+# Production service account
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT:role/vista3d-role"
+  name: "vista3d-service-account"
+
+# Production security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Production node selection
+nodeSelector:
+  node-type: "compute"
+
+# Production tolerations
+tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "medical-ai"
+    effect: "NoSchedule"
+
+# Production affinity
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      preference:
+        matchExpressions:
+        - key: node-type
+          operator: In
+          values: ["compute", "gpu"]
+
+# Production Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Production Horizontal Pod Autoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Production Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+      - protocol: TCP
+        port: 8501
+      - protocol: TCP
+        port: 8888
+      - protocol: TCP
+        port: 8000
+
+# Production monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus

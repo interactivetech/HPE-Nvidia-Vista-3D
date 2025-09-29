@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vista3d.fullname" . }}
+  labels:
+    {{- include "vista3d.labels" . | nindent 4 }}
+data:
+  # Application configuration
+  VISTA3D_SERVER: "http://{{ .Values.backend.name }}:{{ .Values.backend.service.port }}"
+  IMAGE_SERVER: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
+  OUTPUT_FOLDER: "/workspace/output"
+  DICOM_FOLDER: "/data/dicom"
+  
+  # Frontend specific configuration
+  STREAMLIT_SERVER_RUN_ON_SAVE: "true"
+  STREAMLIT_SERVER_FILE_WATCHER_TYPE: "auto"
+  DOCKER_CONTAINER: "true"
+  
+  # Backend specific configuration
+  WORKSPACE_IMAGES_PATH: "/workspace/output/nifti"
+  WORKSPACE_OUTPUTS_PATH: "/workspace/output"
+  WORKSPACE_ROOT: "/workspace"
+  CUDA_VISIBLE_DEVICES: "0"
+  NVIDIA_VISIBLE_DEVICES: "0"
+  NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+  CUDA_LAUNCH_BLOCKING: "1"
+  TORCH_USE_CUDA_DSA: "1"
+  
+  # CORS and security settings
+  CORS_ALLOW_ORIGINS: "*"
+  CORS_ALLOW_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_ALLOW_HEADERS: "*"
+  CORS_ALLOW_CREDENTIALS: "true"
+  CORS_EXPOSE_HEADERS: "*"
+  CORS_MAX_AGE: "3600"
+  
+  # File access settings
+  ALLOW_LOCAL_FILES: "true"
+  ENABLE_CONTAINER_PATHS: "true"
+  ENABLE_FILE_ACCESS: "true"
+  ALLOW_ABSOLUTE_PATHS: "true"
+  ALLOW_RELATIVE_PATHS: "true"
+  ALLOW_FILE_PROTOCOL: "true"
+  ALLOW_LOCAL_PATHS: "true"
+  DISABLE_URL_VALIDATION: "true"
+  ALLOW_ABSOLUTE_FILE_PATHS: "true"
+  ALLOW_RELATIVE_FILE_PATHS: "true"
+  FILE_ACCESS_MODE: "local"
+  LOCAL_FILE_ACCESS: "true"
+  
+  # Network access settings
+  ALLOW_ANY_IMAGE_SERVER_HOST: "true"
+  ALLOW_EXTERNAL_NETWORK_ACCESS: "true"
+  DISABLE_HOST_VALIDATION: "true"
+  ALLOW_ANY_IP_ACCESS: "true"
+  DISABLE_DOMAIN_WHITELIST: "true"
+  ALLOW_HTTP_ACCESS: "true"
+  ALLOW_HTTPS_ACCESS: "true"
+  ALLOW_REMOTE_ACCESS: "true"
+  ALLOW_CROSS_ORIGIN: "true"
+  DISABLE_CORS: "true"
+  ALLOW_ANY_ORIGIN: "true"
+  ALLOW_ANY_HOST: "true"
+  DISABLE_ORIGIN_VALIDATION: "true"
+  ALLOW_WILDCARD_HOSTS: "true"
+  DISABLE_IP_VALIDATION: "true"
+  ALLOW_PRIVATE_IPS: "true"
+  ALLOW_PUBLIC_IPS: "true"
+  ALLOW_LOCALHOST: "true"
+  ALLOW_LOOPBACK: "true"
+  DISABLE_NETWORK_RESTRICTIONS: "true"
+  ENABLE_EXTERNAL_ACCESS: "true"
+  ALLOW_IMAGE_SERVER_ACCESS: "true"
+  DISABLE_IMAGE_SERVER_VALIDATION: "true"
+  
+  # Vista3D specific settings
+  VISTA3D_ALLOW_EXTERNAL_IMAGES: "true"
+  VISTA3D_DISABLE_IMAGE_VALIDATION: "true"
+  VISTA3D_ALLOW_ANY_URL: "true"
+  VISTA3D_DISABLE_URL_VALIDATION: "true"
+  VISTA3D_ALLOW_REMOTE_FILES: "true"
+  VISTA3D_DISABLE_FILE_VALIDATION: "true"
+  VISTA3D_ENABLE_NETWORK_ACCESS: "true"
+  VISTA3D_ALLOW_HTTP_DOWNLOADS: "true"
+  VISTA3D_ALLOW_HTTPS_DOWNLOADS: "true"
+  VISTA3D_DISABLE_SSL_VERIFICATION: "true"
+  VISTA3D_ALLOW_INSECURE_CONNECTIONS: "true"
+  VISTA3D_TIMEOUT: "300"
+  VISTA3D_MAX_RETRIES: "3"
+  
+  # Domain whitelist
+  DOMAIN_WHITELIST: '[".*","http://.*","https://.*","http://.*:.*","https://.*:.*","file:///.*","*"]'
+  
+  # Supported image extensions
+  SUPPORTED_IMAGE_EXT: '".nrrd",".nii",".nii.gz",".dcm"'
+  
+  # Image server specific settings
+  IGNORE_SSL_ERRORS: "True"
+  IMAGE_URI_ALLOW_REDIRECTS: "True"
+  IMAGE_URI_HTTPS_ONLY: "False"
+  
+  # Python settings
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"

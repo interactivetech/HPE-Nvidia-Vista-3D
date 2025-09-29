@@ -1,0 +1,74 @@
+🎉 HPE NVIDIA Vista3D Medical AI Platform has been deployed!
+
+📋 Deployment Summary:
+{{- if .Values.backend.enabled }}
+✅ Backend (Vista3D Server): {{ .Values.backend.name }}
+{{- end }}
+{{- if .Values.frontend.enabled }}
+✅ Frontend (Web Interface): {{ .Values.frontend.name }}
+{{- end }}
+{{- if .Values.imageServer.enabled }}
+✅ Image Server: {{ .Values.imageServer.name }}
+{{- end }}
+
+🔗 Access Information:
+{{- if .Values.ingress.enabled }}
+🌐 Web Interface: http://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+🌐 Web Interface: http://localhost:8501 (port-forward required)
+{{- end }}
+
+📊 Service Status:
+{{- if .Values.backend.enabled }}
+Backend Service: {{ .Values.backend.name }}
+{{- end }}
+{{- if .Values.frontend.enabled }}
+Frontend Service: {{ .Values.frontend.name }}
+{{- end }}
+{{- if .Values.imageServer.enabled }}
+Image Server: {{ .Values.imageServer.name }}
+{{- end }}
+
+🚀 Quick Start:
+1. Wait for all pods to be ready:
+   kubectl get pods -l app.kubernetes.io/name={{ include "vista3d.name" . }}
+
+{{- if not .Values.ingress.enabled }}
+2. Port forward to access the web interface:
+   kubectl port-forward service/{{ .Values.frontend.name }} 8501:8501
+{{- end }}
+
+3. Open your browser and navigate to the web interface
+
+4. Upload your medical imaging data or use the sample data
+
+🔧 Configuration:
+- Backend requires NVIDIA GPU nodes
+- Ensure your cluster has GPU support enabled
+- Configure persistent volumes for data storage
+- Set up your NVIDIA NGC API key in the secret
+
+📚 Documentation:
+- Full documentation: https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D
+- Quick Start Guide: See the project README.md
+- Troubleshooting: Check pod logs with kubectl logs
+
+🔍 Troubleshooting:
+- Check pod status: kubectl get pods -l app.kubernetes.io/name={{ include "vista3d.name" . }}
+- View logs: kubectl logs -l app.kubernetes.io/name={{ include "vista3d.name" . }}
+- Check services: kubectl get svc -l app.kubernetes.io/name={{ include "vista3d.name" . }}
+
+{{- if .Values.backend.enabled }}
+⚠️  Backend Requirements:
+- NVIDIA GPU required
+- NVIDIA Container Toolkit installed on nodes
+- Proper node selectors and tolerations configured
+{{- end }}
+
+🎯 Next Steps:
+1. Configure your NVIDIA NGC API key
+2. Upload medical imaging data
+3. Run AI segmentation
+4. Explore 3D visualizations
+
+For more information, visit: https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D

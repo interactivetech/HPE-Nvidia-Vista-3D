@@ -30,17 +30,4 @@ dependencies = [
     "jinja2>=3.1.0",
     # Environment and configuration
     "python-dotenv>=1.0.0",
-    # Note: usd-core moved to optional dependencies due to ARM64 platform compatibility issues
-    # Install with: pip install "usd-core>=25.8" if needed for OpenUSD functionality
 ]
-
-[project.optional-dependencies]
-# Optional dependencies for advanced 3D processing
-usd = [
-    "usd-core>=25.8",
-]
-
-# Note: Platform-specific dependency handling is managed through optional dependencies
-# usd-core only supports x86_64 platforms, not ARM64 Linux
-
-
