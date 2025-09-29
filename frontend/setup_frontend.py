@@ -71,7 +71,13 @@ def run_command(command: str, check: bool = True, capture_output: bool = False) 
             print_error(f"Command failed: {command}")
             print_error(f"Error: {e}")
             sys.exit(1)
-        return e
+        # Return a CompletedProcess object with the error information
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=e.returncode,
+            stdout=e.stdout if hasattr(e, 'stdout') else '',
+            stderr=e.stderr if hasattr(e, 'stderr') else str(e)
+        )
 
 def check_docker_hub_images() -> Dict[str, bool]:
     """Check if Docker Hub images are available and pull them"""
