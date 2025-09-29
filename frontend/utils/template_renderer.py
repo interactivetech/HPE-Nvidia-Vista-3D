@@ -68,7 +68,7 @@ class TemplateRenderer:
                 'window_width': kwargs.get('window_width', 1000),
                 'overlay_start_index': kwargs.get('overlay_start_index', 0),
                 'actual_slice_type': kwargs.get('actual_slice_type', 3),
-                'segment_opacity': kwargs.get('segment_opacity', 0.5),
+                'segment_opacity': kwargs.get('segment_opacity', 0.8),
                 'view_fit_zoom': kwargs.get('view_fit_zoom', 3.0),
             }
 

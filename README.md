@@ -59,6 +59,8 @@ python3 setup.py
 ```
 
 **Setup Options:**
+
+**Local Docker Deployment:**
 ```bash
 # Setup everything (default)
 python3 setup.py
@@ -74,6 +76,16 @@ python3 setup.py --check-only
 
 # Non-interactive setup with defaults
 python3 setup.py --non-interactive
+```
+
+**Kubernetes Deployment:**
+```bash
+# Deploy with Helm chart
+cd helm/vista3d
+helm install vista3d . --namespace vista3d --create-namespace
+
+# Deploy with production configuration
+helm install vista3d . --namespace vista3d --create-namespace --values values-production.yaml
 
 # Get help
 python3 setup.py --help
@@ -492,6 +504,7 @@ sudo ufw allow 8000
 ## 📚 Additional Resources
 
 - **Setup Guide**: See [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) for comprehensive setup guide and options
+- **Helm Chart**: See [docs/HELM.md](docs/HELM.md) for Kubernetes deployment with Helm
 - **Full Documentation**: See `docs/` directory for detailed guides
 - **API Reference**: Check `utils/` directory for script documentation
 - **HPE GreenLake**: Learn about HPE infrastructure integration

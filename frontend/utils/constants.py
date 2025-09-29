@@ -35,10 +35,10 @@ DEFAULT_VIEWER_SETTINGS = {
     'slice_type': 'Multiplanar',
     'orientation': 'Axial',
     'color_map': 'niivue-ct_translucent',
-    'nifti_opacity': 0.5,  # Default CT scan opacity (will be reduced when voxels are shown)
+    'nifti_opacity': 0.7,  # Default CT scan opacity (will be increased when voxels are shown)
     'nifti_gamma': 1.0,
     'show_overlay': False,
-    'segment_opacity': 0.8,  # High voxel visibility while allowing some background to show through
+    'segment_opacity': 0.8,  # High voxel visibility with good contrast against brighter background
     'segment_gamma': 0.7,   # Lower gamma = brighter voxels
     'window_center': 0,
     'window_width': 1000,

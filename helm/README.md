@@ -75,11 +75,13 @@ The Helm chart deploys three main components:
 - **Purpose**: Web interface for medical imaging
 - **Port**: 8501
 - **Scaling**: Horizontal scaling supported
+- **Health Check**: Built-in Streamlit health endpoint
 
 ### 3. Image Server
 - **Image**: `dwtwp/vista3d-image-server:latest`
 - **Purpose**: HTTP server for medical image files
 - **Port**: 8888
+- **Health Check**: `/health` endpoint for monitoring
 
 ## ⚙️ Configuration
 

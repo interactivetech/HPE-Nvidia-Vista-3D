@@ -425,7 +425,7 @@ def render_viewer(selected_patient: str, selected_file: str):
     # Persist back to viewer_config settings so template sees the intended values
     viewer_config._settings['slice_type'] = slice_type_setting
     viewer_config._settings['orientation'] = orientation_setting
-    segment_opacity = settings.get('segment_opacity', 0.9)
+    segment_opacity = settings.get('segment_opacity', 0.8)
     segment_gamma = settings.get('segment_gamma', 1.0)
     
     # Load the Niivue JavaScript library content

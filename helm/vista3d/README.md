@@ -2,6 +2,9 @@
 
 This Helm chart deploys the HPE NVIDIA Vista3D Medical AI Platform on Kubernetes. The platform provides AI-powered medical image segmentation with 3D visualization capabilities.
 
+**Chart Version**: 1.1.0  
+**App Version**: 1.1.0
+
 ## Prerequisites
 
 - Kubernetes 1.19+
