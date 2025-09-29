@@ -110,9 +110,9 @@ class ViewerConfig:
         base_opacity = self._settings.get('nifti_opacity', 0.5)
         show_voxels = self._settings.get('show_overlay', False)
         
-        # If voxels are being displayed, make CT scan more transparent to highlight voxels
+        # If voxels are being displayed, maintain better background visibility
         if show_voxels:
-            return min(base_opacity * 0.3, 0.2)  # Reduce to 30% of base opacity, max 0.2 for better voxel visibility
+            return min(base_opacity * 0.7, 0.6)  # Reduce to 70% of base opacity, max 0.6 for better background visibility
         else:
             return base_opacity  # Use full opacity when no voxels
 
@@ -237,7 +237,7 @@ class ViewerConfig:
                 "CT Scan Base Opacity",
                 0.0, 1.0,
                 self._settings['nifti_opacity'],
-                help="Base opacity for CT scan. When voxels are shown, this is automatically reduced to 40% for better visibility."
+                help="Base opacity for CT scan. When voxels are shown, this is automatically reduced to 60% for better background visibility."
             )
             self._settings['nifti_gamma'] = st.slider(
                 "Scan Gamma",
