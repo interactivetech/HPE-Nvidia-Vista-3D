@@ -436,6 +436,8 @@ HPE-Nvidia-Vista-3D/
 │   ├── nifti/           # Converted NIFTI files
 │   ├── scans/           # Scan results
 │   └── voxels/          # Voxel data
+│       └── {scan_name}/
+│           └── original/ # Original segmented voxel files
 ├── utils/               # Utility scripts
 │   ├── dicom2nifti.py   # DICOM to NIFTI conversion
 │   ├── segment.py       # Vista3D segmentation processing

@@ -170,6 +170,8 @@ Processed files are saved in the following structure:
 output/
   patient_id/
     voxels/
+        └── {scan_name}/
+            └── original/
       scan_name/
         ultra_realistic_anatomy/
           organ_name.nii.gz

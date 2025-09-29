@@ -90,7 +90,8 @@ The setup script will:
 ### Step 2: Start Vista3D Server (GPU-Enabled Machine)
 ```bash
 # On your GPU-enabled machine (local or remote)
-python3 start_backend.py
+cd backend
+docker-compose up -d
 ```
 
 This starts:
@@ -103,7 +104,11 @@ This starts:
 ### Step 3: Start Frontend Services
 ```bash
 # On any machine (can be same as Vista3D or different)
-python3 start_frontend.py
+cd frontend
+# Start image server first
+cd ../image_server && docker-compose up -d
+# Start frontend
+cd ../frontend && docker-compose up -d
 ```
 
 This starts:
@@ -149,10 +154,10 @@ streamlit run app.py
 uv venv .venv-backend
 source .venv-backend/bin/activate
 uv pip install python-dotenv numpy tqdm requests beautifulsoup4 bs4 nibabel dcm2niix vtk trimesh pymeshfix stl scikit-image plyfile
-python start_backend.py
+cd backend && docker-compose up -d
 ```
 
-See [DEVELOPMENT_ENVIRONMENTS.md](DEVELOPMENT_ENVIRONMENTS.md) for detailed documentation.
+See the [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md) for detailed development environment setup.
 
 ## 🌐 Deployment Scenarios
 
@@ -164,7 +169,13 @@ The platform supports multiple deployment configurations based on your infrastru
 python3 setup.py
 
 # Start all services
-./start_all.sh
+# Backend (GPU machine)
+cd backend && docker-compose up -d
+
+# Frontend (any machine)
+cd frontend
+cd ../image_server && docker-compose up -d
+cd ../frontend && docker-compose up -d
 ```
 **Best for**: Development, testing, small-scale deployments
 
@@ -267,13 +278,21 @@ After running the setup and start scripts, you'll have:
 ### Master Platform Management
 ```bash
 # Start all services (if both frontend and backend were set up)
-./start_all.sh
+# Backend (GPU machine)
+cd backend && docker-compose up -d
+
+# Frontend (any machine)
+cd frontend
+cd ../image_server && docker-compose up -d
+cd ../frontend && docker-compose up -d
 
 # Stop all services
-./stop_all.sh
+cd backend && docker-compose down
+cd ../frontend && docker-compose down
+cd ../image_server && docker-compose down
 
 # Check service status
-./status.sh
+docker-compose ps
 ```
 
 ### Individual Service Management
@@ -313,16 +332,18 @@ cd frontend && docker logs -f vista3d-image-server-standalone
 ### Systemd Service Management (Production)
 ```bash
 # Create systemd services for auto-startup
-sudo python3 start_backend.py --create-service
-sudo python3 start_frontend.py --create-service
+# Note: Systemd service creation is not available in the current version
+# Use Docker Compose with restart policies instead:
+# Add 'restart: unless-stopped' to docker-compose.yml files
 
-# Start services
-sudo systemctl start vista3d
-sudo systemctl start vista3d-gui
+# Start services using Docker Compose
+cd backend && docker-compose up -d
+cd ../frontend
+cd ../image_server && docker-compose up -d
+cd ../frontend && docker-compose up -d
 
 # Check service status
-sudo systemctl status vista3d
-sudo systemctl status vista3d-gui
+docker-compose ps
 ```
 
 ## ⚠️ Command Line Utilities (Advanced Users Only)
@@ -343,8 +364,9 @@ python3 utils/nifti2ply.py      # NIFTI to PLY conversion
 ```
 HPE-Nvidia-Vista-3D/
 ├── setup.py              # Unified setup script
-├── start_backend.py      # Vista3D server startup script
-├── start_frontend.py     # Frontend services startup script
+├── backend/              # Vista3D backend service
+├── frontend/             # Streamlit frontend service
+├── image_server/         # Image server service
 ├── app.py                # Main Streamlit web application
 ├── .env                  # Environment configuration (created by setup)
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
@@ -352,6 +374,8 @@ HPE-Nvidia-Vista-3D/
 │   ├── nifti/           # Converted NIFTI files
 │   ├── scans/           # Scan results
 │   └── voxels/          # Voxel data
+│       └── {scan_name}/
+│           └── original/ # Original segmented voxel files
 ├── utils/               # Utility scripts (for advanced users)
 │   ├── dicom2nifti.py   # DICOM to NIFTI conversion (use Tools page instead)
 │   ├── segment.py       # Vista3D segmentation processing (use Tools page instead)
@@ -389,7 +413,9 @@ NGC_API_KEY="your_nvidia_api_key"
 ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
 
 # Start only frontend services
-python3 start_frontend.py
+cd frontend
+cd ../image_server && docker-compose up -d
+cd ../frontend && docker-compose up -d
 ```
 
 ## 🔍 Troubleshooting

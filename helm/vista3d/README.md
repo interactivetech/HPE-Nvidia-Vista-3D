@@ -13,8 +13,10 @@ This Helm chart deploys the HPE NVIDIA Vista3D Medical AI Platform on Kubernetes
 
 ### Add the Helm repository (if published)
 ```bash
-helm repo add vista3d https://your-helm-repo.com
-helm repo update
+# Note: This chart is not yet published to a public repository
+# Use the local installation method below instead
+# helm repo add vista3d https://your-helm-repo.com
+# helm repo update
 ```
 
 ### Install from local chart

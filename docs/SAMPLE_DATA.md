@@ -123,10 +123,17 @@ dicom/PA00000002/
 output/PA00000002/
 ├── nifti/                    # NIFTI format files
 ├── voxels/                   # Processed voxel data
-│   ├── SAGITTAL_ABDOMEN_602_i00002.nii.gz
-│   ├── 2.5MM_ARTERIAL_3.nii.gz
-│   ├── CORONAL_ABDOMEN_601_i00002.nii.gz
-│   └── ... (processed files)
+│   ├── 2.5MM_ARTERIAL_3/
+│   │   └── original/         # Original segmented voxel files
+│   │       ├── aorta.nii.gz
+│   │       ├── liver.nii.gz
+│   │       └── ... (81 individual structure files)
+│   ├── CORONAL_ABDOMEN_601_i00002/
+│   │   └── original/         # Original segmented voxel files
+│   │       └── ... (83 individual structure files)
+│   └── SAGITTAL_ABDOMEN_602_i00002/
+│       └── original/         # Original segmented voxel files
+│           └── ... (81 individual structure files)
 └── .DS_Store                 # System file (can be ignored)
 ```
 

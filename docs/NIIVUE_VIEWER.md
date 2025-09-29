@@ -104,7 +104,8 @@ Handles rendering of HTML templates with dynamic data injection.
    │   │   └── segmentation_files.nii.gz
    │   └── voxels/
    │       └── SCAN_NAME/
-   │           └── individual_structure_files.nii.gz
+   │           └── original/
+   │               └── individual_structure_files.nii.gz
    ```
 
 ### Starting the Application
