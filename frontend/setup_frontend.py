@@ -16,6 +16,7 @@ import subprocess
 import shutil
 import platform
 import json
+import tarfile
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
@@ -322,6 +323,29 @@ def get_user_input() -> Dict[str, str]:
     
     return config
 
+def prompt_for_sample_data() -> bool:
+    """Prompt user if they want to install sample data"""
+    print_header("Sample Data Installation")
+    
+    sample_data_file = os.path.join(os.getcwd(), "..", "sample_data.tgz")
+    
+    if not os.path.exists(sample_data_file):
+        print_warning(f"Sample data file not found: {sample_data_file}")
+        print_info("Sample data installation will be skipped.")
+        return False
+    
+    print_info("Sample data archive found! This contains:")
+    print_info("  - DICOM medical imaging data")
+    print_info("  - Pre-processed output data")
+    print_info("  - Various medical imaging datasets for testing")
+    
+    response = input("\nInstall sample data? (Y/n): ").strip().lower()
+    if response in ['', 'y', 'yes']:
+        return True
+    else:
+        print_info("Sample data installation skipped.")
+        return False
+
 def create_directories(config: Dict[str, str]) -> None:
     """Create necessary directories"""
     print_header("Creating Directory Structure")
@@ -337,6 +361,134 @@ def create_directories(config: Dict[str, str]) -> None:
             print_success(f"Created: {directory}")
         except Exception as e:
             print_error(f"Failed to create {directory}: {e}")
+
+def install_sample_data(config: Dict[str, str]) -> bool:
+    """Extract and install sample data from sample_data.tgz"""
+    print_header("Installing Sample Data")
+    
+    sample_data_file = os.path.join(os.getcwd(), "..", "sample_data.tgz")
+    
+    if not os.path.exists(sample_data_file):
+        print_warning(f"Sample data file not found: {sample_data_file}")
+        return False
+    
+    try:
+        print_info(f"Extracting sample data from: {sample_data_file}")
+        
+        # Create a temporary directory for extraction
+        temp_dir = os.path.join(os.getcwd(), "..", "temp_sample_data")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Extract the tar.gz file
+        with tarfile.open(sample_data_file, 'r:gz') as tar:
+            tar.extractall(temp_dir)
+        
+        print_success("Sample data extracted successfully")
+        
+        # Move dicom data to the configured dicom folder
+        source_dicom = os.path.join(temp_dir, "dicom")
+        if os.path.exists(source_dicom):
+            print_info(f"Installing DICOM data to: {config['DICOM_FOLDER']}")
+            
+            # Check if dicom folder already has content
+            existing_dicom = os.listdir(config['DICOM_FOLDER'])
+            if existing_dicom and any(item != '.DS_Store' for item in existing_dicom):
+                print_warning(f"DICOM folder already contains data: {config['DICOM_FOLDER']}")
+                response = input("Overwrite existing DICOM data? (y/N): ").strip().lower()
+                if response not in ['y', 'yes']:
+                    print_info("Skipping DICOM data installation")
+                else:
+                    # Remove existing content (except .DS_Store)
+                    for item in os.listdir(config['DICOM_FOLDER']):
+                        if item != '.DS_Store':
+                            item_path = os.path.join(config['DICOM_FOLDER'], item)
+                            if os.path.isdir(item_path):
+                                shutil.rmtree(item_path)
+                            else:
+                                os.remove(item_path)
+                    
+                    # Copy new content
+                    for item in os.listdir(source_dicom):
+                        if item != '.DS_Store':
+                            src_path = os.path.join(source_dicom, item)
+                            dst_path = os.path.join(config['DICOM_FOLDER'], item)
+                            if os.path.isdir(src_path):
+                                shutil.copytree(src_path, dst_path)
+                            else:
+                                shutil.copy2(src_path, dst_path)
+                    print_success("DICOM data installed successfully")
+            else:
+                # Copy all content from source to destination
+                for item in os.listdir(source_dicom):
+                    if item != '.DS_Store':
+                        src_path = os.path.join(source_dicom, item)
+                        dst_path = os.path.join(config['DICOM_FOLDER'], item)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path)
+                        else:
+                            shutil.copy2(src_path, dst_path)
+                print_success("DICOM data installed successfully")
+        else:
+            print_warning("No DICOM data found in sample data archive")
+        
+        # Move output data to the configured output folder
+        source_output = os.path.join(temp_dir, "output")
+        if os.path.exists(source_output):
+            print_info(f"Installing output data to: {config['OUTPUT_FOLDER']}")
+            
+            # Check if output folder already has content
+            existing_output = os.listdir(config['OUTPUT_FOLDER'])
+            if existing_output and any(item != '.DS_Store' for item in existing_output):
+                print_warning(f"Output folder already contains data: {config['OUTPUT_FOLDER']}")
+                response = input("Overwrite existing output data? (y/N): ").strip().lower()
+                if response not in ['y', 'yes']:
+                    print_info("Skipping output data installation")
+                else:
+                    # Remove existing content (except .DS_Store)
+                    for item in os.listdir(config['OUTPUT_FOLDER']):
+                        if item != '.DS_Store':
+                            item_path = os.path.join(config['OUTPUT_FOLDER'], item)
+                            if os.path.isdir(item_path):
+                                shutil.rmtree(item_path)
+                            else:
+                                os.remove(item_path)
+                    
+                    # Copy new content
+                    for item in os.listdir(source_output):
+                        if item != '.DS_Store':
+                            src_path = os.path.join(source_output, item)
+                            dst_path = os.path.join(config['OUTPUT_FOLDER'], item)
+                            if os.path.isdir(src_path):
+                                shutil.copytree(src_path, dst_path)
+                            else:
+                                shutil.copy2(src_path, dst_path)
+                    print_success("Output data installed successfully")
+            else:
+                # Copy all content from source to destination
+                for item in os.listdir(source_output):
+                    if item != '.DS_Store':
+                        src_path = os.path.join(source_output, item)
+                        dst_path = os.path.join(config['OUTPUT_FOLDER'], item)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path)
+                        else:
+                            shutil.copy2(src_path, dst_path)
+                print_success("Output data installed successfully")
+        else:
+            print_warning("No output data found in sample data archive")
+        
+        # Clean up temporary directory
+        shutil.rmtree(temp_dir)
+        print_success("Sample data installation completed successfully")
+        return True
+        
+    except Exception as e:
+        print_error(f"Failed to install sample data: {e}")
+        # Clean up temporary directory if it exists
+        temp_dir = os.path.join(os.getcwd(), "..", "temp_sample_data")
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        return False
 
 def create_env_file(config: Dict[str, str]) -> None:
     """Create .env file with configuration"""
@@ -564,6 +716,13 @@ def main():
     # Create directories
     create_directories(config)
     
+    # Prompt for sample data installation
+    install_sample = prompt_for_sample_data()
+    
+    # Install sample data if requested
+    if install_sample:
+        install_sample_data(config)
+    
     # Create .env file
     create_env_file(config)
     
@@ -597,6 +756,13 @@ def main():
     print_info(f"Output folder: {config['OUTPUT_FOLDER']}")
     print_info(f"Vista3D server: {config['VISTA3D_SERVER']}")
     print_info(f"Image server: {config['IMAGE_SERVER']}")
+    
+    # Check if sample data was installed
+    sample_data_file = os.path.join(os.getcwd(), "..", "sample_data.tgz")
+    if os.path.exists(sample_data_file):
+        print_info("\n📁 Sample data is available for testing the application")
+        print_info("   The sample data includes various medical imaging datasets")
+        print_info("   that you can use to explore the Vista3D features.")
 
 if __name__ == "__main__":
     main()

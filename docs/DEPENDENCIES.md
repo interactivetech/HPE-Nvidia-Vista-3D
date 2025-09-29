@@ -11,7 +11,7 @@ This project uses a unified dependency configuration for simplified management a
 - `streamlit`, `fastapi`, `uvicorn` - Web framework
 - `nibabel`, `dcm2niix` - Medical imaging
 - `torch` - AI/ML framework (includes Triton)
-- `vtk`, `trimesh`, `open3d` - 3D visualization
+- `vtk`, `trimesh` - 3D visualization
 - `pandas`, `plotly` - Data handling and visualization
 
 **Includes**: All dependencies for complete Vista3D platform functionality
