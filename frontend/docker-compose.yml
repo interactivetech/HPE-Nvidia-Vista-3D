@@ -19,8 +19,8 @@ services:
       - STREAMLIT_SERVER_RUN_ON_SAVE=true
       - STREAMLIT_SERVER_FILE_WATCHER_TYPE=auto
     volumes:
-      - ${OUTPUT_FOLDER:-./output}:/app/output
-      - ${DICOM_FOLDER:-./dicom}:/app/dicom
+      - ${OUTPUT_FOLDER:-../output}:/app/output
+      - ${DICOM_FOLDER:-../dicom}:/app/dicom
       # Development: Mount source code for live development (default mode)
       - .:/app
       # Exclude build artifacts from mounting
@@ -41,8 +41,8 @@ services:
       - DICOM_FOLDER=/data/dicom
       - IMAGE_SERVER=http://localhost:8888
     volumes:
-      - ${OUTPUT_FOLDER:-./output}:/data/output:ro
-      - ${DICOM_FOLDER:-./dicom}:/data/dicom:ro
+      - ${OUTPUT_FOLDER:-../output}:/data/output:ro
+      - ${DICOM_FOLDER:-../dicom}:/data/dicom:ro
     restart: unless-stopped
 
 

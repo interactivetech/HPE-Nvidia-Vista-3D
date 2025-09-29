@@ -17,8 +17,8 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
     volumes:
-      - ${OUTPUT_FOLDER:-./output}:/data/output:ro
-      - ${DICOM_FOLDER:-./dicom}:/data/dicom:ro
+      - ${OUTPUT_FOLDER:-../output}:/data/output:ro
+      - ${DICOM_FOLDER:-../dicom}:/data/dicom:ro
       # Development: Mount source code for live development (default mode)
       - .:/srv
       # Exclude build artifacts from mounting
