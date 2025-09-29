@@ -157,8 +157,7 @@ def render_sidebar():
                             display_parts.append(f"({manufacturer})")
                         if study_description:
                             display_parts.append(f"- {study_description}")
-                        
-                        st.caption(" ".join(display_parts))
+                        st.sidebar.info(f"{', '.join(display_parts)}")
                     else:
                         st.caption("📊 Unknown Scan Type")
                 except Exception as e:
