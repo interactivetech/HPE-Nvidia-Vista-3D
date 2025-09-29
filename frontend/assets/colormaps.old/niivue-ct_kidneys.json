@@ -1,0 +1,15 @@
+{
+  "name": "NiiVue CT Kidneys Colormap",
+  "description": "CT kidneys colormap with NiiVue naming",
+  "colormaps": {
+    "niivue-ct_kidneys": {
+      "R": [0, 255, 255],
+      "G": [0, 129, 255],
+      "B": [0, 0, 255],
+      "A": [0, 88, 228],
+      "labels": ["Background", "Kidneys", "Contrast"]
+    }
+  }
+}
+
+

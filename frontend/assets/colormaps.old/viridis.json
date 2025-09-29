@@ -1,0 +1,14 @@
+{
+  "name": "Viridis Colormap",
+  "description": "Perceptually uniform colormap from dark purple to bright yellow with transparency",
+  "colormaps": {
+    "viridis": {
+      "R": [68, 72, 67, 56, 45, 37, 30, 42, 82, 133, 194, 253],
+      "G": [1, 40, 67, 90, 112, 133, 155, 176, 198, 219, 231, 231],
+      "B": [84, 54, 32, 44, 73, 108, 152, 199, 233, 245, 197, 37],
+      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255],
+      "I": [0, 23, 46, 69, 92, 115, 138, 161, 184, 207, 230, 255],
+      "labels": ["Transparent", "Purple", "Blue-Purple", "Blue", "Cyan-Blue", "Cyan", "Green-Cyan", "Green", "Yellow-Green", "Yellow", "Bright Yellow", "White"]
+    }
+  }
+}

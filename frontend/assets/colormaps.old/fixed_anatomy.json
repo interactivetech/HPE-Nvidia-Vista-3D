@@ -1,0 +1,26 @@
+{
+  "name": "Fixed Anatomy Visualization",
+  "description": "Corrected colormap that properly hides skin/face and clearly shows brain, eyes, and vessels",
+  "colormaps": {
+    "fixed_anatomy": {
+      "min": -1000,
+      "max": 1000,
+      "R": [0, 0, 0, 0, 0, 50, 100, 255, 255, 255, 255, 255],
+      "G": [0, 0, 0, 0, 0, 100, 150, 255, 100, 50, 200, 255],
+      "B": [0, 0, 0, 0, 0, 150, 200, 100, 0, 0, 100, 255],
+      "A": [0, 0, 0, 0, 0, 100, 150, 255, 255, 255, 255, 255],
+      "I": [-1000, -500, -200, -50, 0, 10, 30, 50, 70, 100, 200, 1000],
+      "labels": ["Air", "Lung", "Fat", "Skin (Hidden)", "Soft Tissue", "Brain Gray", "Brain White", "Eyes", "Vessels", "Dense Vessels", "Bone", "Metal"]
+    },
+    "working_anatomy": {
+      "min": -1000,
+      "max": 1000,
+      "R": [0, 0, 0, 0, 0, 80, 120, 200, 255, 255, 255, 255],
+      "G": [0, 0, 0, 0, 0, 120, 160, 200, 100, 50, 200, 255],
+      "B": [0, 0, 0, 0, 0, 160, 200, 100, 0, 0, 100, 255],
+      "A": [0, 0, 0, 0, 0, 80, 120, 200, 255, 255, 255, 255],
+      "I": [-1000, -500, -200, -50, 0, 5, 25, 45, 65, 85, 150, 1000],
+      "labels": ["Air", "Lung", "Fat", "Skin (Hidden)", "Soft Tissue", "Brain Gray", "Brain White", "Eyes", "Vessels", "Dense Vessels", "Bone", "Metal"]
+    }
+  }
+}

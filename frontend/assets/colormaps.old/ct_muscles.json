@@ -1,0 +1,13 @@
+{
+  "name": "CT Muscles Colormap",
+  "description": "Colormap for visualizing CT muscle scans",
+  "colormaps": {
+    "ct_muscles": {
+      "R": [0, 128, 159, 255, 255, 255, 255],
+      "G": [0, 0, 56, 90, 0, 255, 255],
+      "B": [0, 0, 41, 70, 0, 0, 255],
+      "A": [0, 63, 105, 135, 167, 184, 228],
+      "labels": ["Background", "Fat", "Muscle", "Soft Tissue", "Blood", "Bone", "Contrast"]
+    }
+  }
+}

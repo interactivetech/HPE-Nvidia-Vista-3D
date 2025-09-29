@@ -1,0 +1,15 @@
+{
+  "name": "NiiVue CT Soft Tissue Colormap",
+  "description": "CT soft tissue colormap with NiiVue naming",
+  "colormaps": {
+    "niivue-ct_soft_tissue": {
+      "R": [0, 199, 255],
+      "G": [0, 127, 255],
+      "B": [0, 127, 255],
+      "A": [0, 48, 128],
+      "labels": ["Background", "Soft Tissue", "Enhanced"]
+    }
+  }
+}
+
+

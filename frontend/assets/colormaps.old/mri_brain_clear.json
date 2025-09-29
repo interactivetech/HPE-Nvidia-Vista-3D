@@ -1,0 +1,26 @@
+{
+  "name": "MRI Brain Clear Visualization",
+  "description": "Specialized colormap for MRI brain scans that hides skin and highlights internal structures",
+  "colormaps": {
+    "mri_brain_clear": {
+      "min": 0,
+      "max": 1000,
+      "R": [0, 0, 0, 0, 0, 60, 120, 200, 255, 255, 255, 255],
+      "G": [0, 0, 0, 0, 0, 100, 150, 200, 150, 100, 200, 255],
+      "B": [0, 0, 0, 0, 0, 140, 180, 100, 50, 0, 100, 255],
+      "A": [0, 0, 0, 0, 0, 60, 120, 200, 255, 255, 255, 255],
+      "I": [0, 50, 100, 150, 200, 250, 300, 350, 400, 500, 700, 1000],
+      "labels": ["Background", "Air", "Fat", "Skin (Hidden)", "Soft Tissue", "Brain Gray", "Brain White", "Eyes", "Vessels", "Dense Vessels", "Bone", "Metal"]
+    },
+    "mri_anatomy": {
+      "min": 0,
+      "max": 1000,
+      "R": [0, 0, 0, 0, 0, 80, 140, 220, 255, 255, 255, 255],
+      "G": [0, 0, 0, 0, 0, 120, 180, 180, 120, 80, 200, 255],
+      "B": [0, 0, 0, 0, 0, 160, 220, 80, 40, 0, 100, 255],
+      "A": [0, 0, 0, 0, 0, 80, 140, 220, 255, 255, 255, 255],
+      "I": [0, 40, 80, 120, 160, 200, 240, 280, 320, 400, 600, 1000],
+      "labels": ["Background", "Air", "Fat", "Skin (Hidden)", "Soft Tissue", "Brain Gray", "Brain White", "Eyes", "Vessels", "Dense Vessels", "Bone", "Metal"]
+    }
+  }
+}

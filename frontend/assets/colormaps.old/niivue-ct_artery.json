@@ -1,0 +1,16 @@
+{
+  "name": "NiiVue CT Artery Colormap",
+  "description": "CT artery/vessel highlighting colormap (skin transparent, vessels bright)",
+  "colormaps": {
+    "niivue-ct_artery": {
+      "R": [0, 0, 0, 64, 128, 192, 220, 240, 255],
+      "G": [0, 0, 0, 0, 32, 64, 96, 140, 190],
+      "B": [0, 0, 0, 0, 32, 64, 96, 128, 160],
+      "A": [0, 0, 0, 0, 64, 128, 192, 224, 255],
+      "I": [0, 40, 80, 120, 140, 160, 180, 200, 255],
+      "labels": ["Transparent", "Transparent", "Transparent", "Dark Red", "Red", "Red-Orange", "Orange", "Yellow", "White"]
+    }
+  }
+}
+
+

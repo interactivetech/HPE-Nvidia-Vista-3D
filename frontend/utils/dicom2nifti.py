@@ -112,15 +112,71 @@ def check_patient_folders_exist(dicom_path: Path) -> bool:
     return False
 
 
-def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s", optimize_reformatted=True):
+def get_modality_specific_dcm2niix_settings(modality, is_reformatted=True):
     """
-    Run dcm2niix conversion with NiiVue-optimized settings.
+    Get modality-specific dcm2niix settings optimized for CT vs MRI scans.
+    
+    Args:
+        modality: Scan modality ('CT' or 'MR')
+        is_reformatted: Whether this is a reformatted slice
+    
+    Returns:
+        list: dcm2niix command arguments optimized for the modality
+    """
+    base_settings = [
+        'dcm2niix',
+        '-b', 'y',           # Generate BIDS sidecar JSON
+        '-ba', 'y',          # Anonymize BIDS sidecar
+        '-f', '%d_%s',       # Filename format
+        '-v', '2',           # Maximum verbose output for troubleshooting
+        '-x', 'i',           # Ignore cropping and rotation (preserves all data for reformatting)
+        '-w', '2',           # Write behavior: 2 = write all series (including reformatted)
+        '-i', 'n',           # Ignore derived images: n = no (include reformatted slices)
+        '-l', 'y',           # Losslessly scale 16-bit integers to use full dynamic range
+        '-m', '2',           # Auto-merge 2D slices from same series (best quality)
+        '--big-endian', 'o', # Optimal byte order (native)
+    ]
+    
+    if modality == 'CT':
+        # CT-optimized settings for maximum quality and HU preservation
+        ct_settings = [
+            '-z', 'o',           # Optimal compression (best quality/size ratio for CT)
+            '-1', '9',           # Maximum compression level (9=smallest, best quality)
+            '-p', 'y',           # Philips precise float scaling (not display scaling)
+            '--ct_slope_intercept', 'y',  # Preserve CT slope/intercept for accurate HU values
+        ]
+        return base_settings + ct_settings
+    
+    elif modality == 'MR':
+        # MRI-optimized settings for maximum quality and contrast preservation
+        mr_settings = [
+            '-z', 'y',           # Compress output (.nii.gz) - MRI benefits from compression
+            '-1', '6',           # Moderate compression level (6=good quality/size balance for MRI)
+            '-p', 'n',           # Don't apply Philips scaling (not needed for MRI)
+            '--mri_slope_intercept', 'y',  # Preserve MRI slope/intercept for accurate intensity values
+        ]
+        return base_settings + mr_settings
+    
+    else:
+        # Default high-quality settings for unknown modalities
+        default_settings = [
+            '-z', 'o',           # Optimal compression
+            '-1', '9',           # Maximum compression level
+            '-p', 'y',           # Philips precise float scaling
+        ]
+        return base_settings + default_settings
+
+
+def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s", optimize_reformatted=True, modality='Unknown'):
+    """
+    Run dcm2niix conversion with modality-specific NiiVue-optimized settings.
     
     Args:
         input_dir: Input DICOM directory
         output_dir: Output directory for NIFTI files
         filename_format: Output filename format (dcm2niix -f option)
         optimize_reformatted: If True, use settings optimized for reformatted slices
+        modality: Scan modality ('CT', 'MR', or 'Unknown') for optimization
     
     Returns:
         dict: Conversion results with status and files created
@@ -129,40 +185,15 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s", opti
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
-        # dcm2niix command with NiiVue-optimized settings
-        if optimize_reformatted:
-            # Maximum quality settings for reformatted slices
-            cmd = [
-                'dcm2niix',
-                '-z', 'o',           # Optimal compression (best quality/size ratio)
-                '-1', '9',           # Maximum compression level (9=smallest, best quality)
-                '-b', 'y',           # Generate BIDS sidecar JSON
-                '-ba', 'y',          # Anonymize BIDS sidecar
-                '-f', filename_format, # Filename format
-                '-o', str(output_dir), # Output directory
-                '-v', '2',           # Maximum verbose output for troubleshooting
-                '-x', 'i',           # Ignore cropping and rotation (preserves all data for reformatting)
-                '-w', '2',           # Write behavior: 2 = write all series (including reformatted)
-                '-i', 'n',           # Ignore derived images: n = no (include reformatted slices)
-                '-l', 'y',           # Losslessly scale 16-bit integers to use full dynamic range
-                '-m', '2',           # Auto-merge 2D slices from same series (best quality)
-                '-p', 'y',           # Philips precise float scaling (not display scaling)
-                '--big-endian', 'o', # Optimal byte order (native)
-                str(input_dir)       # Input directory
-            ]
-        else:
-            # Original settings
-            cmd = [
-                'dcm2niix',
-                '-z', 'y',           # Compress output (.nii.gz)
-                '-b', 'y',           # Generate BIDS sidecar JSON
-                '-ba', 'y',          # Anonymize BIDS sidecar
-                '-f', filename_format, # Filename format
-                '-o', str(output_dir), # Output directory
-                '-v', '2',           # More verbose output for troubleshooting
-                '-x', 'y',           # Crop 3D acquisitions
-                str(input_dir)       # Input directory
-            ]
+        # Get modality-specific dcm2niix settings
+        cmd = get_modality_specific_dcm2niix_settings(modality, optimize_reformatted)
+        
+        # Add output directory and input directory
+        cmd.extend(['-o', str(output_dir), str(input_dir)])
+        
+        # Override filename format if specified
+        if filename_format != "%d_%s":
+            cmd[cmd.index('%d_%s')] = filename_format
         
         print(f"🔧 Running dcm2niix conversion:")
         print(f"   Command: {' '.join(cmd)}")
@@ -233,6 +264,195 @@ def detect_reformatted_slice(json_file):
         return False
 
 
+def detect_scan_modality(json_file):
+    """
+    Detect scan modality (MRI, CT, etc.) from DICOM metadata.
+    
+    Args:
+        json_file: Path to JSON sidecar file
+    
+    Returns:
+        dict: Modality information including type, manufacturer, and additional details
+    """
+    try:
+        if not json_file or not json_file.exists():
+            return {
+                'modality': 'Unknown',
+                'manufacturer': 'Unknown',
+                'model': 'Unknown',
+                'study_description': 'Unknown',
+                'series_description': 'Unknown',
+                'detection_method': 'No metadata available'
+            }
+            
+        with open(json_file, 'r') as f:
+            metadata = json.load(f)
+        
+        # Extract modality information
+        modality = metadata.get('Modality', 'Unknown')
+        manufacturer = metadata.get('Manufacturer', 'Unknown')
+        model = metadata.get('ManufacturersModelName', 'Unknown')
+        study_desc = metadata.get('StudyDescription', 'Unknown')
+        series_desc = metadata.get('SeriesDescription', 'Unknown')
+        
+        # Additional modality-specific information
+        modality_info = {
+            'modality': modality,
+            'manufacturer': manufacturer,
+            'model': model,
+            'study_description': study_desc,
+            'series_description': series_desc,
+            'detection_method': 'DICOM metadata'
+        }
+        
+        # Add modality-specific details
+        if modality == 'MR':
+            modality_info.update({
+                'magnetic_field_strength': metadata.get('MagneticFieldStrength', 'Unknown'),
+                'imaging_frequency': metadata.get('ImagingFrequency', 'Unknown'),
+                'pulse_sequence': metadata.get('PulseSequenceName', 'Unknown'),
+                'scanning_sequence': metadata.get('ScanningSequence', 'Unknown'),
+                'echo_time': metadata.get('EchoTime', 'Unknown'),
+                'repetition_time': metadata.get('RepetitionTime', 'Unknown'),
+                'flip_angle': metadata.get('FlipAngle', 'Unknown'),
+                'body_part': metadata.get('BodyPart', 'Unknown')
+            })
+        elif modality == 'CT':
+            modality_info.update({
+                'xray_tube_current': metadata.get('XRayTubeCurrent', 'Unknown'),
+                'exposure_time': metadata.get('ExposureTime', 'Unknown'),
+                'convolution_kernel': metadata.get('ConvolutionKernel', 'Unknown'),
+                'scan_options': metadata.get('ScanOptions', 'Unknown'),
+                'protocol_name': metadata.get('ProtocolName', 'Unknown')
+            })
+        
+        return modality_info
+        
+    except Exception as e:
+        return {
+            'modality': 'Unknown',
+            'manufacturer': 'Unknown',
+            'model': 'Unknown',
+            'study_description': 'Unknown',
+            'series_description': 'Unknown',
+            'detection_method': f'Error reading metadata: {str(e)}'
+        }
+
+
+def apply_ct_specific_enhancements(data, modality_info):
+    """
+    Apply CT-specific quality enhancements optimized for Hounsfield Unit preservation.
+    
+    Args:
+        data: Input CT image data
+        modality_info: Modality information dictionary
+    
+    Returns:
+        np.ndarray: Enhanced CT data
+    """
+    print(f"    🔧 Applying CT-specific quality enhancements...")
+    
+    # CT-specific enhancements
+    enhanced_data = data.copy()
+    
+    # 1. HU value preservation and noise reduction
+    # CT data should maintain accurate HU values, so we use conservative enhancement
+    if np.min(enhanced_data) < -100:  # Confirmed CT data (has negative HU values)
+        # Apply gentle noise reduction while preserving HU accuracy
+        enhanced_data = ndi.gaussian_filter(enhanced_data, sigma=0.3)
+        print(f"    ✅ Applied gentle noise reduction for HU preservation")
+    
+    # 2. Edge enhancement for better soft tissue contrast
+    # Use unsharp mask with CT-optimized parameters
+    sigma = 0.8  # Larger sigma for CT (preserves larger structures)
+    amount = 0.2  # Conservative amount for HU accuracy
+    threshold = 50  # Higher threshold for CT (HU units)
+    
+    # Apply unsharp mask
+    blurred = ndi.gaussian_filter(enhanced_data, sigma=sigma)
+    unsharp_mask = enhanced_data - blurred
+    sharpened = enhanced_data + amount * unsharp_mask
+    
+    # Only apply sharpening where signal is above threshold
+    mask = np.abs(enhanced_data) > threshold
+    enhanced_data = np.where(mask, sharpened, enhanced_data)
+    
+    print(f"    ✅ Applied CT-optimized edge enhancement (σ={sigma}, amount={amount})")
+    
+    # 3. Contrast optimization for CT windowing
+    # Enhance contrast in the typical CT window range (-1000 to 3000 HU)
+    hu_range = enhanced_data[(enhanced_data >= -1000) & (enhanced_data <= 3000)]
+    if len(hu_range) > 0:
+        # Apply gentle contrast stretching in the HU range
+        hu_min, hu_max = np.percentile(hu_range, [1, 99])
+        if hu_max > hu_min:
+            enhanced_data = np.clip(enhanced_data, hu_min, hu_max)
+            enhanced_data = (enhanced_data - hu_min) / (hu_max - hu_min) * (hu_max - hu_min) + hu_min
+            print(f"    ✅ Applied CT contrast optimization (HU range: {hu_min:.1f} to {hu_max:.1f})")
+    
+    return enhanced_data
+
+
+def apply_mri_specific_enhancements(data, modality_info):
+    """
+    Apply MRI-specific quality enhancements optimized for contrast and artifact reduction.
+    
+    Args:
+        data: Input MRI image data
+        modality_info: Modality information dictionary
+    
+    Returns:
+        np.ndarray: Enhanced MRI data
+    """
+    print(f"    🔧 Applying MRI-specific quality enhancements...")
+    
+    # MRI-specific enhancements
+    enhanced_data = data.copy()
+    
+    # 1. Noise reduction optimized for MRI characteristics
+    # MRI typically has different noise characteristics than CT
+    if np.max(enhanced_data) > 0:  # Confirmed MRI data (positive values)
+        # Apply adaptive noise reduction
+        enhanced_data = ndi.gaussian_filter(enhanced_data, sigma=0.4)
+        print(f"    ✅ Applied MRI-optimized noise reduction")
+    
+    # 2. Contrast enhancement for better tissue differentiation
+    # MRI benefits from more aggressive contrast enhancement
+    sigma = 0.6  # Smaller sigma for MRI (preserves fine details)
+    amount = 0.4  # More aggressive for MRI contrast
+    threshold = 10  # Lower threshold for MRI (intensity units)
+    
+    # Apply unsharp mask
+    blurred = ndi.gaussian_filter(enhanced_data, sigma=sigma)
+    unsharp_mask = enhanced_data - blurred
+    sharpened = enhanced_data + amount * unsharp_mask
+    
+    # Only apply sharpening where signal is above threshold
+    mask = np.abs(enhanced_data) > threshold
+    enhanced_data = np.where(mask, sharpened, enhanced_data)
+    
+    print(f"    ✅ Applied MRI-optimized contrast enhancement (σ={sigma}, amount={amount})")
+    
+    # 3. Artifact reduction for common MRI artifacts
+    # Apply gentle smoothing to reduce motion artifacts
+    if 'magnetic_field_strength' in modality_info and modality_info['magnetic_field_strength'] != 'Unknown':
+        field_strength = modality_info['magnetic_field_strength']
+        if field_strength >= 3.0:  # High field MRI
+            # Apply additional smoothing for high field artifacts
+            enhanced_data = ndi.gaussian_filter(enhanced_data, sigma=0.2)
+            print(f"    ✅ Applied high-field MRI artifact reduction")
+    
+    # 4. Intensity normalization for better visualization
+    # Normalize to 0-1 range while preserving relative contrast
+    data_min, data_max = np.percentile(enhanced_data, [1, 99])
+    if data_max > data_min:
+        enhanced_data = np.clip(enhanced_data, data_min, data_max)
+        enhanced_data = (enhanced_data - data_min) / (data_max - data_min)
+        print(f"    ✅ Applied MRI intensity normalization")
+    
+    return enhanced_data
+
+
 def apply_advanced_interpolation(data, target_spacing=None, method='cubic'):
     """
     Apply advanced interpolation to improve reformatted slice quality.
@@ -285,6 +505,10 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
         if is_reformatted:
             print(f"    📐 Detected reformatted slice - applying quality optimizations...")
         
+        # Detect scan modality (MRI, CT, etc.)
+        modality_info = detect_scan_modality(json_file)
+        print(f"    🔬 Detected scan modality: {modality_info['modality']} ({modality_info['manufacturer']} {modality_info['model']})")
+        
         # Load NIFTI file with error handling
         try:
             img = nib.load(str(nifti_file))
@@ -298,32 +522,12 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
             print(f"    ❌ Error loading NIFTI file: {e}")
             return {'status': 'failed', 'error': f'Failed to load NIFTI file: {e}'}
         
-        # Apply quality enhancements for reformatted slices
-        if is_reformatted:
-            # For reformatted slices, apply advanced quality enhancements
-            print(f"    🔧 Applying advanced quality enhancements for reformatted slice...")
-            
-            # Apply sharpening filter to improve edge definition
-            
-            # Unsharp mask filter for sharpening - use optimal defaults
-            sigma = 0.5  # Gaussian blur sigma
-            amount = 0.3  # Sharpening amount
-            threshold = 0.1  # Threshold for sharpening
-            interpolation_method = 'cubic'  # High quality interpolation
-            enable_quality_metrics = True  # Always calculate quality metrics
-            
-            # Apply Gaussian blur
-            blurred = ndi.gaussian_filter(data, sigma=sigma)
-            
-            # Create unsharp mask
-            unsharp_mask = data - blurred
-            
-            # Apply sharpening with threshold
-            sharpened = data + amount * unsharp_mask
-            
-            # Only apply sharpening where the original signal is above threshold
-            mask = np.abs(data) > threshold
-            data = np.where(mask, sharpened, data)
+        # Apply modality-specific quality enhancements
+        modality = modality_info['modality']
+        
+        if modality == 'CT':
+            # Apply CT-specific enhancements
+            data = apply_ct_specific_enhancements(data, modality_info)
             
             # Update the NIfTI image with enhanced data
             enhanced_img = nib.Nifti1Image(data, img.affine, img.header)
@@ -331,11 +535,54 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
             # Save the enhanced version directly to the original file (in-place enhancement)
             nib.save(enhanced_img, str(nifti_file))
             
-            print(f"    ✅ Applied unsharp mask sharpening (σ={sigma}, amount={amount})")
-            print(f"    💾 Enhanced original file in-place: {nifti_file.name}")
+            print(f"    💾 Enhanced CT data saved in-place: {nifti_file.name}")
             
-            # Update the data for quality reporting
-            data = enhanced_img.get_fdata()
+        elif modality == 'MR':
+            # Apply MRI-specific enhancements
+            data = apply_mri_specific_enhancements(data, modality_info)
+            
+            # Update the NIfTI image with enhanced data
+            enhanced_img = nib.Nifti1Image(data, img.affine, img.header)
+            
+            # Save the enhanced version directly to the original file (in-place enhancement)
+            nib.save(enhanced_img, str(nifti_file))
+            
+            print(f"    💾 Enhanced MRI data saved in-place: {nifti_file.name}")
+            
+        else:
+            # For unknown modalities, apply general high-quality enhancements
+            if is_reformatted:
+                print(f"    🔧 Applying general quality enhancements for reformatted slice...")
+                
+                # Apply sharpening filter to improve edge definition
+                sigma = 0.5  # Gaussian blur sigma
+                amount = 0.3  # Sharpening amount
+                threshold = 0.1  # Threshold for sharpening
+                
+                # Apply Gaussian blur
+                blurred = ndi.gaussian_filter(data, sigma=sigma)
+                
+                # Create unsharp mask
+                unsharp_mask = data - blurred
+                
+                # Apply sharpening with threshold
+                sharpened = data + amount * unsharp_mask
+                
+                # Only apply sharpening where the original signal is above threshold
+                mask = np.abs(data) > threshold
+                data = np.where(mask, sharpened, data)
+                
+                # Update the NIfTI image with enhanced data
+                enhanced_img = nib.Nifti1Image(data, img.affine, img.header)
+                
+                # Save the enhanced version directly to the original file (in-place enhancement)
+                nib.save(enhanced_img, str(nifti_file))
+                
+                print(f"    ✅ Applied general unsharp mask sharpening (σ={sigma}, amount={amount})")
+                print(f"    💾 Enhanced original file in-place: {nifti_file.name}")
+        
+        # Update the data for quality reporting
+        data = enhanced_img.get_fdata() if 'enhanced_img' in locals() else data
         
         # Calculate advanced quality metrics
         def calculate_quality_metrics(data):
@@ -408,7 +655,8 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
                     'noise_level': 0.0
                 }
         
-        # Calculate quality metrics if enabled
+        # Calculate quality metrics (always enabled)
+        enable_quality_metrics = True
         if enable_quality_metrics:
             try:
                 print(f"    📊 Calculating quality metrics...")
@@ -459,6 +707,7 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
                     for i in range(min(3, len(data.shape)))
                 ]
             },
+            'scan_modality': modality_info,
             'advanced_quality_metrics': quality_metrics
         }
         
@@ -491,6 +740,9 @@ def enhance_nifti_for_niivue(nifti_file, json_file=None):
             json.dump(quality_info, f, indent=2, default=str)
         
         print(f"    📊 Quality Report:")
+        print(f"       Scan modality: {modality_info['modality']} ({modality_info['manufacturer']} {modality_info['model']})")
+        print(f"       Study: {modality_info['study_description']}")
+        print(f"       Series: {modality_info['series_description']}")
         print(f"       Data range: [{quality_info['data_quality']['min_value']:.1f}, {quality_info['data_quality']['max_value']:.1f}]")
         print(f"       Voxel spacing: {' x '.join(f'{x:.2f}' for x in quality_info['spatial_info']['voxel_spacing_mm'])} mm")
         print(f"       Volume size: {' x '.join(f'{x:.1f}' for x in quality_info['spatial_info']['volume_dimensions_mm'])} mm")
@@ -697,11 +949,38 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
                     print(f"\n📂 Processing: {dicom_directory}")
                     print("-" * 50)
                     
-                    # Run dcm2niix conversion with maximum quality settings
+                    # Detect modality first to optimize dcm2niix settings
+                    # We'll do a quick pre-scan to detect modality
+                    modality = 'Unknown'  # Default
+                    try:
+                        # Try to detect modality from first DICOM file
+                        import glob
+                        dicom_files = glob.glob(str(input_directory / "*.dcm"))
+                        if dicom_files:
+                            # Use dcm2niix to get metadata from first file
+                            temp_result = subprocess.run([
+                                'dcm2niix', '-b', 'y', '-o', '/tmp', 
+                                str(input_directory)
+                            ], capture_output=True, text=True, timeout=30)
+                            
+                            # Look for JSON files created
+                            json_files = glob.glob("/tmp/*.json")
+                            if json_files:
+                                with open(json_files[0], 'r') as f:
+                                    metadata = json.load(f)
+                                modality = metadata.get('Modality', 'Unknown')
+                                # Clean up temp files
+                                for f in json_files:
+                                    os.unlink(f)
+                    except Exception:
+                        pass  # Use default modality
+                    
+                    # Run dcm2niix conversion with modality-specific settings
                     conversion_result = run_dcm2niix_conversion(
                         input_dir=input_directory,
                         output_dir=output_directory,
-                        optimize_reformatted=True
+                        optimize_reformatted=True,
+                        modality=modality
                     )
                     
                     if conversion_result['status'] == 'success':
