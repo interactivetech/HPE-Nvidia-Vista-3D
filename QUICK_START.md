@@ -60,6 +60,7 @@ python3 setup.py --help
 - ✅ Sets up backend (Vista3D AI server) - if selected
 - ✅ Sets up frontend (Web interface + Image server) - if selected
 - ✅ Creates Docker configurations
+- ✅ Installs sample medical imaging data (if available)
 
 ## Step 2: Start Services
 
@@ -108,7 +109,10 @@ cd ../frontend && docker-compose up -d
 **Note**: This step requires the frontend web interface to be running.
 
 ```bash
-# Add your medical images
+# Sample data is automatically installed during setup (if available)
+# The setup script installs sample medical imaging data for patient PA00000002
+
+# For your own data:
 # Option A: Place DICOM files in dicom/ folder
 # The dicom/ folder contains patient folders (e.g., PA00000001, PA00000002)
 mkdir -p dicom
@@ -127,9 +131,52 @@ mkdir -p output/nifti
 
 **If you only set up the backend**: You can use the API directly or set up the frontend later.
 
+## Step 4: View Sample Data
+
+**Now let's explore the sample data that was automatically installed!**
+
+### 1. Open the Web Interface
+Open your browser and navigate to: **http://localhost:8501**
+
+### 2. Select the Sample Patient
+1. In the sidebar, you'll see a **"Select Patient"** dropdown
+2. Click on it and select **"PA00000002"** (the sample patient)
+3. This will load the available scans for this patient
+
+### 3. Select a Scan to View
+1. In the **"Select Scan"** dropdown, you'll see several available scans:
+   - `2.5MM_ARTERIAL_3` - CT scan with arterial contrast
+   - `SAGITTAL_ABDOMEN_602_i00002` - Sagittal abdominal view
+   - `CORONAL_ABDOMEN_601_i00002` - Coronal abdominal view
+   - And more...
+
+2. Select **`2.5MM_ARTERIAL_3`** for the best example
+
+### 4. Explore the 3D Viewer
+Once you've selected a patient and scan:
+- The **NiiVue viewer** will load the medical image
+- Use your mouse to:
+  - **Rotate**: Click and drag to rotate the 3D view
+  - **Zoom**: Scroll wheel to zoom in/out
+  - **Pan**: Right-click and drag to move around
+- Try different **slice types** in the sidebar:
+  - **Axial**: Horizontal slices
+  - **Coronal**: Front-to-back slices  
+  - **Sagittal**: Left-to-right slices
+  - **Multiplanar**: All three views at once
+  - **3D Render**: 3D volume rendering
+
+### 5. Try the Tools Page
+1. Click on the **"Tools"** tab in the sidebar
+2. Here you can:
+   - Convert DICOM to NIFTI (if needed)
+   - Run AI segmentation on the sample data
+   - View 3D visualizations with overlays
+   - Download results
+
 ## 🎉 You're Done!
 
-You now have a fully functional medical AI platform running!
+You now have a fully functional medical AI platform running with sample data ready to explore!
 
 ## 🌐 Remote Server Setup
 
@@ -254,10 +301,10 @@ sudo systemctl stop conflicting-service
 
 ## 📚 Next Steps
 
-1. **Explore the Web Interface**: Navigate to http://localhost:8501
-2. **Upload Your Data**: Add DICOM or NIFTI files through the web interface
-3. **Use the Tools Page**: Convert DICOM to NIFTI and run AI segmentation
-4. **View Results**: Use the 3D viewer to analyze results
+1. **Explore the Sample Data**: Follow Step 4 above to view the pre-installed sample data
+2. **Try AI Segmentation**: Use the Tools page to run segmentation on the sample data
+3. **Upload Your Own Data**: Add DICOM or NIFTI files through the web interface
+4. **Experiment with Visualization**: Try different slice types and rendering modes
 5. **Process Multiple Studies**: Use batch processing features in the GUI
 
 ## 🆘 Need Help?

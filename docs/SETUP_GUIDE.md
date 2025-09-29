@@ -58,6 +58,7 @@ python3 setup.py
 - ✅ Configures environment variables and Docker settings
 - ✅ Prompts for your NVIDIA NGC API key (backend only)
 - ✅ Creates all necessary directories and files
+- ✅ Installs sample medical imaging data (if available)
 
 ### Step 2: Start Services
 
@@ -106,7 +107,10 @@ cd ../frontend && docker-compose up -d
 **Note**: This step requires the frontend web interface to be running.
 
 ```bash
-# Add your medical images
+# Sample data is automatically installed during setup (if available)
+# The setup script installs sample medical imaging data for patient PA00000002
+
+# For your own data:
 # Option A: Place DICOM files in dicom/ folder
 # The dicom/ folder contains patient folders (e.g., PA00000001, PA00000002)
 mkdir -p dicom

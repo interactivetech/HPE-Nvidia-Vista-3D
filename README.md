@@ -85,6 +85,7 @@ The setup script will:
 - ✅ Configure environment variables and Docker settings
 - ✅ Guide you through configuration (NVIDIA NGC API key for backend)
 - ✅ Create all necessary directories and files
+- ✅ Install sample medical imaging data (if available)
 
 ### Step 2: Start Vista3D Server (GPU-Enabled Machine)
 ```bash
@@ -111,7 +112,10 @@ This starts:
 
 ### Step 4: Process Your Images
 ```bash
-# Add your medical images
+# Sample data is automatically installed during setup (if available)
+# The setup script installs sample medical imaging data for patient PA00000002
+
+# For your own data:
 # Option A: Place DICOM files in dicom/ folder
 mkdir -p dicom/PA00000001
 # Copy your DICOM files to dicom/PA00000001/
@@ -256,6 +260,7 @@ After running the setup and start scripts, you'll have:
 - **3D Visualization**: Interactive 3D medical viewer
 - **Batch Processing**: Process multiple patients and studies through the GUI
 - **API Access**: RESTful API for integration with other systems
+- **Sample Data**: Pre-installed sample medical imaging data for testing (if available)
 
 ## 🔧 Management Commands
 

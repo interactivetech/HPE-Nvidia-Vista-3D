@@ -1,6 +1,6 @@
 # 📁 Sample Data Setup Guide
 
-This guide explains how to extract and use the sample data provided with the HPE NVIDIA Vista3D project.
+This guide explains how sample data is automatically installed and used in the HPE NVIDIA Vista3D project.
 
 ## 📦 What's Included
 
@@ -10,11 +10,37 @@ The `sample_data.tgz` file contains sample medical imaging data for patient **PA
 - **Processed Output**: 262 processed files including NIFTI volumes and segmentation results
 - **Total Files**: 656 files across both DICOM and output directories
 
-## 🚀 Quick Setup
+## 🚀 Automatic Installation
 
-### Option 1: Extract to Existing Directories (Recommended)
+**Sample data is automatically installed during the setup process!**
 
-If you already have `dicom/` and `output/` directories in your project:
+When you run the setup script (`python3 setup.py`), it will:
+
+1. **Detect the sample data archive** (`sample_data.tgz`) in the project root
+2. **Prompt you to install it** with a clear description of what's included
+3. **Automatically extract and install** the data to the correct directories
+4. **Set up the proper directory structure** for immediate use
+
+### What Happens During Setup
+
+```bash
+# When you run the setup script
+python3 setup.py
+
+# The script will:
+# 1. Check for sample_data.tgz in the project root
+# 2. Ask: "Install sample data? (Y/n):"
+# 3. If you choose Yes, it automatically:
+#    - Extracts the archive to a temporary location
+#    - Moves DICOM files to dicom/PA00000002/
+#    - Moves output files to output/PA00000002/
+#    - Cleans up temporary files
+#    - Reports success
+```
+
+### Manual Installation (If Needed)
+
+If you need to install sample data manually or the automatic installation failed:
 
 ```bash
 # Navigate to the project root
@@ -31,41 +57,9 @@ mv sample_data/output/PA00000002 output/
 rm -rf sample_data
 ```
 
-### Option 2: Extract and Copy Manually
-
-```bash
-# Navigate to the project root
-cd HPE-Nvidia-Vista-3D
-
-# Extract to a temporary location
-tar -xzf sample_data.tgz
-
-# Copy DICOM files
-cp -r sample_data/dicom/PA00000002 dicom/
-
-# Copy processed output
-cp -r sample_data/output/PA00000002 output/
-
-# Clean up
-rm -rf sample_data
-```
-
-### Option 3: Extract with Custom Location
-
-If you want to extract to a different location:
-
-```bash
-# Extract to a specific directory
-tar -xzf sample_data.tgz -C /path/to/your/project/
-
-# Then move the files as needed
-mv /path/to/your/project/sample_data/dicom/PA00000002 dicom/
-mv /path/to/your/project/sample_data/output/PA00000002 output/
-```
-
 ## 📋 Verification
 
-After extraction, verify the data is in the correct location:
+After automatic installation (or manual extraction), verify the data is in the correct location:
 
 ```bash
 # Check DICOM files
@@ -85,7 +79,7 @@ Expected output:
 
 ## 🎯 Using the Sample Data
 
-Once extracted, you can use the sample data with the Vista3D system:
+Once automatically installed (or manually extracted), you can use the sample data with the Vista3D system:
 
 ### 1. Start the Services
 
@@ -150,19 +144,11 @@ sudo chmod -R 755 output/PA00000002/
 ```
 
 ### Directory Already Exists
-If the `PA00000002` directory already exists:
+If the `PA00000002` directory already exists during automatic installation:
 
-```bash
-# Backup existing data (optional)
-mv dicom/PA00000002 dicom/PA00000002_backup
-mv output/PA00000002 output/PA00000002_backup
-
-# Then extract the sample data
-tar -xzf sample_data.tgz
-mv sample_data/dicom/PA00000002 dicom/
-mv sample_data/output/PA00000002 output/
-rm -rf sample_data
-```
+- The setup script will **skip installation** if the directory already exists
+- You can manually remove the existing directory and re-run setup if needed
+- Or use the manual installation method above to overwrite existing data
 
 ### Insufficient Disk Space
 Check available space before extraction:
@@ -182,6 +168,7 @@ ls -lh sample_data.tgz
 - Output files include processed NIFTI volumes and segmentation results
 - This data is suitable for testing the Vista3D system functionality
 - The data has been de-identified for privacy and research purposes
+- **Automatic installation** happens during setup - no manual extraction needed!
 
 ## 🆘 Need Help?
 
@@ -194,4 +181,4 @@ If you encounter issues with the sample data:
 
 ---
 
-**Ready to explore?** Extract the sample data and start exploring the Vista3D medical AI platform! 🚀
+**Ready to explore?** Run the setup script and the sample data will be automatically installed for you to start exploring the Vista3D medical AI platform! 🚀
