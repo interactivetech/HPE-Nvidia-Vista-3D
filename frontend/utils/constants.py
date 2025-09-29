@@ -207,8 +207,14 @@ def load_colormaps():
         try:
             with open(colormap_file, 'r') as cf:
                 data = json.load(cf)
+                # Check if this is a collection file with 'colormaps' key
                 if 'colormaps' in data and isinstance(data['colormaps'], dict):
                     available_colormaps.update(data['colormaps'].keys())
+                # Check if this is an individual colormap file with required fields
+                elif all(key in data for key in ['R', 'G', 'B', 'A']):
+                    # Extract colormap name from filename (without .json extension)
+                    colormap_name = os.path.splitext(os.path.basename(colormap_file))[0]
+                    available_colormaps.add(colormap_name)
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
             continue
@@ -293,9 +299,16 @@ def load_colormap_data(colormap_name):
         try:
             with open(colormap_file, 'r') as cf:
                 data = json.load(cf)
+                # Check if this is a collection file with 'colormaps' key
                 if 'colormaps' in data and isinstance(data['colormaps'], dict):
                     if colormap_name in data['colormaps']:
                         return data['colormaps'][colormap_name]
+                # Check if this is an individual colormap file with required fields
+                elif all(key in data for key in ['R', 'G', 'B', 'A']):
+                    # Extract colormap name from filename (without .json extension)
+                    file_colormap_name = os.path.splitext(os.path.basename(colormap_file))[0]
+                    if file_colormap_name == colormap_name:
+                        return data
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Warning: Could not load colormaps from {colormap_file}: {e}")
             continue
@@ -335,7 +348,31 @@ def load_3d_render_config(config_name='3d_render_quality'):
             'backColor': [0, 0, 0, 1]
         }
 
-AVAILABLE_COLOR_MAPS = load_colormaps()
+# Lazy loading of colormaps - only load when actually needed
+_available_colormaps = None
+
+def get_available_colormaps():
+    """Get available colormaps, loading them lazily if needed."""
+    global _available_colormaps
+    if _available_colormaps is None:
+        _available_colormaps = load_colormaps()
+    return _available_colormaps
+
+# For backward compatibility, create a property-like access
+class _ColormapAccessor:
+    def __iter__(self):
+        return iter(get_available_colormaps())
+    
+    def __contains__(self, item):
+        return item in get_available_colormaps()
+    
+    def __len__(self):
+        return len(get_available_colormaps())
+    
+    def __getitem__(self, key):
+        return get_available_colormaps()[key]
+
+AVAILABLE_COLOR_MAPS = _ColormapAccessor()
 
 # Voxel selection modes
 VOXEL_MODES = ["All", "Individual Voxels"]
