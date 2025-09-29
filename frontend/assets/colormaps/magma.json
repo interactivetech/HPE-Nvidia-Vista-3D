@@ -1,14 +1,9 @@
 {
   "name": "Magma Colormap",
-  "description": "Perceptually uniform colormap from black to bright white with transparency",
-  "colormaps": {
-    "magma": {
-      "R": [0, 7, 22, 44, 73, 108, 149, 194, 239, 255, 255, 255],
-      "G": [0, 3, 11, 25, 44, 70, 103, 144, 192, 247, 255, 255],
-      "B": [4, 9, 25, 57, 100, 154, 220, 255, 255, 255, 255, 255],
-      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255],
-      "I": [0, 23, 46, 69, 92, 115, 138, 161, 184, 207, 230, 255],
-      "labels": ["Transparent", "Dark Purple", "Purple", "Magenta", "Pink", "Orange", "Yellow", "White-Yellow", "White", "Bright White", "White", "White"]
-    }
-  }
+  "description": "Perceptually uniform colormap from black to white",
+  "R": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "G": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "B": [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64],
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
+  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
 }

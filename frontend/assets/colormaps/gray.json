@@ -1,14 +1,10 @@
 {
   "name": "Gray Colormap",
   "description": "Linear grayscale colormap from black to white with maximum opacity for background scan visibility when voxels are displayed",
-  "colormaps": {
-    "gray": {
-      "R": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
-      "G": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
-      "B": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
-      "A": [0, 200, 220, 240, 250, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
-      "I": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
-      "labels": ["Transparent", "Very Dark Gray", "Dark Gray", "Medium Dark Gray", "Medium Gray", "Medium Light Gray", "Light Gray", "Very Light Gray", "White"]
-    }
-  }
+  "R": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+  "G": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+  "B": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+  "A": [0, 200, 220, 240, 250, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+  "I": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255],
+  "labels": ["Transparent", "Very Dark Gray", "Dark Gray", "Medium Dark Gray", "Medium Gray", "Medium Light Gray", "Light Gray", "Very Light Gray", "White"]
 }

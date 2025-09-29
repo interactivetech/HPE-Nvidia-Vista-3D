@@ -1,14 +1,9 @@
 {
   "name": "Rainbow Colormap",
-  "description": "Rainbow colormap from red to violet with transparency",
-  "colormaps": {
-    "rainbow": {
-      "R": [255, 255, 255, 0, 0, 0, 128, 255, 255, 255, 255, 128],
-      "G": [0, 128, 255, 255, 255, 0, 0, 0, 128, 255, 255, 0],
-      "B": [0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 0, 128],
-      "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255, 255],
-      "I": [0, 23, 46, 69, 92, 115, 138, 161, 184, 207, 230, 255],
-      "labels": ["Transparent", "Orange", "Yellow", "Green", "Cyan", "Blue", "Indigo", "Violet", "Purple", "Magenta", "Pink", "Red"]
-    }
-  }
+  "description": "Classic rainbow colormap with transparency",
+  "R": [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
+  "G": [0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255],
+  "B": [255, 238, 221, 204, 187, 170, 153, 136, 119, 102, 85, 68, 51, 34, 17, 0],
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
+  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
 }

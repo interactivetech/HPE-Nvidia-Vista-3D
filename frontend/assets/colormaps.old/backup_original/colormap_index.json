@@ -1,0 +1,71 @@
+{
+  "name": "Vista 3D Colormap Index",
+  "description": "Master index of all available colormaps organized by category",
+  "version": "2.0",
+  "last_updated": "2024-12-19",
+  "categories": {
+    "scientific": {
+      "name": "Scientific Colormaps",
+      "description": "Standard scientific visualization colormaps",
+      "file": "scientific/standard_colormaps.json",
+      "colormaps": [
+        "gray", "turbo", "viridis", "plasma", "parula", "rainbow", 
+        "jet", "hot", "hsv", "magma", "inferno", "linspecer"
+      ]
+    },
+    "medical": {
+      "name": "Medical CT Colormaps", 
+      "description": "CT and medical imaging specific colormaps",
+      "file": "medical/ct_colormaps.json",
+      "colormaps": [
+        "ct_bones", "ct_soft", "ct_brain", "ct_vessels", "ct_lung",
+        "ct_liver", "ct_kidneys", "ct_muscles", "ct_scalp", "ct_skull",
+        "ct_w_contrast"
+      ]
+    },
+    "custom": {
+      "name": "Custom Medical Visualization",
+      "description": "Specialized colormaps for advanced medical visualization",
+      "file": "custom/medical_visualization.json", 
+      "colormaps": [
+        "brain_vessels_eyes", "fixed_anatomy", "enhanced_brain_anatomy",
+        "realistic_vessels", "mri_brain_clear", "clear_anatomy",
+        "distinct_anatomy", "gray_translucent", "bright_blues"
+      ]
+    }
+  },
+  "niivue_builtins": {
+    "name": "NiiVue Built-in Colormaps",
+    "description": "Colormaps that are built into NiiVue and don't need separate files",
+    "note": "These are handled by NiiVue's built-in colormap system",
+    "colormaps": [
+      "gray", "turbo", "viridis", "plasma", "parula", "rainbow", "jet", "hot", "hsv",
+      "magma", "inferno", "linspecer", "autumn", "batlow", "blues", "bone", "cividis",
+      "cool", "copper", "cubehelix", "spring", "summer", "warm", "winter"
+    ]
+  },
+  "deprecated": {
+    "name": "Deprecated Files",
+    "description": "Files that have been consolidated and should be removed",
+    "files_to_remove": [
+      "niivue-gray.json", "niivue-turbo.json", "niivue-viridis.json", "niivue-plasma.json",
+      "niivue-parula.json", "niivue-rainbow.json", "niivue-jet.json", "niivue-hot.json",
+      "niivue-hsv.json", "niivue-magma.json", "niivue-inferno.json", "niivue-linspecer.json",
+      "niivue-autumn.json", "niivue-batlow.json", "niivue-blues.json", "niivue-bone.json",
+      "niivue-cividis.json", "niivue-cool.json", "niivue-copper.json", "niivue-cubehelix.json",
+      "niivue-spring.json", "niivue-summer.json", "niivue-warm.json", "niivue-winter.json",
+      "niivue-ct_translucent.json", "niivue-ct_bones.json", "niivue-ct_soft.json",
+      "niivue-ct_brain.json", "niivue-ct_vessels.json", "niivue-ct_lung.json",
+      "niivue-ct_liver.json", "niivue-ct_kidneys.json", "niivue-ct_muscles.json",
+      "niivue-ct_scalp.json", "niivue-ct_skull.json", "niivue-ct_w_contrast.json",
+      "niivue-ct_soft_tissue.json", "niivue-ct_artery.json", "niivue-ct_air.json",
+      "niivue-ct_enhanced.json", "niivue-ct_brain_metallic.json", "niivue-ct_metallic.json",
+      "niivue-mri_brain_metallic.json", "ct_bones.json", "ct_soft.json", "ct_brain.json",
+      "ct_vessels.json", "ct_lung.json", "ct_liver.json", "ct_kidneys.json",
+      "ct_muscles.json", "ct_scalp.json", "ct_skull.json", "ct_w_contrast.json",
+      "ct_soft_tissue.json", "ct_cardiac.json", "fixed_anatomy.json", "mri_brain_clear.json",
+      "clear_anatomy.json", "distinct_anatomy.json", "enhanced_brain_anatomy.json",
+      "realistic_vessels.json", "gray_translucent.json", "bright_blues.json"
+    ]
+  }
+}

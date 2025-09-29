@@ -1,16 +1,12 @@
 {
   "name": "Brain, Vessels & Eyes Visualization",
   "description": "Specialized colormap that hides skin/face while highlighting brain tissue, blood vessels, and eyes for clear internal visualization",
-  "colormaps": {
-    "brain_vessels_eyes": {
-      "min": -1000,
-      "max": 1000,
-      "R": [0, 0, 0, 0, 0, 40, 80, 120, 200, 255, 255, 255],
-      "G": [0, 0, 0, 0, 0, 80, 120, 160, 100, 50, 200, 255],
-      "B": [0, 0, 0, 0, 0, 120, 160, 200, 50, 0, 100, 255],
-      "A": [0, 0, 0, 0, 0, 30, 60, 100, 150, 200, 240, 255],
-      "I": [-1000, -500, -200, -50, 0, 20, 40, 60, 80, 120, 200, 1000],
-      "labels": ["Air", "Lung", "Fat", "Skin (Hidden)", "Soft Tissue", "Brain Gray", "Brain White", "Eyes/CSF", "Blood Vessels", "Dense Vessels", "Bone", "Metal"]
-    }
-  }
+  "min": -1000,
+  "max": 1000,
+  "R": [0, 0, 0, 0, 0, 40, 80, 120, 200, 255, 255, 255],
+  "G": [0, 0, 0, 0, 0, 80, 120, 160, 100, 50, 200, 255],
+  "B": [0, 0, 0, 0, 0, 120, 160, 200, 50, 0, 100, 255],
+  "A": [0, 0, 0, 0, 0, 30, 60, 100, 150, 200, 240, 255],
+  "I": [-1000, -500, -200, -50, 0, 20, 40, 60, 80, 120, 200, 1000],
+  "labels": ["Air", "Lung", "Fat", "Skin (Hidden)", "Soft Tissue", "Brain Gray", "Brain White", "Eyes/CSF", "Blood Vessels", "Dense Vessels", "Bone", "Metal"]
 }
