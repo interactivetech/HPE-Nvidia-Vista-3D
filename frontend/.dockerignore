@@ -1,0 +1,62 @@
+# Exclude image server files
+../image_server/
+image_server/
+
+# Exclude backend files
+../backend/
+backend/
+
+# Exclude documentation
+../docs/
+docs/
+
+# Exclude helm charts
+../helm/
+helm/
+
+# Exclude output and dicom directories (will be mounted as volumes)
+output/
+dicom/
+
+# Exclude Python cache and virtual environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+
+# Exclude IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Exclude OS files
+.DS_Store
+Thumbs.db
+
+# Exclude git files
+.git/
+.gitignore
+
+# Exclude Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Exclude setup files
+setup_*.py
+setup.py
+
+# Exclude test files
+.pytest_cache/
+test_*.py
+*_test.py
+
+# Exclude temporary files
+*.tmp
+*.temp

@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -1283,22 +1283,6 @@ wheels = [
 ]
 
 [[package]]
-name = "usd-core"
-version = "25.8"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/af/8dace54e7471fbdbc970cc3f5ea365d3150cc2a8c57c83afa9852f82fafb/usd_core-25.8-cp311-none-macosx_10_9_universal2.whl", hash = "sha256:b9fe2236205c4324115f73d60ae4f7a7cdab661e5b089bcdf330e5120a7abe5e", size = 37374950, upload-time = "2025-07-31T19:19:59.973Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/a9/0a63ea2a54645e03e71780a5e95fb9f877a0382a24d3b4445fa676e1691b/usd_core-25.8-cp311-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ec4a897e828e7aa761bbbe48ec24e27be2212467495aa60f293f5097a38b542a", size = 26742066, upload-time = "2025-07-31T19:20:02.969Z" },
-    { url = "https://files.pythonhosted.org/packages/74/a3/bba9bd0527280540eed1e77e87d4e7943a56ea3796f2a574a53a2a32f554/usd_core-25.8-cp311-none-win_amd64.whl", hash = "sha256:44061c4833c4d4044cedf0a70b92b5dda7a3bbedc83b3fe2812976fd328df348", size = 12727802, upload-time = "2025-07-31T19:20:05.674Z" },
-    { url = "https://files.pythonhosted.org/packages/72/b9/2097f0a856c20a9bf952185e0e5ce97f17a1f1a2e6a739e559186a7f77f6/usd_core-25.8-cp312-none-macosx_10_9_universal2.whl", hash = "sha256:0d509e35d4fd56e7119ddde39886debdfafd219abc5584d011fe67e8e383a0a8", size = 37431221, upload-time = "2025-07-31T19:20:08.961Z" },
-    { url = "https://files.pythonhosted.org/packages/1d/27/aac9f2eb7cf3934d990ba6566379662ca4493f7cbb7270aa5f860e60fcbe/usd_core-25.8-cp312-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cf52c5a77a314681ffb571528dd5e14c0a2e591437606671b90ee4390700e384", size = 26623647, upload-time = "2025-07-31T19:20:18.671Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/2b/7ba6d5f5e8e21c5056f27cc31bd31861d068caf8cb32803b2ae94f787168/usd_core-25.8-cp312-none-win_amd64.whl", hash = "sha256:ddb4845c7a7a42c8bf1bb6fcc4a3d7a3b1fecfdab105ad5e4ed9fa8dcd40ba95", size = 12771730, upload-time = "2025-07-31T19:20:21.34Z" },
-    { url = "https://files.pythonhosted.org/packages/18/b2/f07c4706c4809169ecae0f18da05ff37e47069a6c9978bb3e43c500f2c44/usd_core-25.8-cp313-none-macosx_10_9_universal2.whl", hash = "sha256:992756dac5ea29ad40eaac085126ae22e15b3f37174735d409ee0995420b584e", size = 37431897, upload-time = "2025-07-31T19:20:24.254Z" },
-    { url = "https://files.pythonhosted.org/packages/43/7b/f275eeb308883cf64f5b36a466efe45c12c72e0ddf011feff393ae67f329/usd_core-25.8-cp313-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e1882ee4821c9dda9e749caf1d7d80ac29b0f4000554cdb35dd4191d4816d3cc", size = 26624317, upload-time = "2025-07-31T19:20:27.689Z" },
-    { url = "https://files.pythonhosted.org/packages/63/5f/c32bf32ae163e6ad5257ec0cfcb58966275de5c55ae0a884bad71cd5f625/usd_core-25.8-cp313-none-win_amd64.whl", hash = "sha256:6d98ad58514afc5c28c9610b4e1017da9b460932192ce564cf311b2451b308de", size = 12771777, upload-time = "2025-07-31T19:20:30.362Z" },
-]
-
-[[package]]
 name = "uvicorn"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1335,11 +1319,6 @@ dependencies = [
     { name = "uvicorn" },
 ]
 
-[package.optional-dependencies]
-usd = [
-    { name = "usd-core" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12.3" },
@@ -1358,10 +1337,8 @@ requires-dist = [
     { name = "streamlit", specifier = ">=1.32.0" },
     { name = "streamlit-mermaid", specifier = ">=0.3.0" },
     { name = "tqdm", specifier = ">=4.66.0" },
-    { name = "usd-core", marker = "extra == 'usd'", specifier = ">=25.8" },
     { name = "uvicorn", specifier = ">=0.24.0" },
 ]
-provides-extras = ["usd"]
 
 [[package]]
 name = "watchdog"

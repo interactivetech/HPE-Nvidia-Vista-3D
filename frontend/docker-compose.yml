@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  vista3d-app:
+  vista3d-frontend:
     build:
       context: .
       dockerfile: Dockerfile
