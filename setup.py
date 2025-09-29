@@ -252,8 +252,8 @@ def get_user_input_non_interactive(setup_choice: str = 'both') -> Dict[str, str]
     print_info("Running in non-interactive mode with defaults")
     
     config = {
-        'DICOM_FOLDER': os.path.join(os.getcwd(), "dicom"),
-        'OUTPUT_FOLDER': os.path.join(os.getcwd(), "output"),
+        'DICOM_FOLDER': os.path.abspath(os.path.join(os.getcwd(), "dicom")),
+        'OUTPUT_FOLDER': os.path.abspath(os.path.join(os.getcwd(), "output")),
         'VISTA3D_SERVER': 'http://host.docker.internal:8000',
         'IMAGE_SERVER': 'http://localhost:8888',
         'FRONTEND_PORT': '8501',

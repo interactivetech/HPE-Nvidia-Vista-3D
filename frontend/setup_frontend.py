@@ -291,8 +291,9 @@ def get_user_input() -> Dict[str, str]:
     config = {}
     
     # Use default data directories
-    config['DICOM_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "..", "dicom"))
-    config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "..", "output"))
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    config['DICOM_FOLDER'] = os.path.abspath(os.path.join(script_dir, "..", "dicom"))
+    config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(script_dir, "..", "output"))
     
     # Use default server URLs and ports
     config['VISTA3D_SERVER'] = "http://host.docker.internal:8000"
