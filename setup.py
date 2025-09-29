@@ -462,8 +462,9 @@ def check_system_requirements(setup_choice: str = 'both') -> Dict[str, bool]:
     return requirements
 
 def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
-    """Get configuration from user"""
+    """Get configuration using defaults"""
     print_header("Configuration Setup")
+    print_info("Using default configuration values")
     
     config = {}
     
@@ -494,42 +495,21 @@ def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
         # Frontend-only setup - no Org ID needed
         config['NGC_ORG_ID'] = ""
     
-    # Get data directories
-    print_info("Data directories (use absolute paths for best results)")
+    # Use default data directories
+    config['DICOM_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "dicom"))
+    config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "output"))
     
-    # DICOM folder
-    default_dicom = os.path.join(os.getcwd(), "dicom")
-    dicom_path = input(f"DICOM folder path [{default_dicom}]: ").strip()
-    if not dicom_path:
-        dicom_path = default_dicom
-    config['DICOM_FOLDER'] = os.path.abspath(dicom_path)
-    
-    # Output folder
-    default_output = os.path.join(os.getcwd(), "output")
-    output_path = input(f"Output folder path [{default_output}]: ").strip()
-    if not output_path:
-        output_path = default_output
-    config['OUTPUT_FOLDER'] = os.path.abspath(output_path)
-    
-    # Server URLs
-    vista3d_url = input("Vista3D server URL [http://host.docker.internal:8000]: ").strip()
-    if not vista3d_url:
-        vista3d_url = "http://host.docker.internal:8000"
-    config['VISTA3D_SERVER'] = vista3d_url
-    
-    image_server_url = input("Image server URL [http://localhost:8888]: ").strip()
-    if not image_server_url:
-        image_server_url = "http://localhost:8888"
-    config['IMAGE_SERVER'] = image_server_url
-    
-    # Ports
-    frontend_port = input("Frontend port [8501]: ").strip()
-    if not frontend_port:
-        frontend_port = "8501"
-    config['FRONTEND_PORT'] = frontend_port
-    
-    # Segmentation settings - always use "all" as default
+    # Use default server URLs and ports
+    config['VISTA3D_SERVER'] = "http://host.docker.internal:8000"
+    config['IMAGE_SERVER'] = "http://localhost:8888"
+    config['FRONTEND_PORT'] = "8501"
     config['VESSELS_OF_INTEREST'] = "all"
+    
+    print_success(f"DICOM folder: {config['DICOM_FOLDER']}")
+    print_success(f"Output folder: {config['OUTPUT_FOLDER']}")
+    print_success(f"Vista3D server: {config['VISTA3D_SERVER']}")
+    print_success(f"Image server: {config['IMAGE_SERVER']}")
+    print_success(f"Frontend port: {config['FRONTEND_PORT']}")
     
     return config
 

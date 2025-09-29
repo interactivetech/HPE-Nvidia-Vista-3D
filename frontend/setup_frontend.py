@@ -284,53 +284,32 @@ def load_config_from_env() -> Dict[str, str]:
         sys.exit(1)
 
 def get_user_input() -> Dict[str, str]:
-    """Get configuration from user"""
+    """Get configuration using defaults"""
     print_header("Frontend Configuration Setup")
+    print_info("Using default configuration values")
     
     config = {}
     
-    # Get data directories
-    print_info("Data directories (use absolute paths for best results)")
+    # Use default data directories
+    config['DICOM_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "..", "dicom"))
+    config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "..", "output"))
     
-    # DICOM folder
-    default_dicom = os.path.join(os.getcwd(), "..", "dicom")
-    dicom_path = input(f"DICOM folder path [{default_dicom}]: ").strip()
-    if not dicom_path:
-        dicom_path = default_dicom
-    config['DICOM_FOLDER'] = os.path.abspath(dicom_path)
+    # Use default server URLs and ports
+    config['VISTA3D_SERVER'] = "http://host.docker.internal:8000"
+    config['FRONTEND_PORT'] = "8501"
+    config['IMAGE_SERVER_PORT'] = "8888"
+    config['IMAGE_SERVER'] = f"http://localhost:{config['IMAGE_SERVER_PORT']}"
     
-    # Output folder
-    default_output = os.path.join(os.getcwd(), "..", "output")
-    output_path = input(f"Output folder path [{default_output}]: ").strip()
-    if not output_path:
-        output_path = default_output
-    config['OUTPUT_FOLDER'] = os.path.abspath(output_path)
-    
-    # Vista3D server URL (where frontend will connect to)
-    vista3d_url = input("Vista3D server URL [http://host.docker.internal:8000]: ").strip()
-    if not vista3d_url:
-        vista3d_url = "http://host.docker.internal:8000"
-    config['VISTA3D_SERVER'] = vista3d_url
-    
-    # Frontend port
-    frontend_port = input("Frontend port [8501]: ").strip()
-    if not frontend_port:
-        frontend_port = "8501"
-    config['FRONTEND_PORT'] = frontend_port
-    
-    # Image server port
-    img_port = input("Image server port [8888]: ").strip()
-    if not img_port:
-        img_port = "8888"
-    config['IMAGE_SERVER_PORT'] = img_port
-    
-    # Set default values for other required fields
-    config['IMAGE_SERVER'] = f"http://localhost:{img_port}"
+    print_success(f"DICOM folder: {config['DICOM_FOLDER']}")
+    print_success(f"Output folder: {config['OUTPUT_FOLDER']}")
+    print_success(f"Vista3D server: {config['VISTA3D_SERVER']}")
+    print_success(f"Frontend port: {config['FRONTEND_PORT']}")
+    print_success(f"Image server port: {config['IMAGE_SERVER_PORT']}")
     
     return config
 
 def prompt_for_sample_data() -> bool:
-    """Prompt user if they want to install sample data"""
+    """Check if sample data should be installed (default: yes)"""
     print_header("Sample Data Installation")
     
     sample_data_file = os.path.join(os.getcwd(), "..", "sample_data.tgz")
@@ -344,13 +323,9 @@ def prompt_for_sample_data() -> bool:
     print_info("  - DICOM medical imaging data")
     print_info("  - Pre-processed output data")
     print_info("  - Various medical imaging datasets for testing")
+    print_info("Installing sample data by default...")
     
-    response = input("\nInstall sample data? (Y/n): ").strip().lower()
-    if response in ['', 'y', 'yes']:
-        return True
-    else:
-        print_info("Sample data installation skipped.")
-        return False
+    return True
 
 def create_directories(config: Dict[str, str]) -> None:
     """Create necessary directories"""

@@ -202,8 +202,9 @@ def check_system_requirements() -> Dict[str, bool]:
     return requirements
 
 def get_user_input() -> Dict[str, str]:
-    """Get configuration from user"""
+    """Get configuration using defaults"""
     print_header("Configuration Setup")
+    print_info("Using default configuration values")
     
     config = {}
     
@@ -222,32 +223,22 @@ def get_user_input() -> Dict[str, str]:
         except Exception as e:
             print_warning(f"Failed to read master .env file: {e}")
     
-    # If no master .env or missing required fields, get user input
+    # Use defaults for missing fields
     if not config.get('DICOM_FOLDER'):
-        # DICOM folder
-        default_dicom = os.path.join(os.getcwd(), "..", "dicom")
-        dicom_path = input(f"DICOM folder path [{default_dicom}]: ").strip()
-        if not dicom_path:
-            dicom_path = default_dicom
-        config['DICOM_FOLDER'] = os.path.abspath(dicom_path)
+        config['DICOM_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "..", "dicom"))
     
     if not config.get('OUTPUT_FOLDER'):
-        # Output folder
-        default_output = os.path.join(os.getcwd(), "..", "output")
-        output_path = input(f"Output folder path [{default_output}]: ").strip()
-        if not output_path:
-            output_path = default_output
-        config['OUTPUT_FOLDER'] = os.path.abspath(output_path)
+        config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "..", "output"))
     
     if not config.get('IMAGE_SERVER_PORT'):
-        # Image server port
-        img_port = input("Image server port [8888]: ").strip()
-        if not img_port:
-            img_port = "8888"
-        config['IMAGE_SERVER_PORT'] = img_port
+        config['IMAGE_SERVER_PORT'] = "8888"
     
     # Set default values for other required fields
     config['IMAGE_SERVER'] = f"http://localhost:{config['IMAGE_SERVER_PORT']}"
+    
+    print_success(f"DICOM folder: {config['DICOM_FOLDER']}")
+    print_success(f"Output folder: {config['OUTPUT_FOLDER']}")
+    print_success(f"Image server port: {config['IMAGE_SERVER_PORT']}")
     
     return config
 
