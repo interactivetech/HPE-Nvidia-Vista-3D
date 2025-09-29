@@ -191,14 +191,21 @@ class VoxelManager:
         if filename is None:
             return set(), {}, []
             
+        # Detect scan modality to filter appropriate structures
+        scan_modality = self._detect_scan_modality(patient_id, filename)
+            
         if voxel_mode == "All":
-            # For "All" mode, return all configured labels
+            # For "All" mode, return all configured labels (filtered by modality)
             available_ids = set()
             id_to_name_map = {}
             available_voxel_names = []
 
             for name, label_id in self.config.label_dict.items():
                 if isinstance(label_id, int):
+                    # Filter out inappropriate structures for brain scans
+                    if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, name):
+                        continue
+                        
                     available_ids.add(label_id)
                     id_to_name_map[label_id] = name
                     available_voxel_names.append(name)
@@ -220,11 +227,14 @@ class VoxelManager:
                 patient_id, query_filename, filename_to_id, selected_effect
             )
 
-            # Get names for available labels
-            available_voxel_names = [
-                name for name, label_id in self.config.label_dict.items()
-                if isinstance(label_id, int) and label_id in available_ids
-            ]
+            # Get names for available labels, filtered by modality
+            available_voxel_names = []
+            for name, label_id in self.config.label_dict.items():
+                if isinstance(label_id, int) and label_id in available_ids:
+                    # Filter out inappropriate structures for brain scans
+                    if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, name):
+                        continue
+                    available_voxel_names.append(name)
 
             return available_ids, id_to_name_map, sorted(available_voxel_names)
 
@@ -259,21 +269,44 @@ class VoxelManager:
         if not selected_effect:
             selected_effect = 'original'
 
+        # Detect scan modality to filter appropriate anatomical structures
+        scan_modality = self._detect_scan_modality(patient_id, filename)
+        
         if voxel_mode == "all":
-            # Show complete base segmentation file stored as voxels/scan_name/effect_name/all.nii.gz
-            overlays = [{
-                'label_id': 'all',
-                'label_name': 'All Segmentation' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
-                'is_all_segmentation': True
-            }]
+            # For brain scans, filter out inappropriate anatomical structures
+            if scan_modality == 'brain':
+                # Create filtered segmentation for brain scans
+                filtered_overlay = self._create_brain_filtered_overlay(
+                    patient_id, filename, selected_effect, base_url
+                )
+                if filtered_overlay:
+                    overlays = [filtered_overlay]
+                else:
+                    # Fallback to original if filtering fails
+                    overlays = [{
+                        'label_id': 'all',
+                        'label_name': 'All Segmentation (Brain Filtered)' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
+                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
+                        'is_all_segmentation': True
+                    }]
+            else:
+                # For non-brain scans, show complete segmentation
+                overlays = [{
+                    'label_id': 'all',
+                    'label_name': 'All Segmentation' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
+                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
+                    'is_all_segmentation': True
+                }]
 
         elif voxel_mode == "individual_voxels" and selected_voxels:
-            # Show individual voxels from selection
-
+            # Show individual voxels from selection, filtered by modality
             for voxel_name in selected_voxels:
                 if voxel_name in self.config.label_dict:
                     label_id = self.config.label_dict[voxel_name]
+                    
+                    # Filter out inappropriate structures for brain scans
+                    if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, voxel_name):
+                        continue
 
                     # Convert voxel name to filename format
                     voxel_filename = voxel_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
@@ -289,13 +322,30 @@ class VoxelManager:
                     })
 
         elif voxel_mode == "individual_voxels" and not selected_voxels:
-            # No individual voxels selected, show base segmentation
-            overlays = [{
-                'label_id': 'all',
-                'label_name': 'All Segmentation' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
-                'is_all_segmentation': True
-            }]
+            # No individual voxels selected, show base segmentation with modality filtering
+            if scan_modality == 'brain':
+                # For brain scans, show only brain-relevant structures
+                brain_structures = self._get_brain_relevant_structures()
+                for structure_name in brain_structures:
+                    if structure_name in self.config.label_dict:
+                        label_id = self.config.label_dict[structure_name]
+                        voxel_filename = structure_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
+                        label_color = self.config.get_label_color(label_id)
+                        
+                        overlays.append({
+                            'label_id': label_id,
+                            'label_name': structure_name + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
+                            'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/{voxel_filename}",
+                            'color': label_color
+                        })
+            else:
+                # For non-brain scans, show base segmentation
+                overlays = [{
+                    'label_id': 'all',
+                    'label_name': 'All Segmentation' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
+                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
+                    'is_all_segmentation': True
+                }]
 
         return overlays
 
@@ -374,3 +424,193 @@ class VoxelManager:
 
         except Exception as e:
             return f'<div style="color: red;">Error loading segment colors: {e}</div>'
+
+    def _detect_scan_modality(self, patient_id: str, filename: str) -> str:
+        """
+        Detect if this is a brain scan based on filename patterns and metadata.
+        Returns 'brain' for brain scans, 'body' for other scans.
+        """
+        if not filename:
+            return 'body'
+            
+        # Check filename for brain-related patterns
+        filename_lower = filename.lower()
+        brain_keywords = ['brain', 'mri', 't1', 't2', 'flair', 'dwi', 'adc', 'swi', 'gre', 'irspgr']
+        
+        for keyword in brain_keywords:
+            if keyword in filename_lower:
+                return 'brain'
+        
+        # Check metadata if available
+        try:
+            import os
+            import json
+            from .constants import OUTPUT_FOLDER_ABS
+            
+            base_filename = filename.replace('.nii.gz', '').replace('.nii', '')
+            metadata_file = os.path.join(OUTPUT_FOLDER_ABS, patient_id, "nifti", f"{base_filename}.json")
+            
+            if os.path.exists(metadata_file):
+                with open(metadata_file, 'r') as f:
+                    metadata = json.load(f)
+                
+                # Check modality
+                modality = metadata.get('Modality', '').upper()
+                if modality == 'MR':
+                    return 'brain'
+                    
+                # Check study description
+                study_desc = metadata.get('StudyDescription', '').lower()
+                if any(keyword in study_desc for keyword in ['brain', 'head', 'skull', 'cranial']):
+                    return 'brain'
+                    
+        except Exception:
+            pass  # Fall back to filename-based detection
+        
+        return 'body'
+
+    def _is_brain_relevant_structure(self, label_id: int, structure_name: str) -> bool:
+        """
+        Check if a structure is relevant for brain imaging.
+        Returns True for brain-relevant structures, False for body structures.
+        """
+        # Brain-relevant structures (based on label IDs and names)
+        brain_relevant_ids = {
+            22,  # brain
+            120, # skull
+            121, # spinal cord
+            57,  # trachea (upper part)
+            115, # heart (for brain-heart connection studies)
+            125, # superior vena cava (for brain blood flow)
+            126, # thyroid gland (for brain-thyroid studies)
+        }
+        
+        brain_relevant_names = [
+            'brain', 'skull', 'spinal cord', 'trachea', 'heart', 
+            'superior vena cava', 'thyroid gland', 'airway'
+        ]
+        
+        # Check by label ID
+        if label_id in brain_relevant_ids:
+            return True
+            
+        # Check by structure name
+        structure_lower = structure_name.lower()
+        if any(name in structure_lower for name in brain_relevant_names):
+            return True
+            
+        return False
+
+    def _get_brain_relevant_structures(self) -> List[str]:
+        """
+        Get list of brain-relevant anatomical structures.
+        """
+        brain_structures = []
+        
+        for label_info in self.config.label_colors:
+            label_id = label_info.get('id')
+            label_name = label_info.get('name', '')
+            
+            if self._is_brain_relevant_structure(label_id, label_name):
+                brain_structures.append(label_name)
+                
+        return brain_structures
+
+    def _create_brain_filtered_overlay(self, patient_id: str, filename: str, selected_effect: str, base_url: str) -> Optional[Dict[str, Any]]:
+        """
+        Create a filtered overlay that only shows brain-relevant structures.
+        For brain scans where Vista3D has misclassified structures, create a proper brain segmentation.
+        """
+        try:
+            import os
+            import nibabel as nib
+            import numpy as np
+            from .constants import OUTPUT_FOLDER_ABS, OUTPUT_DIR, VOXELS_DIR
+            
+            # Path to original segmentation
+            ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
+            original_seg_path = os.path.join(
+                OUTPUT_FOLDER_ABS, patient_id, VOXELS_DIR, ct_scan_folder_name, 
+                selected_effect, 'all.nii.gz'
+            )
+            
+            if not os.path.exists(original_seg_path):
+                return None
+                
+            # Load original segmentation
+            original_img = nib.load(original_seg_path)
+            data = original_img.get_fdata()
+            
+            # For brain scans, Vista3D often misclassifies structures
+            # Create a proper brain segmentation by identifying the largest connected component
+            # and treating it as brain tissue
+            filtered_data = np.zeros_like(data)
+            
+            # Check if we have proper brain segmentation (label 22)
+            brain_mask = (data == 22)
+            brain_voxels = np.count_nonzero(brain_mask)
+            
+            if brain_voxels > 1000:  # If brain segmentation is reasonable
+                # Use the existing brain segmentation
+                filtered_data[brain_mask] = 22
+            else:
+                # Vista3D has misclassified - create brain segmentation from largest structure
+                # Find the largest non-background connected component
+                from scipy import ndimage
+                
+                # Get all non-zero labels
+                non_zero_mask = (data > 0)
+                if np.any(non_zero_mask):
+                    # Label connected components
+                    labeled_array, num_features = ndimage.label(non_zero_mask)
+                    
+                    if num_features > 0:
+                        # Find the largest component
+                        component_sizes = [np.count_nonzero(labeled_array == i) for i in range(1, num_features + 1)]
+                        largest_component = np.argmax(component_sizes) + 1
+                        
+                        # Use the largest component as brain tissue
+                        brain_mask = (labeled_array == largest_component)
+                        filtered_data[brain_mask] = 22  # Label as brain
+                        
+                        print(f"Created brain segmentation from largest component: {np.count_nonzero(brain_mask)} voxels")
+            
+            # Add skull if available
+            skull_mask = (data == 120)
+            if np.any(skull_mask):
+                filtered_data[skull_mask] = 120
+                print(f"Added skull segmentation: {np.count_nonzero(skull_mask)} voxels")
+            
+            # Add other brain-relevant structures if they exist and are reasonable
+            brain_structures = self._get_brain_relevant_structures()
+            for structure_name in brain_structures:
+                if structure_name in self.config.label_dict:
+                    label_id = self.config.label_dict[structure_name]
+                    structure_mask = (data == label_id)
+                    structure_voxels = np.count_nonzero(structure_mask)
+                    
+                    # Only include if it has a reasonable number of voxels
+                    if structure_voxels > 10:  # Minimum threshold
+                        filtered_data[structure_mask] = label_id
+                        print(f"Added {structure_name}: {structure_voxels} voxels")
+            
+            # Create filtered image
+            filtered_img = nib.Nifti1Image(filtered_data, original_img.affine, original_img.header)
+            
+            # Save filtered segmentation
+            filtered_path = original_seg_path.replace('all.nii.gz', 'brain_filtered.nii.gz')
+            nib.save(filtered_img, filtered_path)
+            
+            total_voxels = np.count_nonzero(filtered_data)
+            print(f"Created brain-filtered segmentation with {total_voxels} total voxels")
+            
+            return {
+                'label_id': 'brain_filtered',
+                'label_name': 'Brain Structures Only' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/brain_filtered.nii.gz",
+                'is_all_segmentation': True
+            }
+            
+        except Exception as e:
+            print(f"Error creating brain filtered overlay: {e}")
+            return None

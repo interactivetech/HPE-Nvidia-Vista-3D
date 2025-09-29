@@ -20,6 +20,11 @@ import traceback
 from scipy import ndimage
 import scipy.ndimage as ndi
 
+# Import the shared constants
+import sys
+sys.path.append(str(Path(__file__).parent))
+from constants import MIN_FILE_SIZE_MB
+
 
 def check_dcm2niix_installation():
     """Check if dcm2niix is installed and accessible"""
@@ -841,13 +846,13 @@ def create_quality_comparison_report(patient_id, output_folder):
         print(f"❌ Error creating quality comparison report: {e}")
 
 
-def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folders=None):
+def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=None, patient_folders=None):
     """
     Convert DICOM files to NIFTI format using dcm2niix with maximum quality optimization.
     
     Args:
         force_overwrite: If True, overwrite existing NIFTI directories
-        min_size_mb: If > 0, delete NIFTI files smaller than this size in MB.
+        min_size_mb: If > 0, delete NIFTI files smaller than this size in MB. If None, uses MIN_FILE_SIZE_MB from constants.py.
         patient_folders: If specified, only process these specific patient folders. Can be a single string or list of strings.
     """
     try:
@@ -860,6 +865,10 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
         
         # Load label dictionary
         label_dict = load_label_dictionary()
+        
+        # Use shared constant for minimum file size if not specified
+        if min_size_mb is None:
+            min_size_mb = MIN_FILE_SIZE_MB
         
         # Define paths - dicom_folder is now always absolute
         dicom_data_path = Path(dicom_folder)
@@ -884,6 +893,7 @@ def convert_dicom_to_nifti(force_overwrite=False, min_size_mb=0.5, patient_folde
         print(f"📁 DICOM Source: {dicom_data_path}")
         print(f"📁 NIFTI Destination Base: {nifti_base_path}")
         print(f"⚡ Quality Mode: Maximum Quality (best results)")
+        print(f"📏 Minimum File Size: {min_size_mb} MB (shared with segmentation)")
         print("-" * 70)
         
         # Check if DICOM directory exists

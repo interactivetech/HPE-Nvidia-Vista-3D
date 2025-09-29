@@ -1,9 +1,10 @@
 {
   "name": "Rainbow Colormap",
-  "description": "Classic rainbow colormap with transparency",
-  "R": [128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128],
-  "G": [0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255],
-  "B": [255, 238, 221, 204, 187, 170, 153, 136, 119, 102, 85, 68, 51, 34, 17, 0],
-  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
-  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+  "description": "Rainbow colormap with full spectrum visualization and automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
+  "R": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+  "G": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
+  "B": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255]
 }

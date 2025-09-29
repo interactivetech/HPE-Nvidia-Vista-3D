@@ -1,9 +1,10 @@
 {
   "name": "Jet Colormap",
-  "description": "MATLAB jet colormap with transparency",
+  "description": "MATLAB jet colormap with transparency and automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
   "R": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "G": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   "B": [143, 127, 111, 95, 79, 63, 47, 31, 15, 0, 0, 0, 0, 0, 0, 0],
-  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
-  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255]
 }

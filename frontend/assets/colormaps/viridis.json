@@ -1,9 +1,10 @@
 {
   "name": "Viridis Colormap",
-  "description": "Perceptually uniform colormap from purple to yellow",
+  "description": "Viridis colormap with perceptually uniform visualization from purple to yellow and automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
   "R": [68, 72, 62, 56, 50, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26],
   "G": [1, 40, 56, 71, 85, 99, 112, 125, 138, 150, 162, 174, 186, 198, 210, 222],
   "B": [84, 120, 125, 125, 120, 110, 95, 75, 50, 20, 0, 0, 0, 0, 0, 0],
-  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
-  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255]
 }

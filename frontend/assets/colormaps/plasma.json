@@ -1,9 +1,10 @@
 {
   "name": "Plasma Colormap",
-  "description": "Perceptually uniform colormap from purple to pink",
+  "description": "Plasma colormap with perceptually uniform purple-to-pink visualization and automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
   "R": [13, 28, 42, 55, 68, 80, 92, 104, 116, 128, 140, 152, 164, 176, 188, 200],
   "G": [8, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47, 51, 55, 59, 63],
   "B": [135, 140, 135, 130, 125, 120, 115, 110, 105, 100, 95, 90, 85, 80, 75, 70],
-  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
-  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255]
 }

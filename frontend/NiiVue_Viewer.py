@@ -126,6 +126,48 @@ def render_sidebar():
                     selected_index = display_names.index(selected_display_name)
                     selected_file = filenames[selected_index]
 
+        # Display modality type under scan selection in sidebar
+        if selected_patient and selected_file:
+            # Remove .nii.gz extension to get the base filename for JSON file
+            base_filename = selected_file.replace('.nii.gz', '').replace('.nii', '')
+            metadata_file_path = os.path.join(OUTPUT_FOLDER, selected_patient, "nifti", f"{base_filename}.json")
+            
+            if os.path.exists(metadata_file_path):
+                try:
+                    with open(metadata_file_path, 'r') as f:
+                        metadata = json.load(f)
+                    
+                    # Get modality, manufacturer, and study description from metadata
+                    modality = metadata.get('Modality', '')
+                    manufacturer = metadata.get('Manufacturer', '')
+                    study_description = metadata.get('StudyDescription', '')
+                    
+                    if modality:
+                        # Convert DICOM modality codes to readable format
+                        if modality == 'MR':
+                            modality_display = 'MRI'
+                        elif modality == 'CT':
+                            modality_display = 'CT'
+                        else:
+                            modality_display = modality  # Use as-is for other modalities
+                        
+                        # Build display text with available information
+                        display_parts = [f"{modality_display} Scan"]
+                        if manufacturer:
+                            display_parts.append(f"({manufacturer})")
+                        if study_description:
+                            display_parts.append(f"- {study_description}")
+                        
+                        st.caption(" ".join(display_parts))
+                    else:
+                        st.caption("📊 Unknown Scan Type")
+                except Exception as e:
+                    # Show error for debugging
+                    st.caption(f"⚠️ Could not read scan type: {str(e)}")
+            else:
+                # Metadata file doesn't exist - show debug info
+                st.caption(f"⚠️ Metadata file not found: {metadata_file_path}")
+
         # Update viewer config with selections
         viewer_config.selected_patient = selected_patient
         viewer_config.selected_file = selected_file

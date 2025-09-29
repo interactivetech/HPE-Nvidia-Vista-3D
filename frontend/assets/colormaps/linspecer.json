@@ -1,0 +1,10 @@
+{
+  "name": "Linspecer Colormap",
+  "description": "Linspecer colormap with automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
+  "R": [0, 0, 0, 0, 10, 182, 255, 255, 255, 240, 169],
+  "G": [156, 172, 233, 248, 206, 230, 232, 199, 142, 70, 0],
+  "B": [156, 172, 137, 72, 0, 0, 0, 0, 0, 0, 0],
+  "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255, 255]
+}

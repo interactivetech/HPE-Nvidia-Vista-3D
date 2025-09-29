@@ -1,9 +1,10 @@
 {
   "name": "Inferno Colormap",
-  "description": "Perceptually uniform colormap from black to yellow",
-  "R": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "G": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  "B": [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64],
-  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255],
-  "labels": ["Transparent", "Very Low", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+  "description": "Inferno colormap with dark-to-bright intensity visualization and automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
+  "R": [0, 1, 4, 13, 32, 63, 107, 165, 236, 255, 255, 255, 255, 255, 255, 255],
+  "G": [0, 0, 0, 5, 15, 33, 59, 95, 141, 188, 234, 255, 255, 255, 255, 255],
+  "B": [4, 7, 11, 18, 28, 40, 55, 74, 97, 125, 158, 196, 238, 255, 255, 255],
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255]
 }

@@ -1,9 +1,10 @@
 {
   "name": "Turbo Colormap",
-  "description": "Perceptually uniform colormap for scientific data with transparency",
-  "R": [48, 71, 117, 179, 223, 252, 253, 229, 179, 115],
-  "G": [18, 135, 202, 229, 235, 210, 154, 90, 38, 9],
-  "B": [59, 51, 41, 55, 96, 154, 206, 237, 249, 246],
-  "A": [0, 32, 64, 96, 128, 160, 192, 224, 255, 255],
-  "labels": ["Transparent", "Low", "Low-Mid", "Mid-Low", "Mid", "Mid-High", "High-Mid", "High", "Very High", "Max"]
+  "description": "Turbo colormap with high-contrast visualization and automatic intensity mapping for CT and MRI scans",
+  "min": 0,
+  "max": 0,
+  "R": [35, 60, 85, 110, 135, 160, 185, 210, 235, 255, 255, 255, 255, 255, 255, 255],
+  "G": [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 255, 255, 255, 255],
+  "B": [48, 96, 144, 192, 240, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+  "A": [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 255]
 }
