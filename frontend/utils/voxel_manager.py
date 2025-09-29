@@ -544,7 +544,8 @@ class VoxelManager:
             # For brain scans, Vista3D often misclassifies structures
             # Create a proper brain segmentation by identifying the largest connected component
             # and treating it as brain tissue
-            filtered_data = np.zeros_like(data)
+            # Ensure we use integer data type for proper label handling
+            filtered_data = np.zeros_like(data, dtype=np.int16)
             
             # Check if we have proper brain segmentation (label 22)
             brain_mask = (data == 22)
@@ -554,32 +555,80 @@ class VoxelManager:
                 # Use the existing brain segmentation
                 filtered_data[brain_mask] = 22
             else:
-                # Vista3D has misclassified - create brain segmentation from largest structure
-                # Find the largest non-background connected component
+                # Vista3D has misclassified - create brain segmentation
+                # For brain MRI scans, look for brain tissue in the upper portion of the image
                 from scipy import ndimage
                 
                 # Get all non-zero labels
                 non_zero_mask = (data > 0)
                 if np.any(non_zero_mask):
-                    # Label connected components
-                    labeled_array, num_features = ndimage.label(non_zero_mask)
+                    # For brain scans, focus on the upper 2/3 of the image where brain tissue should be
+                    height = data.shape[2]  # Assuming Z is the slice dimension
+                    upper_slice_start = height // 3  # Start from upper 2/3
                     
-                    if num_features > 0:
-                        # Find the largest component
-                        component_sizes = [np.count_nonzero(labeled_array == i) for i in range(1, num_features + 1)]
-                        largest_component = np.argmax(component_sizes) + 1
+                    # Create a mask for the upper portion
+                    upper_mask = np.zeros_like(non_zero_mask, dtype=bool)
+                    upper_mask[:, :, upper_slice_start:] = True
+                    
+                    # Only consider voxels in the upper portion
+                    upper_non_zero_mask = non_zero_mask & upper_mask
+                    
+                    if np.any(upper_non_zero_mask):
+                        # Label connected components in upper portion
+                        labeled_array, num_features = ndimage.label(upper_non_zero_mask)
                         
-                        # Use the largest component as brain tissue
-                        brain_mask = (labeled_array == largest_component)
-                        filtered_data[brain_mask] = 22  # Label as brain
+                        if num_features > 0:
+                            # Find the largest component in upper portion
+                            component_sizes = [np.count_nonzero(labeled_array == i) for i in range(1, num_features + 1)]
+                            largest_component = np.argmax(component_sizes) + 1
+                            
+                            # Use the largest component in upper portion as brain tissue
+                            brain_mask = (labeled_array == largest_component)
+                            filtered_data[brain_mask] = 22  # Label as brain
+                            
+                            print(f"Created brain segmentation from largest upper component: {np.count_nonzero(brain_mask)} voxels")
+                    else:
+                        # Fallback: use largest component from entire image
+                        labeled_array, num_features = ndimage.label(non_zero_mask)
                         
-                        print(f"Created brain segmentation from largest component: {np.count_nonzero(brain_mask)} voxels")
+                        if num_features > 0:
+                            component_sizes = [np.count_nonzero(labeled_array == i) for i in range(1, num_features + 1)]
+                            largest_component = np.argmax(component_sizes) + 1
+                            
+                            brain_mask = (labeled_array == largest_component)
+                            filtered_data[brain_mask] = 22  # Label as brain
+                            
+                            print(f"Created brain segmentation from largest component (fallback): {np.count_nonzero(brain_mask)} voxels")
             
             # Add skull if available
             skull_mask = (data == 120)
             if np.any(skull_mask):
                 filtered_data[skull_mask] = 120
                 print(f"Added skull segmentation: {np.count_nonzero(skull_mask)} voxels")
+            else:
+                # Try to find bone structures (label 21) as potential skull
+                bone_mask = (data == 21)
+                if np.any(bone_mask):
+                    # For brain scans, bone in upper portion might be skull
+                    height = data.shape[2]
+                    upper_slice_start = height // 3
+                    upper_bone_mask = bone_mask.copy()
+                    upper_bone_mask[:, :, :upper_slice_start] = False  # Remove lower portion
+                    
+                    if np.any(upper_bone_mask):
+                        filtered_data[upper_bone_mask] = 120  # Label as skull
+                        print(f"Added bone as skull segmentation: {np.count_nonzero(upper_bone_mask)} voxels")
+                else:
+                    # Try to create skull from brain boundary
+                    if np.any(brain_mask):
+                        from scipy import ndimage
+                        # Dilate brain mask to create skull-like boundary
+                        dilated_brain = ndimage.binary_dilation(brain_mask, structure=np.ones((3,3,3)))
+                        skull_candidate = dilated_brain & ~brain_mask
+                        
+                        if np.any(skull_candidate):
+                            filtered_data[skull_candidate] = 120  # Label as skull
+                            print(f"Created skull from brain boundary: {np.count_nonzero(skull_candidate)} voxels")
             
             # Add other brain-relevant structures if they exist and are reasonable
             brain_structures = self._get_brain_relevant_structures()
@@ -594,8 +643,10 @@ class VoxelManager:
                         filtered_data[structure_mask] = label_id
                         print(f"Added {structure_name}: {structure_voxels} voxels")
             
-            # Create filtered image
-            filtered_img = nib.Nifti1Image(filtered_data, original_img.affine, original_img.header)
+            # Create filtered image with proper integer data type
+            # Ensure the data is properly converted to int16
+            filtered_data_int = filtered_data.astype(np.int16)
+            filtered_img = nib.Nifti1Image(filtered_data_int, original_img.affine, original_img.header)
             
             # Save filtered segmentation
             filtered_path = original_seg_path.replace('all.nii.gz', 'brain_filtered.nii.gz')
