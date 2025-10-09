@@ -117,7 +117,7 @@ def check_system_requirements() -> Dict[str, bool]:
     
     # Check NVIDIA Container Toolkit
     try:
-        result = run_command("docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi", capture_output=True)
+        result = run_command("docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi", capture_output=True)
         if result.returncode == 0:
             requirements['nvidia_docker'] = True
             print_success("NVIDIA Container Toolkit: Working")
@@ -290,7 +290,7 @@ def verify_docker_setup() -> bool:
     
     # Check NVIDIA Container Toolkit
     try:
-        result = run_command("docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi", capture_output=True)
+        result = run_command("docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi", capture_output=True)
         if result.returncode == 0:
             print_success("NVIDIA Container Toolkit is working")
             return True
@@ -352,7 +352,7 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 # Check if NVIDIA Container Toolkit is working
-if ! docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi > /dev/null 2>&1; then
+if ! docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi > /dev/null 2>&1; then
     echo "⚠️  NVIDIA Container Toolkit may not be working properly."
     echo "   Vista3D may not start correctly."
 fi

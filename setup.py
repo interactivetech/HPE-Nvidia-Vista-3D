@@ -257,6 +257,7 @@ def get_user_input_non_interactive(setup_choice: str = 'both') -> Dict[str, str]
         'VISTA3D_SERVER': 'http://host.docker.internal:8000',
         'IMAGE_SERVER': 'http://localhost:8888',
         'FRONTEND_PORT': '8501',
+        'IMAGE_SERVER_PORT': '8888',
         'VESSELS_OF_INTEREST': 'all'
     }
     
@@ -366,7 +367,7 @@ def check_system_requirements(setup_choice: str = 'both') -> Dict[str, bool]:
     # Check NVIDIA Container Toolkit (only required for backend)
     if setup_choice in ['backend', 'both']:
         try:
-            result = run_command("docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu22.04 nvidia-smi", capture_output=True)
+            result = run_command("docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi", capture_output=True)
             if result.returncode == 0:
                 requirements['nvidia_docker'] = True
                 print_success("NVIDIA Container Toolkit: Working")
@@ -464,21 +465,43 @@ def check_system_requirements(setup_choice: str = 'both') -> Dict[str, bool]:
 def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
     """Get configuration using defaults"""
     print_header("Configuration Setup")
+    
+    # Check if .env file already exists and load it
+    env_file = os.path.join(os.getcwd(), '.env')
+    existing_config = {}
+    if os.path.exists(env_file):
+        print_info(f"Found existing .env file: {env_file}")
+        try:
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        existing_config[key.strip()] = value.strip().strip('"\'')
+            print_success("Loaded existing configuration from .env file")
+        except Exception as e:
+            print_warning(f"Could not load existing .env: {e}")
+    
     print_info("Using default configuration values")
     
     config = {}
     
     # Get NVIDIA NGC API key (required for backend, not needed for frontend-only)
     if setup_choice in ['backend', 'both']:
-        print_info("NVIDIA NGC API Key is required for Vista3D backend access")
-        print_info("Get your free API key at: https://ngc.nvidia.com/")
-        while True:
-            api_key = input("Enter your NVIDIA NGC API key (starts with 'nvapi-'): ").strip()
-            if api_key.startswith('nvapi-'):
-                config['NGC_API_KEY'] = api_key
-                break
-            else:
-                print_error("API key must start with 'nvapi-'")
+        # Check if NGC_API_KEY already exists in .env
+        if 'NGC_API_KEY' in existing_config and existing_config['NGC_API_KEY'] and existing_config['NGC_API_KEY'].startswith('nvapi-'):
+            config['NGC_API_KEY'] = existing_config['NGC_API_KEY']
+            print_success(f"Using existing NGC API Key from .env: {config['NGC_API_KEY'][:15]}...")
+        else:
+            print_info("NVIDIA NGC API Key is required for Vista3D backend access")
+            print_info("Get your free API key at: https://ngc.nvidia.com/")
+            while True:
+                api_key = input("Enter your NVIDIA NGC API key (starts with 'nvapi-'): ").strip()
+                if api_key.startswith('nvapi-'):
+                    config['NGC_API_KEY'] = api_key
+                    break
+                else:
+                    print_error("API key must start with 'nvapi-'")
     else:
         # Frontend-only setup - no API key needed
         print_info("NVIDIA NGC API Key is not needed for frontend-only setup")
@@ -487,23 +510,29 @@ def get_user_input(setup_choice: str = 'both') -> Dict[str, str]:
     
     # Get NVIDIA Org ID (only needed for backend)
     if setup_choice in ['backend', 'both']:
-        org_id = input("Enter your NVIDIA Org ID (optional, press Enter to skip): ").strip()
-        if not org_id:
-            org_id = ""
-        config['NGC_ORG_ID'] = org_id
+        # Check if NGC_ORG_ID already exists in .env
+        if 'NGC_ORG_ID' in existing_config and existing_config['NGC_ORG_ID']:
+            config['NGC_ORG_ID'] = existing_config['NGC_ORG_ID']
+            print_success(f"Using existing NGC Org ID from .env: {config['NGC_ORG_ID']}")
+        else:
+            org_id = input("Enter your NVIDIA Org ID (optional, press Enter to skip): ").strip()
+            if not org_id:
+                org_id = ""
+            config['NGC_ORG_ID'] = org_id
     else:
         # Frontend-only setup - no Org ID needed
         config['NGC_ORG_ID'] = ""
     
-    # Use default data directories
-    config['DICOM_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "dicom"))
-    config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.getcwd(), "output"))
+    # Use data directories from existing .env or defaults
+    config['DICOM_FOLDER'] = existing_config.get('DICOM_FOLDER', os.path.abspath(os.path.join(os.getcwd(), "dicom")))
+    config['OUTPUT_FOLDER'] = existing_config.get('OUTPUT_FOLDER', os.path.abspath(os.path.join(os.getcwd(), "output")))
     
-    # Use default server URLs and ports
-    config['VISTA3D_SERVER'] = "http://host.docker.internal:8000"
-    config['IMAGE_SERVER'] = "http://localhost:8888"
-    config['FRONTEND_PORT'] = "8501"
-    config['VESSELS_OF_INTEREST'] = "all"
+    # Use server URLs and ports from existing .env or defaults
+    config['VISTA3D_SERVER'] = existing_config.get('VISTA3D_SERVER', "http://host.docker.internal:8000")
+    config['IMAGE_SERVER'] = existing_config.get('IMAGE_SERVER', "http://localhost:8888")
+    config['FRONTEND_PORT'] = existing_config.get('FRONTEND_PORT', "8501")
+    config['IMAGE_SERVER_PORT'] = existing_config.get('IMAGE_SERVER_PORT', "8888")
+    config['VESSELS_OF_INTEREST'] = existing_config.get('VESSELS_OF_INTEREST', "all")
     
     print_success(f"DICOM folder: {config['DICOM_FOLDER']}")
     print_success(f"Output folder: {config['OUTPUT_FOLDER']}")
@@ -551,6 +580,7 @@ VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:{config['IMAGE_SERVER_PORT
 
 # Ports
 FRONTEND_PORT="{config['FRONTEND_PORT']}"
+IMAGE_SERVER_PORT="{config['IMAGE_SERVER_PORT']}"
 
 # Segmentation Settings
 VESSELS_OF_INTEREST="{config['VESSELS_OF_INTEREST']}"
