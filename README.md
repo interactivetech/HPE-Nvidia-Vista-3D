@@ -47,118 +47,111 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 
 ## 🚀 Quick Start
 
-### Most Common Setup: Remote Backend + Local Frontend
+### Recommended Setup: Remote Backend + Local Frontend
 
-**The recommended deployment for GPU-enabled systems:**
-
+**The recommended deployment:**
 - **Backend**: Remote Ubuntu server with NVIDIA GPUs
-- **Frontend**: Local Mac or workstation
+- **Frontend**: Local Mac or workstation  
 - **Connection**: SSH tunnels
 
-**Quick setup (3 commands):**
+### Setup Instructions
 
-1. **On Ubuntu server** (setup backend):
-   ```bash
-   cd ~/HPE-Nvidia-Vista-3D/backend
-   python3 setup_backend_remote.py
-   ./start_remote_backend.sh
-   ```
-
-2. **On your Mac** (setup frontend):
-   ```bash
-   cd ~/HPE-Nvidia-Vista-3D/frontend
-   python3 setup_frontend_local.py
-   ```
-
-3. **On your Mac** (connect and run):
-   ```bash
-   ./connect_to_backend.sh     # Terminal 1: SSH tunnel
-   ./start_image_server.sh     # Terminal 2: Image server  
-   ./start_frontend.sh         # Terminal 3: Frontend
-   # Open browser: http://localhost:8501
-   ```
-
-**📚 See [REMOTE_SETUP_QUICK_START.md](REMOTE_SETUP_QUICK_START.md) for detailed instructions**
-
-### Alternative: Local All-in-One Setup
-
-**For development or single-machine deployment:**
+#### 1. Backend Setup (Ubuntu Server with GPU)
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd HPE-Nvidia-Vista-3D
-
-# Run the unified setup script
+cd backend
 python3 setup.py
-
-# Setup Options:
-# Setup everything (default)
-python3 setup.py
-
-# Setup only frontend (for non-GPU systems)
-python3 setup.py --setup frontend
-
-# Setup only backend (for GPU-enabled systems)
-python3 setup.py --setup backend
-
-# Check system requirements only
-python3 setup.py --check-only
-
-# Non-interactive setup with defaults
-python3 setup.py --non-interactive
+docker compose up -d
 ```
 
-**Kubernetes Deployment:**
+The setup will:
+- ✅ Check system requirements (Docker, NVIDIA GPU, NVIDIA Container Toolkit)
+- ✅ Request your NVIDIA NGC API key
+- ✅ Create necessary directories and configuration
+- ✅ Pull Vista3D Docker image (~30GB)
+
+#### 2. Frontend Setup (Your Mac)
+
+```bash
+cd frontend
+python3 setup.py
+```
+
+The setup will:
+- ✅ Check Docker installation
+- ✅ Create necessary directories
+- ✅ Pull Docker images for frontend and image server
+- ✅ Create configuration files
+
+#### 3. Connect and Run (Your Mac)
+
+**Terminal 1 - SSH Tunnel:**
+```bash
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@ubuntu-server
+```
+Keep this terminal open!
+
+**Terminal 2 - Start Frontend & Image Server:**
+```bash
+cd frontend
+docker compose up -d
+```
+
+**Browser:**
+Open http://localhost:8501
+
+### Daily Usage
+
+Once setup is complete, just run these commands:
+
+**On Ubuntu Server:**
+```bash
+cd backend && docker compose up -d
+```
+
+**On Your Mac:**
+```bash
+# Terminal 1: SSH tunnel
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@ubuntu-server
+
+# Terminal 2: Frontend
+cd frontend && docker compose up -d
+```
+
+**📚 See [SETUP.md](SETUP.md) for complete setup instructions**
+**📋 See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for a quick command reference**
+
+### Stop Services
+
+```bash
+# On Mac
+cd frontend && docker compose down
+
+# On Ubuntu Server
+cd backend && docker compose down
+```
+
+### Kubernetes Deployment
+
 ```bash
 # Deploy with Helm chart
 cd helm/vista3d
 helm install vista3d . --namespace vista3d --create-namespace
-
-# Deploy with production configuration
-helm install vista3d . --namespace vista3d --create-namespace --values values-production.yaml
-
-# Get help
-python3 setup.py --help
 ```
 
-The setup script will:
-- ✅ Check system requirements (Ubuntu/macOS, Python 3.11+, GPU, Docker)
-- ✅ Set up Python environment with all dependencies
-- ✅ Configure environment variables and Docker settings
-- ✅ Guide you through configuration (NVIDIA NGC API key for backend)
-- ✅ Create all necessary directories and files
-- ✅ Install sample medical imaging data (if available)
+## What Gets Installed
 
-### Step 2: Start Vista3D Server (GPU-Enabled Machine)
-```bash
-# On your GPU-enabled machine (local or remote)
-cd backend
-docker-compose up -d
-```
+### Backend Components
+- 🧠 **Vista3D AI Server**: NVIDIA's medical imaging AI model
+- 🐳 **Docker Container**: ~30GB Vista3D NIM image
 
-This starts:
-- 🧠 **Vista3D AI Server** (http://localhost:8000)
-- ⚡ **GPU-accelerated processing** for medical image segmentation
-- 🔄 **Auto-restart capability** for production deployments
+### Frontend Components  
+- 🌐 **Web Interface**: Streamlit-based UI for medical imaging
+- 🖼️ **Image Server**: FastAPI server for DICOM/NIfTI file serving
 
-**Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
+## Using Vista3D
 
-### Step 3: Start Frontend Services
-```bash
-# On any machine (can be same as Vista3D or different)
-cd frontend
-# Start image server first
-cd ../image_server && docker-compose up -d
-# Start frontend
-cd ../frontend && docker-compose up -d
-```
-
-This starts:
-- 🌐 **Streamlit Web Interface** (http://localhost:8501)
-- 🖼️ **Image Server** (http://localhost:8888)
-
-### Step 4: Process Your Images
+### Process Your Medical Images
 ```bash
 # Sample data is automatically installed during setup (if available)
 # The setup script installs sample medical imaging data for patient PA00000002
