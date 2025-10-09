@@ -7,8 +7,10 @@ This guide explains the SSH tunnel configuration for connecting a local Mac fron
 ## The SSH Tunnel Command
 
 ```bash
-ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
+
+**CRITICAL**: The reverse tunnel must use `-R 8888:0.0.0.0:8888` (not `localhost`) so Docker containers on the Ubuntu server can access the tunneled port!
 
 ## Command Breakdown
 
@@ -32,16 +34,22 @@ curl http://localhost:8000/v1/vista3d/info
 # remote-server:8000 → Vista3D Docker container
 ```
 
-### Reverse Tunnel: `-R 8888:localhost:8888`
+### Reverse Tunnel: `-R 8888:0.0.0.0:8888`
 
 **What it does:**
 - Forwards remote server's port 8888 to your Mac's localhost:8888
 - Allows Vista3D backend to access your Mac's image server
+- **MUST bind to 0.0.0.0** so Docker containers can access it
 
 **How it works:**
 ```
-Vista3D → localhost:8888 → SSH → Mac localhost:8888 → Image Server
+Vista3D Container → host.docker.internal:8888 → Ubuntu host → localhost:8888 → SSH Tunnel → Mac :8888 → Image Server
 ```
+
+**Why `0.0.0.0` is required:**
+- Docker containers on Linux cannot access `127.0.0.1` (localhost only)
+- Binding to `0.0.0.0` makes the tunnel accessible from containers
+- Vista3D backend docker-compose.yml maps `host.docker.internal` to the Ubuntu host
 
 **Example:**
 ```bash
@@ -130,7 +138,7 @@ docker exec vista3d-server-standalone curl -I http://localhost:8888/health
 ### Basic Tunnel (Interactive)
 
 ```bash
-ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
 
 **Pros:**
@@ -145,7 +153,7 @@ ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
 ### Background Tunnel
 
 ```bash
-ssh -f -N -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -f -N -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
 
 **Options:**
@@ -169,7 +177,7 @@ Host vista3d-remote
     HostName your-server.com
     User your-username
     LocalForward 8000 localhost:8000
-    RemoteForward 8888 localhost:8888
+    RemoteForward 8888 0.0.0.0:8888
     ServerAliveInterval 60
     ServerAliveCountMax 3
     ExitOnForwardFailure yes
@@ -192,7 +200,7 @@ autossh -M 0 -f -N \
     -o ServerAliveInterval=60 \
     -o ServerAliveCountMax=3 \
     -L 8000:localhost:8000 \
-    -R 8888:localhost:8888 \
+    -R 8888:0.0.0.0:8888 \
     user@remote-server
 ```
 
@@ -215,7 +223,7 @@ lsof -i :8000
 kill -9 <PID>
 
 # Or use a different port
-ssh -L 8001:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -L 8001:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 # Then configure frontend to use 8001
 ```
 
@@ -226,7 +234,7 @@ ssh -L 8001:localhost:8000 -R 8888:localhost:8888 user@remote-server
 ssh -o ServerAliveInterval=60 \
     -o ServerAliveCountMax=3 \
     -L 8000:localhost:8000 \
-    -R 8888:localhost:8888 \
+    -R 8888:0.0.0.0:8888 \
     user@remote-server
 ```
 
@@ -235,7 +243,7 @@ ssh -o ServerAliveInterval=60 \
 autossh -M 0 -f -N \
     -o ServerAliveInterval=60 \
     -L 8000:localhost:8000 \
-    -R 8888:localhost:8888 \
+    -R 8888:0.0.0.0:8888 \
     user@remote-server
 ```
 
@@ -271,7 +279,7 @@ ssh user@remote-server
 **But if SSH itself is blocked:**
 ```bash
 # Try different SSH port (if configured)
-ssh -p 2222 -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -p 2222 -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 
 # Or use VPN first
 ```
@@ -346,7 +354,7 @@ If your server is behind a bastion:
 ```bash
 ssh -J bastion-host \
     -L 8000:localhost:8000 \
-    -R 8888:localhost:8888 \
+    -R 8888:0.0.0.0:8888 \
     user@remote-server
 ```
 
@@ -366,7 +374,7 @@ Host vista3d-remote
 
 For large file transfers:
 ```bash
-ssh -C -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -C -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
 
 **Note:** May increase CPU usage but reduces bandwidth.
@@ -378,7 +386,7 @@ For high-latency connections:
 ssh -o "TCPRcvBuf=524288" \
     -o "TCPSndBuf=524288" \
     -L 8000:localhost:8000 \
-    -R 8888:localhost:8888 \
+    -R 8888:0.0.0.0:8888 \
     user@remote-server
 ```
 
@@ -411,13 +419,13 @@ done
 
 ```bash
 # Run with verbose logging
-ssh -v -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -v -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 
 # More verbose
-ssh -vv -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -vv -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 
 # Very verbose
-ssh -vvv -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -vvv -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
 
 ## Alternative: VPN
@@ -446,7 +454,7 @@ If SSH tunnels are problematic, consider a VPN:
 
 **Standard command:**
 ```bash
-ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
 
 **Recommended for daily use:**
@@ -456,7 +464,7 @@ Host vista3d
     HostName your-server.com
     User your-username
     LocalForward 8000 localhost:8000
-    RemoteForward 8888 localhost:8888
+    RemoteForward 8888 0.0.0.0:8888
     ServerAliveInterval 60
     ServerAliveCountMax 3
 
@@ -474,7 +482,7 @@ autossh -M 0 -f -N \
     -o ServerAliveInterval=60 \
     -o ServerAliveCountMax=3 \
     -L 8000:localhost:8000 \
-    -R 8888:localhost:8888 \
+    -R 8888:0.0.0.0:8888 \
     user@remote-server
 ```
 
@@ -482,9 +490,10 @@ autossh -M 0 -f -N \
 
 | Task | Command |
 |------|---------|
-| Connect | `ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@server` |
+| Connect | `ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@server` |
 | Test forward | `curl http://localhost:8000/v1/vista3d/info` |
 | Test reverse | `ssh server "curl http://localhost:8888/health"` |
+| Test from Docker | `ssh server "docker exec vista3d-server-standalone curl http://localhost:8888/health"` |
 | Check tunnel | `lsof -i :8000` |
 | Disconnect | `Ctrl+C` or `pkill -f "ssh.*8000"` |
 | Background | Add `-f -N` flags |

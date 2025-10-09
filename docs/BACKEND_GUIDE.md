@@ -4,10 +4,14 @@ This guide explains how to start and manage the Vista3D backend server for AI-po
 
 ## 🚀 Quick Start
 
-### Start Vista3D Server
+### Setup and Start Vista3D Server
 ```bash
-# Start the Vista3D server (requires GPU)
-python3 start_backend.py
+# One-time setup (requires GPU)
+cd backend
+python3 setup.py
+
+# Start the Vista3D server
+docker compose up -d
 ```
 
 **This starts:**
@@ -28,11 +32,19 @@ python3 start_backend.py
 - **NVIDIA NGC account** and API key
 
 ### Pre-Setup
-Before starting the backend, ensure you've run the initial setup:
+Before starting the backend, run the backend setup:
 ```bash
-# Run the unified setup script first
+# Run the backend setup script
+cd backend
 python3 setup.py
 ```
+
+This will:
+- Check system requirements (Docker, NVIDIA GPU, Container Toolkit)
+- Request your NGC API key
+- Create necessary directories
+- Pull the Vista3D Docker image (~30GB)
+- Create `.env` configuration file
 
 ## 🐍 Virtual Environment Setup
 
@@ -198,16 +210,17 @@ netstat -tlnp | grep 8000
 ### Server Management
 ```bash
 # Start server
-python3 start_backend.py
+cd backend
+docker compose up -d
 
 # Stop server
-docker stop vista3d
+docker compose down
 
 # Restart server
-docker restart vista3d
+docker compose restart
 
 # View logs
-docker logs -f vista3d
+docker compose logs -f
 
 # Check status
 docker ps | grep vista3d
@@ -353,28 +366,29 @@ For clients connecting to a remote Vista3D server:
 ### SSH Port Forwarding Setup
 ```bash
 # Forward local ports to remote Vista3D server
-ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote_server
 
 # This forwards:
 # - Local port 8000 → Remote Vista3D server port 8000
-# - Remote port 8888 → Local image server port 8888
+# - Remote port 8888 → Local image server port 8888 (MUST use 0.0.0.0 for Docker access)
 ```
 
-### Client Configuration
+### Client Configuration (Mac)
 ```bash
-# Edit .env file on client machine
-VISTA3D_SERVER="http://localhost:8000"  # Uses SSH tunnel
+# The frontend setup.py creates the correct .env automatically:
+VISTA3D_SERVER="http://host.docker.internal:8000"  # Via SSH tunnel
 IMAGE_SERVER="http://localhost:8888"    # Local image server
-NGC_API_KEY="your_nvidia_api_key"
+VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:8888"  # For backend to fetch
 ```
 
 ### Complete Client Workflow
 ```bash
 # 1. Set up SSH tunnel (keep running)
-ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote_server
 
-# 2. Start frontend services on client
-python3 start_frontend.py
+# 2. Start frontend & image server on Mac
+cd frontend
+docker compose up -d
 
 # 3. Access GUI at http://localhost:8501
 ```

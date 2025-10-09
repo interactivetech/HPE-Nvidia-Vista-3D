@@ -11,23 +11,21 @@ The platform consists of three main components:
 
 ## 🏗️ Architecture
 
-The platform uses a flexible three-component architecture:
+The platform uses a simplified two-component architecture:
 
-1. **`setup.py`** - Initial setup and configuration
-   - Checks system requirements
-   - Sets up Python environment
-   - Configures environment variables
-   - Creates necessary directories
+1. **Backend** (`backend/setup.py`) - Vista3D AI server (GPU-enabled Ubuntu machine)
+   - One setup script checks requirements
+   - Configures NGC API access
+   - Pulls Vista3D Docker image
+   - Creates `.env` configuration
+   - Start with: `docker compose up -d`
 
-2. **Backend Services** - Vista3D server startup (GPU-enabled machine)
-   - Starts Vista3D Docker container
-   - Configures GPU access
-   - Sets up networking for remote access
-
-3. **Frontend Services** - Frontend services startup (any machine)
-   - Starts Streamlit app container
-   - Starts image server container
-   - Configures networking and CORS
+2. **Frontend** (`frontend/setup.py`) - Web interface + Image server (Mac or any Docker machine)
+   - One setup script for both services
+   - Configures frontend and image server together
+   - Pulls Docker images
+   - Creates `.env` configuration
+   - Start with: `docker compose up -d` (starts both services)
 
 ### **Benefits:**
 - **Distributed Deployments**: Vista3D on GPU server, frontend on client machines
@@ -60,112 +58,130 @@ The platform uses a flexible three-component architecture:
 - Docker Desktop or Docker Engine installed
 - Docker Compose (included with Docker Desktop)
 - At least 8GB RAM available for containers
-- NVIDIA GPU support (for local Vista3D)
+- NVIDIA GPU support (for backend Vista3D)
 
 ### Initial Setup
-```bash
-# Run the unified setup script
-python3 setup.py
 
-# Follow the prompts to configure your deployment
+#### Backend (Ubuntu Server with GPU)
+```bash
+cd backend
+python3 setup.py
+```
+
+#### Frontend (Mac or any Docker machine)
+```bash
+cd frontend
+python3 setup.py
 ```
 
 ### Start Services
 
-#### Frontend Services (Any Machine)
-```bash
-cd frontend
-# Start image server first
-cd ../image_server && docker-compose up -d
-# Start frontend
-cd ../frontend && docker-compose up -d
-```
-
-#### Backend Services (GPU Machine)
+#### Backend (GPU Machine)
 ```bash
 cd backend
-# Start Vista3D server
-docker-compose up -d
+docker compose up -d
+```
+
+#### Frontend & Image Server (Any Machine)
+```bash
+cd frontend
+docker compose up -d  # Starts both frontend and image server
+```
+
+#### SSH Tunnel (from Mac to Ubuntu)
+```bash
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@ubuntu-server
 ```
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
+The setup scripts automatically create `.env` files with the correct configuration:
 
+**Frontend `.env` (for remote backend setup):**
 ```bash
-# Vista3D Server Configuration
-VISTA3D_SERVER=http://localhost:8000  # or remote server URL
-VISTA3D_API_KEY=your_api_key_here
+# Data Directories
+DICOM_FOLDER=/path/to/dicom
+OUTPUT_FOLDER=/path/to/output
 
-# Frontend Configuration
+# Server URLs (configured for SSH tunnel)
+VISTA3D_SERVER=http://host.docker.internal:8000
+IMAGE_SERVER=http://localhost:8888
+VISTA3D_IMAGE_SERVER_URL=http://host.docker.internal:8888
+
+# Ports
 FRONTEND_PORT=8501
 IMAGE_SERVER_PORT=8888
+```
+
+**Backend `.env`:**
+```bash
+# NVIDIA NGC Configuration
+NGC_API_KEY=nvapi-YOUR_KEY_HERE
+NGC_ORG_ID=
 
 # Data Directories
-DICOM_FOLDER=/path/to/dicom/files
-OUTPUT_FOLDER=/path/to/output/files
+OUTPUT_FOLDER=/path/to/output
 
-# Docker Images
-FRONTEND_IMAGE=dwtwp/vista3d-frontend:latest
-IMAGE_SERVER_IMAGE=dwtwp/vista3d-image-server:latest
-VISTA3D_IMAGE=nvcr.io/nvidia/vista3d:latest
+# Server URLs
+VISTA3D_SERVER=http://localhost:8000
+IMAGE_SERVER=http://localhost:8888
 ```
 
 ### Remote Vista3D Configuration
 
-For remote Vista3D deployments:
-
-```bash
-# .env file for remote Vista3D
-VISTA3D_SERVER=http://your-gpu-server:8000
-VISTA3D_API_KEY=your_remote_api_key
-```
+The setup scripts automatically configure for remote deployment when using SSH tunnels. No manual configuration needed!
 
 ## 🐳 Docker Commands
 
 ### Start Services
 ```bash
-# Start all services (if all local)
-python3 setup.py --setup all
-
-# Start frontend only
-cd frontend
-cd ../image_server && docker-compose up -d
-cd ../frontend && docker-compose up -d
-
-# Start backend only
+# Start backend (GPU machine)
 cd backend
-docker-compose up -d
+docker compose up -d
+
+# Start frontend & image server (any machine)
+cd frontend
+docker compose up -d
 ```
 
 ### Stop Services
 ```bash
-# Stop frontend services
-cd frontend && docker-compose down
-cd ../image_server && docker-compose down
+# Stop frontend & image server
+cd frontend
+docker compose down
 
-# Stop backend services
-cd backend && docker-compose down
+# Stop backend
+cd backend
+docker compose down
 ```
 
 ### View Logs
 ```bash
-# Frontend logs
-cd frontend && docker-compose logs -f
+# Frontend logs (both services)
+cd frontend
+docker compose logs -f
 
 # Backend logs
-cd backend && docker-compose logs -f
+cd backend
+docker compose logs -f
+
+# Specific service logs
+cd frontend
+docker compose logs -f vista3d-frontend-standalone
+docker compose logs -f vista3d-image-server-for-frontend
 ```
 
 ### Restart Services
 ```bash
-# Restart frontend
-cd frontend && docker-compose restart
+# Restart frontend & image server
+cd frontend
+docker compose restart
 
 # Restart backend
-cd backend && docker-compose restart
+cd backend
+docker compose restart
 ```
 
 ## 🌐 Network Configuration

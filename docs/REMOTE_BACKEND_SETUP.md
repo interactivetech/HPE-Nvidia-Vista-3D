@@ -28,7 +28,7 @@ This guide covers the recommended setup where:
 │                             │         │                              │
 │  SSH Tunnels:               │         │                              │
 │  -L 8000:localhost:8000 ────┼────────>│  (Forward: Access backend)   │
-│  -R 8888:localhost:8888 <───┼─────────│  (Reverse: Backend→Image)    │
+│  -R 8888:0.0.0.0:8888 <─────┼─────────│  (Reverse: Backend→Image)    │
 │                             │         │                              │
 └─────────────────────────────┘         └──────────────────────────────┘
 ```
@@ -66,7 +66,7 @@ git clone https://github.com/your-org/HPE-Nvidia-Vista-3D.git
 cd HPE-Nvidia-Vista-3D/backend
 
 # Run the backend setup script
-python3 setup_backend.py
+python3 setup.py
 ```
 
 The setup script will:
@@ -96,7 +96,7 @@ git clone https://github.com/your-org/HPE-Nvidia-Vista-3D.git
 cd HPE-Nvidia-Vista-3D/frontend
 
 # Run the frontend setup script
-python3 setup_frontend.py
+python3 setup.py
 ```
 
 The setup script will:
@@ -111,8 +111,9 @@ The setup script will:
 # Frontend .env configuration
 DICOM_FOLDER="/absolute/path/to/dicom"
 OUTPUT_FOLDER="/absolute/path/to/output"
-VISTA3D_SERVER="http://localhost:8000"  # Via SSH forward tunnel
+VISTA3D_SERVER="http://host.docker.internal:8000"  # Via SSH forward tunnel
 IMAGE_SERVER="http://localhost:8888"     # Local image server
+VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:8888"  # For backend to fetch images
 IMAGE_SERVER_PORT="8888"
 ```
 
@@ -142,15 +143,16 @@ On your Mac, create the SSH tunnels:
 
 ```bash
 # Connect with both forward and reverse tunnels
-ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 
 # Alternative: Run in background
-ssh -f -N -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+ssh -f -N -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
 ```
 
 **Tunnel Explanation:**
 - `-L 8000:localhost:8000`: Forward local port 8000 to remote server's localhost:8000 (Vista3D)
-- `-R 8888:localhost:8888`: Reverse tunnel remote port 8888 to your Mac's localhost:8888 (Image Server)
+- `-R 8888:0.0.0.0:8888`: Reverse tunnel remote port 8888 to your Mac's localhost:8888 (Image Server)
+  - **CRITICAL**: Must use `0.0.0.0` (not `localhost`) so Docker containers on Ubuntu can access it
 - `-f`: Run in background (optional)
 - `-N`: Don't execute remote commands (optional)
 
@@ -164,79 +166,44 @@ curl http://localhost:8000/v1/vista3d/info
 curl http://localhost:8888/health
 ```
 
-### 5. Start Local Image Server
+### 5. Start Frontend & Image Server (on Your Mac)
 
-On your Mac:
-
-#### Option A: Using Docker (Recommended)
-
-```bash
-cd HPE-Nvidia-Vista-3D/image_server
-
-# Start image server
-docker-compose up -d
-
-# Verify it's running
-docker ps
-curl http://localhost:8888/health
-```
-
-#### Option B: Native Python Execution
-
-```bash
-cd HPE-Nvidia-Vista-3D/image_server
-
-# Install dependencies (first time only)
-pip install -r requirements.txt
-
-# Start image server
-python server.py
-
-# Or use uvicorn directly
-uvicorn server:app --host 0.0.0.0 --port 8888
-```
-
-### 6. Start Local Frontend
-
-On your Mac:
-
-#### Option A: Using Docker
+The frontend docker-compose.yml includes both services, so one command starts everything:
 
 ```bash
 cd HPE-Nvidia-Vista-3D/frontend
 
-# Start frontend
-docker-compose up -d
+# Start both frontend and image server together
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
+
+# View specific service logs
+docker compose logs -f vista3d-frontend-standalone
+docker compose logs -f vista3d-image-server-for-frontend
 ```
 
-#### Option B: Native Python Execution (Recommended for Development)
+#### Alternative: Native Python Execution (Development Only)
 
 ```bash
 cd HPE-Nvidia-Vista-3D/frontend
 
 # Install dependencies (first time only)
-pip install -r requirements.txt
-# Or use uv
 uv pip install -r requirements.txt
 
 # Start frontend
 streamlit run app.py --server.port 8501
-
-# Or use the environment
-export VISTA3D_SERVER="http://localhost:8000"
-export IMAGE_SERVER="http://localhost:8888"
-streamlit run app.py
 ```
 
-### 7. Access the Web Interface
+**Note**: For native execution, you need to start the image server separately in another terminal.
+
+### 6. Access the Web Interface
 
 Open your browser:
 - **Frontend**: http://localhost:8501
-- **Image Server**: http://localhost:8888
-- **Vista3D API**: http://localhost:8000/docs
+- **Image Server**: http://localhost:8888 (serves files)
+- **Vista3D API**: http://localhost:8000/docs (via tunnel)
 
 ## SSH Tunnel Management
 
@@ -502,21 +469,17 @@ sudo ufw allow 22/tcp
 
 2. **Start SSH Tunnels** (keep running):
    ```bash
-   ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+   ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
    # Or use background mode:
-   ssh -f -N -L 8000:localhost:8000 -R 8888:localhost:8888 user@remote-server
+   ssh -f -N -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote-server
    ```
+   
+   **Important**: Must use `-R 8888:0.0.0.0:8888` (not `localhost`) so Docker containers can access it!
 
-3. **Start Local Image Server**:
-   ```bash
-   cd HPE-Nvidia-Vista-3D/image_server
-   docker-compose up -d  # Or: python server.py
-   ```
-
-4. **Start Local Frontend**:
+3. **Start Frontend & Image Server** (on your Mac):
    ```bash
    cd HPE-Nvidia-Vista-3D/frontend
-   streamlit run app.py  # Or: docker-compose up -d
+   docker compose up -d  # Starts both frontend and image server
    ```
 
 5. **Open Browser**: http://localhost:8501
@@ -524,13 +487,9 @@ sudo ufw allow 22/tcp
 ### Stop Everything
 
 ```bash
-# Stop local frontend (if Docker)
+# Stop frontend & image server (on Mac)
 cd HPE-Nvidia-Vista-3D/frontend
-docker-compose down
-
-# Stop local image server (if Docker)
-cd ../image_server
-docker-compose down
+docker compose down
 
 # Kill SSH tunnel (if background)
 pkill -f "ssh.*8000.*8888"
@@ -538,7 +497,7 @@ pkill -f "ssh.*8000.*8888"
 # Stop remote backend (SSH into server)
 ssh user@remote-server
 cd HPE-Nvidia-Vista-3D/backend
-docker-compose down
+docker compose down
 ```
 
 ## Next Steps

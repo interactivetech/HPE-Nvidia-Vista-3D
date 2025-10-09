@@ -1,31 +1,68 @@
-# DICOM folder location - ABSOLUTE PATH RECOMMENDED
-# Use absolute paths for external directories to avoid confusion
-# Example: DICOM_FOLDER="/Users/username/data/dicom"
-DICOM_FOLDER="/Users/dave/AI/HPE/dicom"
+# HPE NVIDIA Vista3D Configuration Template
+# 
+# This file shows the WORKING configuration for remote backend setup
+# Copy this file to .env and adjust paths for your system
 
-# Output folder - ABSOLUTE PATH RECOMMENDED  
-# Use absolute paths for external directories to avoid confusion
-# Example: OUTPUT_FOLDER="/Users/username/data/output"
-OUTPUT_FOLDER="/Users/dave/AI/HPE/output"
+# =============================================================================
+# DATA DIRECTORIES - ADJUST THESE FOR YOUR SYSTEM
+# =============================================================================
+# Use absolute paths to avoid confusion
+DICOM_FOLDER="/path/to/your/dicom"
+OUTPUT_FOLDER="/path/to/your/output"
 
-# Local HTTP Image Server
-# For remote backend setup: http://localhost:8888 (Mac image server, accessed via -R 8888:localhost:8888)
-# For local setup: http://localhost:8888
-# Note: The remote Vista3D backend accesses this via SSH reverse tunnel
+# =============================================================================
+# FRONTEND CONFIGURATION (Mac/Local Machine)
+# =============================================================================
+# These settings work with Docker containers and SSH tunnels
+
+# Vista3D Backend URL
+# - Frontend container uses host.docker.internal to reach Mac's localhost
+# - Mac's localhost:8000 connects via SSH forward tunnel to Ubuntu backend
+VISTA3D_SERVER="http://host.docker.internal:8000"
+
+# Image Server URL (for browser/local access)
 IMAGE_SERVER="http://localhost:8888"
 
-# External image server variable is deprecated; use IMAGE_SERVER only
+# Image Server URL for Vista3D Backend
+# - Backend uses host.docker.internal to reach Ubuntu host
+# - Ubuntu host's localhost:8888 is the SSH reverse tunnel back to Mac
+VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:8888"
 
-# Vista3D server URL
-# For remote setup with SSH tunnel: http://localhost:8000 (via -L 8000:localhost:8000)
-# For local setup: http://localhost:8000
-# For direct remote access: http://your-remote-vista3d-server:8000
-VISTA3D_SERVER="http://localhost:8000"
+# Frontend and Image Server Ports
+FRONTEND_PORT="8501"
+IMAGE_SERVER_PORT="8888"
 
+# =============================================================================
+# BACKEND CONFIGURATION (Ubuntu Server with GPU)
+# =============================================================================
+# NVIDIA NGC Configuration (required for backend)
+NGC_API_KEY="nvapi-YOUR_API_KEY_HERE"
+NGC_ORG_ID=""
+
+# =============================================================================
+# SEGMENTATION SETTINGS
+# =============================================================================
 # Vessels of interest for segmentation analysis or "all"
-# Example: VESSELS_OF_INTEREST="brain,skull,spinal cord,left common carotid artery,right common carotid artery"
+# Example: "brain,skull,spinal cord,left common carotid artery,right common carotid artery"
 VESSELS_OF_INTEREST="all"
 
 # Alternatively, choose a predefined label set from conf/vista3d_label_sets.json
 # Examples: HeadNeckCore, HeadNeckExtended
 #LABEL_SET="HeadNeckCore"
+
+# =============================================================================
+# SSH TUNNEL SETUP (from Mac to Ubuntu Server)
+# =============================================================================
+# Run this command on your Mac to establish the tunnels:
+# ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@ubuntu-server
+#
+# What it does:
+# -L 8000:localhost:8000  - Forward tunnel: Mac can access Ubuntu's Vista3D backend
+# -R 8888:0.0.0.0:8888    - Reverse tunnel: Ubuntu can access Mac's image server
+#                           (MUST use 0.0.0.0 so Docker containers can access it)
+# =============================================================================
+
+# =============================================================================
+# DOCKER CONFIGURATION
+# =============================================================================
+COMPOSE_PROJECT_NAME="vista3d-platform"
