@@ -81,6 +81,8 @@ services:
       - SUPPORTED_IMAGE_EXT=[".nrrd",".nii",".nii.gz",".dcm"]
     volumes:
       - ${OUTPUT_FOLDER:-./output}:/workspace/output
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     deploy:
       resources:
         reservations:

@@ -24,7 +24,7 @@ python3 start_backend.py
 - **NVIDIA GPU** with CUDA support (RTX/Tesla/A100/H100 series)
 - **NVIDIA Drivers** (version 470+)
 - **Docker** and **NVIDIA Container Toolkit**
-- **At least 8GB RAM** and **10GB free disk space**
+- **At least 16GB RAM** and **40GB+ free disk space** (Vista3D Docker image is ~30GB)
 - **NVIDIA NGC account** and API key
 
 ### Pre-Setup

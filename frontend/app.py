@@ -25,7 +25,6 @@ except ImportError:
 # Add utils to path for imports
 sys.path.append(str(Path(__file__).parent / 'utils'))
 from utils.navigation import render_navigation
-from utils.mermaid import render_workflow_section
 from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
 #from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
@@ -167,16 +166,6 @@ if current_page == 'home':
     - **🩻 NiiVue Viewer**: Interactive medical image viewer for NIfTI files
     - **🛠️ Tools**: Utilities for medical image processing
     """)
-    
-    
-    # Add workflow diagram after Image Data section
-    st.markdown("---")
-    
-    # Display workflow section directly
-    render_workflow_section()
-    
-    # Add definitions section
-    st.markdown("---")
     
 
 elif current_page == 'image_data':

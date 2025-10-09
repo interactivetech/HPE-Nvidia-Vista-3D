@@ -139,7 +139,7 @@ REQUIREMENTS:
     - NVIDIA Container Toolkit (for GPU acceleration)
     - NVIDIA GPU (recommended)
     - 16+ GB RAM (recommended)
-    - 10+ GB free disk space
+    - 40+ GB free disk space (Vista3D Docker image is ~30GB)
     
     For Frontend Setup (Web Interface):
     - 8+ GB RAM (minimum)
@@ -423,7 +423,7 @@ def check_system_requirements(setup_choice: str = 'both') -> Dict[str, bool]:
         print_warning("Could not check memory")
     
     # Check disk space
-    min_disk_gb = 5 if setup_choice == 'frontend' else 10
+    min_disk_gb = 5 if setup_choice == 'frontend' else 40
     try:
         result = run_command("df -h .", capture_output=True)
         if result.returncode == 0:
@@ -547,7 +547,7 @@ OUTPUT_FOLDER="{config['OUTPUT_FOLDER']}"
 # Server URLs
 VISTA3D_SERVER="{config['VISTA3D_SERVER']}"
 IMAGE_SERVER="{config['IMAGE_SERVER']}"
-VISTA3D_IMAGE_SERVER_URL="{config['IMAGE_SERVER']}"
+VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:{config['IMAGE_SERVER_PORT']}"
 
 # Ports
 FRONTEND_PORT="{config['FRONTEND_PORT']}"

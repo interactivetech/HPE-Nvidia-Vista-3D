@@ -117,6 +117,39 @@ OUTPUT_FOLDER="/path/to/your/output"
 VESSELS_OF_INTEREST="all"
 ```
 
+### **🐳 Docker Networking Configuration**
+
+When running the system in Docker, there's an important distinction between two environment variables:
+
+#### **IMAGE_SERVER vs VISTA3D_IMAGE_SERVER_URL**
+
+- **`IMAGE_SERVER`**: URL used by your browser to display images
+  - Set to `http://localhost:8888` when running locally
+  - Set to your external IP (e.g., `http://203.0.113.1:8888`) when accessing remotely
+
+- **`VISTA3D_IMAGE_SERVER_URL`**: URL used by Vista3D container to fetch images
+  - **Automatically set to `http://host.docker.internal:8888`** in Docker environments
+  - This allows the Vista3D container to access the image server running on the host machine
+  - **Do not change this** unless you have a custom Docker network setup
+
+#### **Why Two Different URLs?**
+
+When Vista3D runs in a Docker container:
+- It cannot access `localhost:8888` (localhost in a container refers to the container itself)
+- It needs to use `host.docker.internal:8888` to reach services on the host machine
+- The frontend and setup scripts automatically configure this correctly
+
+#### **Default Configuration (Recommended)**
+
+The system automatically sets up the correct URLs:
+```bash
+# In docker-compose.yml (auto-configured)
+IMAGE_SERVER=http://localhost:8888                    # For your browser
+VISTA3D_IMAGE_SERVER_URL=http://host.docker.internal:8888  # For Vista3D container
+```
+
+**⚠️ Common Error**: If you see "Connection refused" errors during segmentation, ensure `VISTA3D_IMAGE_SERVER_URL` uses `host.docker.internal` and not `localhost`.
+
 ### **🔑 Critical Configuration: External IP Address**
 
 Deprecated: EXTERNAL_IMAGE_SERVER_URL

@@ -35,6 +35,7 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 - **OS**: Ubuntu Linux (18.04+) or macOS
 - **GPU**: NVIDIA GPU with CUDA support (8GB+ VRAM recommended)
 - **Memory**: 16GB+ RAM for large medical imaging datasets
+- **Storage**: 40GB+ free disk space (Vista3D Docker image is ~30GB)
 - **Docker**: Docker and NVIDIA Container Toolkit (required)
 - **NVIDIA NGC**: Account for Vista3D access
 

@@ -486,7 +486,7 @@ OUTPUT_FOLDER="{config['OUTPUT_FOLDER']}"
 # Server URLs
 VISTA3D_SERVER="{config['VISTA3D_SERVER']}"
 IMAGE_SERVER="{config['IMAGE_SERVER']}"
-VISTA3D_IMAGE_SERVER_URL="{config['IMAGE_SERVER']}"
+VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:{config['IMAGE_SERVER_PORT']}"
 
 # Ports
 FRONTEND_PORT="{config['FRONTEND_PORT']}"

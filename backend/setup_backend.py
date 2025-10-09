@@ -311,8 +311,8 @@ def pull_docker_images() -> None:
     
     for image in images:
         print_info(f"Pulling {image}...")
-        print_info("This may take several minutes depending on your internet connection...")
-        print_info("The Vista3D image is approximately 5-10GB in size")
+        print_info("This may take a considerable amount of time depending on your internet connection...")
+        print_info("The Vista3D image is approximately 30GB in size")
         print("")
         try:
             # Don't capture output so users can see Docker's progress bars

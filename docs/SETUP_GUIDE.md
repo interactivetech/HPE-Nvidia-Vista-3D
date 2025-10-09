@@ -10,7 +10,7 @@ Get up and running with the HPE GreenLake Medical AI Platform with NVIDIA Vista3
 - **Ubuntu Linux** (18.04+) or **macOS**
 - **NVIDIA GPU** with CUDA support (8GB+ VRAM recommended)
 - **16GB+ RAM** for large medical imaging datasets
-- **10GB+ free disk space**
+- **40GB+ free disk space** (Vista3D Docker image is ~30GB)
 - **Docker and NVIDIA Container Toolkit** (for Docker deployment)
 - **Internet connection** for downloading packages and Docker images
 
@@ -194,7 +194,7 @@ python3 setup.py --setup backend
 - GPU: NVIDIA GPU with CUDA support (8GB+ VRAM recommended)
 - Memory: 16GB+ RAM
 - Docker: Required with NVIDIA Container Toolkit
-- Disk Space: 10GB+ free space
+- Disk Space: 40GB+ free space (Vista3D Docker image is ~30GB)
 
 ## 🔧 Additional Setup Options
 
@@ -610,6 +610,35 @@ sudo docker ps | grep vista3d
 # Test API connectivity
 curl -v http://localhost:8000/v1/vista3d/info
 ```
+
+#### Segmentation "Connection Refused" Error
+If you see errors like "Failed to fetch image: Connection refused" during segmentation:
+
+**Problem**: Vista3D container cannot access the image server at `localhost:8888`
+
+**Solution**: Ensure `VISTA3D_IMAGE_SERVER_URL` uses `host.docker.internal`:
+```bash
+# Check your .env file
+grep VISTA3D_IMAGE_SERVER_URL .env
+
+# Should be set to:
+VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:8888"
+
+# NOT:
+# VISTA3D_IMAGE_SERVER_URL="http://localhost:8888"  # ❌ Won't work in Docker
+```
+
+**Why?** In Docker:
+- `localhost` inside a container refers to the container itself, not the host machine
+- `host.docker.internal` is Docker's special hostname that resolves to the host machine
+- The setup scripts automatically configure this, but if you manually edited `.env`, ensure you use `host.docker.internal`
+
+**Quick Fix**:
+1. Update `.env` file with the correct `VISTA3D_IMAGE_SERVER_URL`
+2. Restart the Docker containers: `docker-compose restart`
+3. Retry the segmentation
+
+See [docs/IMAGE_SERVER.md](IMAGE_SERVER.md) for more details on Docker networking configuration.
 
 #### DICOM Conversion Issues
 ```bash
