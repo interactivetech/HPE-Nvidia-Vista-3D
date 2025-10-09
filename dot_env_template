@@ -8,13 +8,19 @@ DICOM_FOLDER="/Users/dave/AI/HPE/dicom"
 # Example: OUTPUT_FOLDER="/Users/username/data/output"
 OUTPUT_FOLDER="/Users/dave/AI/HPE/output"
 
-# Local HTTP Image Server (for your local machine)
+# Local HTTP Image Server
+# For remote backend setup: http://localhost:8888 (Mac image server, accessed via -R 8888:localhost:8888)
+# For local setup: http://localhost:8888
+# Note: The remote Vista3D backend accesses this via SSH reverse tunnel
 IMAGE_SERVER="http://localhost:8888"
 
 # External image server variable is deprecated; use IMAGE_SERVER only
 
-# Remote Vista3D server URL
-VISTA3D_SERVER="http://your-remote-vista3d-server:8000"
+# Vista3D server URL
+# For remote setup with SSH tunnel: http://localhost:8000 (via -L 8000:localhost:8000)
+# For local setup: http://localhost:8000
+# For direct remote access: http://your-remote-vista3d-server:8000
+VISTA3D_SERVER="http://localhost:8000"
 
 # Vessels of interest for segmentation analysis or "all"
 # Example: VESSELS_OF_INTEREST="brain,skull,spinal cord,left common carotid artery,right common carotid artery"

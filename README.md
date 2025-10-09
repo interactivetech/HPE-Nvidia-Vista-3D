@@ -47,9 +47,43 @@ This platform provides automated vessel segmentation using NVIDIA's Vista3D mode
 
 ## 🚀 Quick Start
 
-**Get up and running with our new three-script architecture!**
+### Most Common Setup: Remote Backend + Local Frontend
 
-### Step 1: Initial Setup
+**The recommended deployment for GPU-enabled systems:**
+
+- **Backend**: Remote Ubuntu server with NVIDIA GPUs
+- **Frontend**: Local Mac or workstation
+- **Connection**: SSH tunnels
+
+**Quick setup (3 commands):**
+
+1. **On Ubuntu server** (setup backend):
+   ```bash
+   cd ~/HPE-Nvidia-Vista-3D/backend
+   python3 setup_backend_remote.py
+   ./start_remote_backend.sh
+   ```
+
+2. **On your Mac** (setup frontend):
+   ```bash
+   cd ~/HPE-Nvidia-Vista-3D/frontend
+   python3 setup_frontend_local.py
+   ```
+
+3. **On your Mac** (connect and run):
+   ```bash
+   ./connect_to_backend.sh     # Terminal 1: SSH tunnel
+   ./start_image_server.sh     # Terminal 2: Image server  
+   ./start_frontend.sh         # Terminal 3: Frontend
+   # Open browser: http://localhost:8501
+   ```
+
+**📚 See [REMOTE_SETUP_QUICK_START.md](REMOTE_SETUP_QUICK_START.md) for detailed instructions**
+
+### Alternative: Local All-in-One Setup
+
+**For development or single-machine deployment:**
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -57,12 +91,8 @@ cd HPE-Nvidia-Vista-3D
 
 # Run the unified setup script
 python3 setup.py
-```
 
-**Setup Options:**
-
-**Local Docker Deployment:**
-```bash
+# Setup Options:
 # Setup everything (default)
 python3 setup.py
 
