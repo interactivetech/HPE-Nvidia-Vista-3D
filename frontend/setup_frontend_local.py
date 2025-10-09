@@ -100,18 +100,26 @@ def get_config():
     output_path = input(f"Output folder path [{default_output}]: ").strip()
     config['OUTPUT_FOLDER'] = os.path.abspath(output_path if output_path else default_output)
     
-    # Remote server info
-    print_info("\nRemote Vista3D server information")
-    print_info("You will connect to the remote backend via SSH tunnel")
+    # Optional: Remote server info for convenience script
+    print_info("\nOptional: Generate SSH tunnel helper script?")
+    print_info("(You can always create the SSH tunnel manually)")
     
-    remote_server = input("Remote server hostname or IP: ").strip()
-    if not remote_server:
-        print_error("Remote server is required")
-        sys.exit(1)
-    config['REMOTE_SERVER'] = remote_server
+    generate_script = input("Generate connect_to_backend.sh script? (y/N): ").strip().lower()
     
-    remote_user = input(f"Remote server username [{os.getenv('USER')}]: ").strip()
-    config['REMOTE_USER'] = remote_user if remote_user else os.getenv('USER')
+    if generate_script in ['y', 'yes']:
+        remote_server = input("\nRemote server hostname or IP: ").strip()
+        if not remote_server:
+            print_warning("No remote server specified, skipping script generation")
+            config['REMOTE_SERVER'] = ""
+            config['REMOTE_USER'] = ""
+        else:
+            config['REMOTE_SERVER'] = remote_server
+            remote_user = input(f"Remote server username [{os.getenv('USER')}]: ").strip()
+            config['REMOTE_USER'] = remote_user if remote_user else os.getenv('USER')
+    else:
+        config['REMOTE_SERVER'] = ""
+        config['REMOTE_USER'] = ""
+        print_info("Skipping SSH tunnel script generation")
     
     # Set fixed values for local setup
     config['VISTA3D_SERVER'] = "http://localhost:8000"  # Via SSH forward tunnel
@@ -158,15 +166,19 @@ IMAGE_SERVER="{config['IMAGE_SERVER']}"
 IMAGE_SERVER_PORT="{config['IMAGE_SERVER_PORT']}"
 FRONTEND_PORT="{config['FRONTEND_PORT']}"
 
-# Remote Server Info (for reference)
-REMOTE_SERVER="{config['REMOTE_SERVER']}"
-REMOTE_USER="{config['REMOTE_USER']}"
-
 # Vessel Configuration
 VESSELS_OF_INTEREST="all"
 
 # Docker Configuration
 COMPOSE_PROJECT_NAME=vista3d-frontend
+"""
+    
+    # Add remote server info if provided (for reference only)
+    if config.get('REMOTE_SERVER'):
+        env_content += f"""
+# Remote Server Info (for reference only - not used by frontend)
+REMOTE_SERVER="{config['REMOTE_SERVER']}"
+REMOTE_USER="{config['REMOTE_USER']}"
 """
     
     env_file = os.path.join(os.getcwd(), '.env')
@@ -205,6 +217,13 @@ COMPOSE_PROJECT_NAME=vista3d-image-server
 
 def create_ssh_tunnel_script(config):
     """Create SSH tunnel helper script"""
+    # Only create if remote server info was provided
+    if not config.get('REMOTE_SERVER'):
+        print_info("Skipping SSH tunnel script (no remote server configured)")
+        print_info("Create SSH tunnel manually with:")
+        print_info("  ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@your-server")
+        return
+    
     print_header("Creating SSH Tunnel Script")
     
     script_content = f'''#!/bin/bash
@@ -343,6 +362,11 @@ fi
         print_error(f"Failed to create frontend script: {e}")
     
     # Master startup script
+    if config.get('REMOTE_SERVER'):
+        ssh_command = f"./connect_to_backend.sh\n# Or: ssh -L 8000:localhost:8000 -R 8888:localhost:8888 {config['REMOTE_USER']}@{config['REMOTE_SERVER']}"
+    else:
+        ssh_command = "ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@your-remote-server"
+    
     master_script = f'''#!/bin/bash
 # Master startup script for Vista3D local frontend
 # This script helps you start all services in the correct order
@@ -360,10 +384,7 @@ echo "You need to establish SSH tunnels to the remote backend."
 echo "Open a new terminal and run:"
 echo ""
 echo "  cd $SCRIPT_DIR"
-echo "  ./connect_to_backend.sh"
-echo ""
-echo "Or manually run:"
-echo "  ssh -L 8000:localhost:8000 -R 8888:localhost:8888 {config['REMOTE_USER']}@{config['REMOTE_SERVER']}"
+echo "  {ssh_command}"
 echo ""
 read -p "Press Enter when SSH tunnel is connected..."
 
@@ -433,15 +454,23 @@ def main():
     print_info("Configuration Summary:")
     print_info(f"  DICOM folder: {config['DICOM_FOLDER']}")
     print_info(f"  Output folder: {config['OUTPUT_FOLDER']}")
-    print_info(f"  Remote server: {config['REMOTE_USER']}@{config['REMOTE_SERVER']}")
+    if config.get('REMOTE_SERVER'):
+        print_info(f"  Remote server: {config['REMOTE_USER']}@{config['REMOTE_SERVER']}")
     print_info(f"  Vista3D server: {config['VISTA3D_SERVER']} (via SSH tunnel)")
     print_info(f"  Image server: {config['IMAGE_SERVER']} (local)")
     print("")
     print_info("Next Steps:")
     print_info("")
-    print_info("  1. Connect to remote backend:")
-    print_info("     ./connect_to_backend.sh")
-    print_info("     (Keep that terminal open)")
+    
+    if config.get('REMOTE_SERVER'):
+        print_info("  1. Connect to remote backend:")
+        print_info("     ./connect_to_backend.sh")
+        print_info("     (Keep that terminal open)")
+    else:
+        print_info("  1. Connect to remote backend with SSH tunnel:")
+        print_info("     ssh -L 8000:localhost:8000 -R 8888:localhost:8888 user@your-server")
+        print_info("     (Keep that terminal open)")
+    
     print("")
     print_info("  2. In a new terminal, start image server:")
     print_info("     ./start_image_server.sh")
@@ -451,9 +480,12 @@ def main():
     print("")
     print_info("  4. Open browser: http://localhost:8501")
     print("")
-    print_info("  OR use the master script:")
-    print_info("     ./start_all.sh")
-    print("")
+    
+    if config.get('REMOTE_SERVER'):
+        print_info("  OR use the master script:")
+        print_info("     ./start_all.sh")
+        print("")
+    
     print_info("📚 See docs/REMOTE_BACKEND_SETUP.md for detailed instructions")
 
 if __name__ == "__main__":
