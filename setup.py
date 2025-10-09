@@ -613,12 +613,15 @@ def run_backend_setup() -> None:
     
     try:
         print_info("Running backend setup...")
-        result = run_command(f"cd {backend_dir} && python3 setup_backend.py", capture_output=True)
+        print_info("This may take several minutes, especially when pulling Docker images...")
+        print_info("Progress will be shown below:")
+        print("")
+        # Don't capture output so users can see real-time progress from Docker pulls
+        result = run_command(f"cd {backend_dir} && python3 setup_backend.py", capture_output=False)
         if result.returncode == 0:
             print_success("Backend setup completed")
         else:
             print_error("Backend setup failed")
-            print_error(result.stderr)
     except Exception as e:
         print_error(f"Failed to run backend setup: {e}")
 

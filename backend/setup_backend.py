@@ -311,10 +311,15 @@ def pull_docker_images() -> None:
     
     for image in images:
         print_info(f"Pulling {image}...")
+        print_info("This may take several minutes depending on your internet connection...")
+        print_info("The Vista3D image is approximately 5-10GB in size")
+        print("")
         try:
-            result = run_command(f"docker pull {image}", capture_output=True)
+            # Don't capture output so users can see Docker's progress bars
+            result = run_command(f"docker pull {image}", capture_output=False)
+            print("")  # Add blank line after Docker output
             if result.returncode == 0:
-                print_success(f"Pulled: {image}")
+                print_success(f"Successfully pulled: {image}")
             else:
                 print_error(f"Failed to pull: {image}")
         except Exception as e:
