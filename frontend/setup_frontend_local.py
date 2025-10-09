@@ -288,9 +288,30 @@ if [ -f ".env" ]; then
     # Check if Docker is available
     if command -v docker &> /dev/null; then
         echo "Using Docker..."
-        docker-compose up -d
+        
+        # Detect docker-compose command (V1 vs V2)
+        if command -v docker-compose &> /dev/null; then
+            COMPOSE_CMD="docker-compose"
+        elif docker compose version &> /dev/null; then
+            COMPOSE_CMD="docker compose"
+        else
+            echo "Docker Compose not found. Starting with Python..."
+            if [ -f "server.py" ]; then
+                python3 server.py &
+                echo $! > .image_server.pid
+                echo "✅ Image server started (Python)"
+                echo "📊 Check logs: tail -f nohup.out"
+                echo "🌐 Image server: http://localhost:8888"
+                exit 0
+            else
+                echo "❌ server.py not found"
+                exit 1
+            fi
+        fi
+        
+        $COMPOSE_CMD up -d
         echo "✅ Image server started (Docker)"
-        echo "📊 Check logs: docker-compose logs -f"
+        echo "📊 Check logs: $COMPOSE_CMD logs -f"
     else
         echo "Docker not found. Starting with Python..."
         if [ -f "server.py" ]; then
@@ -340,7 +361,17 @@ if [ -f ".env" ]; then
         streamlit run app.py --server.port ${FRONTEND_PORT:-8501}
     elif command -v docker &> /dev/null; then
         echo "Streamlit not found locally. Using Docker..."
-        docker-compose up
+        
+        # Detect docker-compose command (V1 vs V2)
+        if command -v docker-compose &> /dev/null; then
+            docker-compose up
+        elif docker compose version &> /dev/null; then
+            docker compose up
+        else
+            echo "❌ Docker Compose not found"
+            echo "Install Streamlit: pip install streamlit"
+            exit 1
+        fi
     else
         echo "❌ Neither Streamlit nor Docker found"
         echo "Install Streamlit: pip install streamlit"

@@ -357,9 +357,19 @@ if ! docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi >
     echo "   Vista3D may not start correctly."
 fi
 
+# Detect docker-compose command (V1 vs V2)
+if command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker compose"
+else
+    echo "❌ Docker Compose not found"
+    exit 1
+fi
+
 # Start the Vista3D server
 echo "🧠 Starting Vista3D server..."
-docker-compose up -d
+$COMPOSE_CMD up -d
 
 # Wait for the service to be ready
 echo "⏳ Waiting for Vista3D server to be ready..."

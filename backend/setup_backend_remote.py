@@ -241,9 +241,19 @@ if ! docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi >
     echo "⚠️  NVIDIA Container Toolkit may not be working"
 fi
 
+# Detect docker-compose command (V1 vs V2)
+if command -v docker-compose &> /dev/null; then
+    COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null; then
+    COMPOSE_CMD="docker compose"
+else
+    echo "❌ Docker Compose not found"
+    exit 1
+fi
+
 # Start Vista3D
 echo "🧠 Starting Vista3D server..."
-docker-compose up -d
+$COMPOSE_CMD up -d
 
 # Wait for service
 echo "⏳ Waiting for Vista3D to be ready..."
