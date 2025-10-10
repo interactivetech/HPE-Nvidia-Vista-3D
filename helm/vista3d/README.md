@@ -2,8 +2,14 @@
 
 This Helm chart deploys the HPE NVIDIA Vista3D Medical AI Platform on Kubernetes. The platform provides AI-powered medical image segmentation with 3D visualization capabilities.
 
-**Chart Version**: 1.1.0  
-**App Version**: 1.1.0
+**Chart Version**: 1.2.0  
+**App Version**: 1.2.0
+
+## What's New in v1.2.0
+
+- **Enhanced Colormap Support**: Added built-in NiiVue colormaps (23 colormaps including gray, jet, viridis, plasma, and more)
+- **Improved Visualization**: Built-in colormaps are now natively supported without requiring custom JSON definitions
+- **Better Performance**: Optimized colormap loading with intelligent caching for built-in options
 
 ## Prerequisites
 

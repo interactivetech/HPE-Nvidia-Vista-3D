@@ -76,6 +76,10 @@ The Helm chart deploys three main components:
 - **Port**: 8501
 - **Scaling**: Horizontal scaling supported
 - **Health Check**: Built-in Streamlit health endpoint
+- **Features**: 
+  - Enhanced NiiVue 3D viewer with 23+ built-in colormaps
+  - Medical-specific colormaps for CT/MRI visualization
+  - Real-time volume rendering and segmentation overlay
 
 ### 3. Image Server
 - **Image**: `dwtwp/vista3d-image-server:latest`

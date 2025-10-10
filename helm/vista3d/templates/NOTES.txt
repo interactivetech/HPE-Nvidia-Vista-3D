@@ -69,6 +69,11 @@ Image Server: {{ .Values.imageServer.name }}
 1. Configure your NVIDIA NGC API key
 2. Upload medical imaging data
 3. Run AI segmentation
-4. Explore 3D visualizations
+4. Explore 3D visualizations with enhanced colormaps
+
+✨ New Features in v1.2.0:
+- 23+ built-in NiiVue colormaps for better visualization
+- Improved medical imaging colormaps (CT, MRI, vessels, bones)
+- Optimized colormap loading performance
 
 For more information, visit: https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D
