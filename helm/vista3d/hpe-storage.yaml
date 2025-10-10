@@ -1,0 +1,71 @@
+# ============================================================================
+# HPE Storage Configuration for Vista3D
+# ============================================================================
+# This file creates storage classes optimized for medical imaging workloads
+# on HPE GreenLake infrastructure
+# ============================================================================
+
+---
+# High-performance storage for active processing
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vista3d-fast
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    hpe.com/description: "High-performance storage for Vista3D active processing"
+provisioner: csi.hpe.com
+parameters:
+  csi.storage.k8s.io/fstype: ext4
+  csi.storage.k8s.io/provisioner-secret-name: hpe-backend
+  csi.storage.k8s.io/provisioner-secret-namespace: hpe-storage
+  accessProtocol: "iscsi"
+  description: "Vista3D high-performance storage"
+  performancePolicy: "high"
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+
+---
+# Standard storage for output/results
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vista3d-standard
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    hpe.com/description: "Standard storage for Vista3D results"
+provisioner: csi.hpe.com
+parameters:
+  csi.storage.k8s.io/fstype: ext4
+  csi.storage.k8s.io/provisioner-secret-name: hpe-backend
+  csi.storage.k8s.io/provisioner-secret-namespace: hpe-storage
+  accessProtocol: "iscsi"
+  description: "Vista3D standard storage"
+  performancePolicy: "medium"
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Retain
+
+---
+# Archive storage for long-term retention
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: vista3d-archive
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    hpe.com/description: "Archive storage for Vista3D long-term data"
+provisioner: csi.hpe.com
+parameters:
+  csi.storage.k8s.io/fstype: ext4
+  csi.storage.k8s.io/provisioner-secret-name: hpe-backend
+  csi.storage.k8s.io/provisioner-secret-namespace: hpe-storage
+  accessProtocol: "iscsi"
+  description: "Vista3D archive storage"
+  performancePolicy: "low"
+  compressionEnabled: "true"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+
