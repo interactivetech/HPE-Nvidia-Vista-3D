@@ -45,11 +45,13 @@ source .venv/bin/activate
 # Install all dependencies
 uv sync
 
-# Run frontend
-python3 start_frontend.py
+# Start frontend & image server
+cd frontend
+docker compose up -d
 
-# Run backend
-python3 start_backend.py
+# Start backend
+cd backend
+docker compose up -d
 ```
 
 ### Docker Builds

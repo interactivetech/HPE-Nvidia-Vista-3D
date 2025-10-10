@@ -43,64 +43,70 @@ DICOM Images → NIfTI Conversion → Vista3D AI Segmentation → 3D Visualizati
 **Get up and running with our unified setup script!**
 
 ### Step 1: Initial Setup
+### Backend Setup (Ubuntu Server with GPU)
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd HPE-Nvidia-Vista-3D
-
-# Run the unified setup script
+cd backend
 python3 setup.py
 ```
 
-**What the setup script does:**
-- ✅ Checks system requirements (OS, Python, GPU, Docker)
-- ✅ Sets up separate Python environments for frontend and backend
-- ✅ Configures environment variables and Docker settings
-- ✅ Prompts for your NVIDIA NGC API key (backend only)
-- ✅ Creates all necessary directories and files
-- ✅ Installs sample medical imaging data (if available)
+**What it does:**
+- ✅ Checks system requirements (Docker, NVIDIA GPU, Container Toolkit)
+- ✅ Requests your NVIDIA NGC API key
+- ✅ Creates necessary directories
+- ✅ Pulls Vista3D Docker image (~30GB)
+- ✅ Creates `.env` configuration file
+
+### Frontend Setup (Mac or any Docker machine)
+```bash
+cd frontend
+python3 setup.py
+```
+
+**What it does:**
+- ✅ Checks Docker installation
+- ✅ Creates necessary directories
+- ✅ Pulls Docker images for frontend and image server
+- ✅ Creates `.env` configuration file
+- ✅ Configures for SSH tunnel connection (default)
 
 ### Step 2: Start Services
 
-**The commands depend on what you set up in Step 1:**
+#### For Remote Backend Setup (Recommended):
 
-#### If you set up both frontend and backend:
+**On Ubuntu Server:**
 ```bash
-# Start Vista3D AI Server (GPU-enabled machine)
 cd backend
-docker-compose up -d
-
-# Start Frontend Services (any machine)
-cd ../frontend
-# Start image server first
-cd ../image_server && docker-compose up -d
-# Start frontend
-cd ../frontend && docker-compose up -d
+docker compose up -d
 ```
 
-#### If you set up only the backend:
+**On Your Mac:**
 ```bash
-# Start Vista3D AI Server
-cd backend
-docker-compose up -d
-```
+# Terminal 1: SSH tunnel (keep open)
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@ubuntu-server
 
-#### If you set up only the frontend:
-```bash
-# Start Frontend Services
+# Terminal 2: Start frontend & image server
 cd frontend
-# Start image server first
-cd ../image_server && docker-compose up -d
-# Start frontend
-cd ../frontend && docker-compose up -d
+docker compose up -d
 ```
 
-**This starts:**
-- 🧠 **Vista3D AI Server** (http://localhost:8000) - if backend was set up
-- 🌐 **Streamlit Web Interface** (http://localhost:8501) - if frontend was set up
-- 🖼️ **Image Server** (http://localhost:8888) - if frontend was set up
+#### For Local Setup (All on One Machine):
 
-**Note**: The Vista3D server takes a few minutes to initialize and be ready for use.
+```bash
+# Start backend
+cd backend
+docker compose up -d
+
+# Start frontend & image server
+cd frontend
+docker compose up -d
+```
+
+**What's running:**
+- 🧠 **Vista3D AI Server** (http://localhost:8000)
+- 🌐 **Streamlit Web Interface** (http://localhost:8501)
+- 🖼️ **Image Server** (http://localhost:8888)
+
+**Note**: The Vista3D server takes 1-2 minutes to initialize.
 
 ### Step 3: Process Your Images
 
@@ -131,13 +137,12 @@ mkdir -p output/nifti
 
 ## ⚙️ Setup Options
 
-The `setup.py` script provides flexible installation options to accommodate different deployment scenarios and system configurations.
+The platform now uses two simple setup scripts - one for backend, one for frontend.
 
-### 1. Full Platform Setup (Default)
+### 1. Backend Setup (Ubuntu Server with GPU)
 ```bash
+cd backend
 python3 setup.py
-# or
-python3 setup.py --setup both
 ```
 
 **What it does:**
@@ -342,7 +347,7 @@ For remote Vista3D server deployments, you'll need to set up port forwarding:
 ### SSH Port Forwarding
 ```bash
 # Forward local ports to remote Vista3D server
-ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote_server
 
 # This forwards:
 # - Local port 8000 → Remote Vista3D server port 8000
@@ -426,9 +431,12 @@ OUTPUT_FOLDER="/path/to/your/output"
 
 ```
 HPE-Nvidia-Vista-3D/
-├── setup.py              # Unified setup script
-├── start_backend.py      # Vista3D server startup script
-├── start_frontend.py     # Frontend services startup script
+├── frontend/
+│   ├── setup.py          # Frontend & image server setup
+│   └── docker-compose.yml
+├── backend/
+│   ├── setup.py          # Backend setup
+│   └── docker-compose.yml
 ├── app.py                # Main Streamlit web application
 ├── .env                  # Environment configuration (created by setup)
 ├── dicom/                # DICOM files (patient folders: PA*, SER*)
@@ -442,7 +450,7 @@ HPE-Nvidia-Vista-3D/
 │   ├── dicom2nifti.py   # DICOM to NIFTI conversion
 │   ├── segment.py       # Vista3D segmentation processing
 │   ├── image_server.py  # HTTP image server
-│   └── start_backend.py # Vista3D Docker container manager
+│   └── (backend managed via docker compose)
 ├── conf/                # Configuration files
 │   ├── vista3d_label_sets.json    # Predefined label sets
 │   ├── vista3d_label_dict.json    # Label dictionary
@@ -484,7 +492,7 @@ echo "VISTA3D_SERVER=http://localhost:8000" >> .env  # Uses SSH tunnel
 echo "NGC_API_KEY=your_nvidia_api_key" >> .env
 
 # 3. Set up SSH port forwarding
-ssh user@remote_server -L 8000:localhost:8000 -R 8888:localhost:8888
+ssh -L 8000:localhost:8000 -R 8888:0.0.0.0:8888 user@remote_server
 
 # 4. Place your medical images
 cp your_scan.nii.gz output/nifti/
@@ -492,8 +500,9 @@ cp your_scan.nii.gz output/nifti/
 # 5. Convert DICOM to NIFTI (if needed)
 python3 utils/dicom2nifti.py
 
-# 6. Start frontend services (Streamlit + Image Server)
-python3 start_frontend.py
+# 6. Start frontend & image server
+cd frontend
+docker compose up -d
 
 # 7. Run segmentation
 python3 utils/segment.py
@@ -515,10 +524,12 @@ cp your_scan.nii.gz output/nifti/
 python3 utils/dicom2nifti.py
 
 # 5. Start Vista3D server (requires GPU)
-python3 start_backend.py
+cd backend
+docker compose up -d
 
-# 6. Start frontend services (in separate terminal)
-python3 start_frontend.py
+# 6. Start frontend & image server (in separate terminal)
+cd frontend
+docker compose up -d
 
 # 7. Run segmentation
 python3 utils/segment.py

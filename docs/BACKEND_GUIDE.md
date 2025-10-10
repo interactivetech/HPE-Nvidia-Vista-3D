@@ -121,7 +121,9 @@ LOCAL_NIM_CACHE=~/.cache/nim
 ### Server Setup (GPU Machine)
 ```bash
 # On the GPU server
-python3 start_backend.py
+cd backend
+python3 setup.py   # One-time setup
+docker compose up -d  # Start server
 ```
 
 ### Network Access Configuration
@@ -227,19 +229,45 @@ docker ps | grep vista3d
 ```
 
 ### System Service Management (Optional)
-```bash
-# Create systemd service for automatic startup on boot
-sudo python3 start_backend.py --create-service
 
+For automatic startup on boot, create a systemd service:
+
+```bash
+# Create systemd service file
+sudo nano /etc/systemd/system/vista3d-backend.service
+```
+
+Add this content:
+```ini
+[Unit]
+Description=Vista3D Backend Server
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/path/to/HPE-Nvidia-Vista-3D/backend
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+User=your-username
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and manage:
+```bash
 # Enable and start service
-sudo systemctl enable vista3d
-sudo systemctl start vista3d
+sudo systemctl daemon-reload
+sudo systemctl enable vista3d-backend
+sudo systemctl start vista3d-backend
 
 # Check service status
-sudo systemctl status vista3d
+sudo systemctl status vista3d-backend
 
 # View service logs
-sudo journalctl -u vista3d -f
+sudo journalctl -u vista3d-backend -f
 ```
 
 ## 🔍 Troubleshooting
