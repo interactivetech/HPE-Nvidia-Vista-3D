@@ -17,101 +17,18 @@ class VoxelManager:
     """
     Manages voxel selection and overlay configuration.
     Provides a clean interface for handling different voxel display modes.
-    New folder structure: output/patient/voxels/scan_name/effect_name/
+    Folder structure: output/patient/voxels/scan_name/
     """
 
     def __init__(self, config_manager: ConfigManager, data_manager: DataManager):
         self.config = config_manager
         self.data = data_manager
 
-    def get_effect_display_name(self, effect_name: str) -> str:
-        """Get display name for an effect."""
-        # Convert effect name to display name
-        display_names = {
-            'original': 'Original (No Processing)',
-            'realistic_medical': 'Realistic Medical Visualization',
-            'anatomical_enhancement': 'Anatomical Structure Enhancement',
-            'monai_smooth': 'Subtle Smooth',
-            'ultra_smooth_medical': 'Gentle Smooth',
-            'surface_refinement': 'Minimal Refinement',
-            'texture_enhancement': 'Minimal Enhancement',
-            'realistic_rendering': 'Minimal Rendering',
-            'ultra_realistic_anatomy': 'Ultra-Realistic Anatomy',
-            'photorealistic_organs': 'Photorealistic Organs',
-            'medical_grade_rendering': 'Medical-Grade Rendering'
-        }
-        return display_names.get(effect_name, effect_name.replace('_', ' ').title())
-
-    def detect_effect_folders(self, patient_id: str, scan_name: str) -> List[str]:
-        """
-        Detect effect-based folders for a given patient and scan.
-        Returns list of effect names that have corresponding folders.
-        New structure: output/patient/voxels/scan_name/effect_name/
-        """
-        available_effects = []
-        
-        # Return empty list if scan_name is None
-        if scan_name is None:
-            return available_effects
-            
-        # Remove .nii.gz extension from scan name if present
-        clean_scan_name = scan_name.replace('.nii.gz', '').replace('.nii', '')
-        
-        # Check for effect folders via image server first
-        try:
-            # New structure: /output/patient/voxels/scan_name/
-            scan_voxels_folder_url = f"{self.data.image_server_url}/output/{patient_id}/voxels/{clean_scan_name}/"
-            resp = requests.get(scan_voxels_folder_url, timeout=5)
-            
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, 'html.parser')
-                for link in soup.find_all('a'):
-                    href = link.get('href')
-                    if href and not href.startswith('..') and href.endswith('/'):
-                        # Extract effect folder name from the full path
-                        # href is like "/output/PA00000002/voxels/2.5MM_ARTERIAL_3/original/"
-                        effect_folder_name = href.rstrip('/').split('/')[-1]
-                        
-                        # Verify this folder contains .nii.gz files
-                        effect_folder_url = f"{self.data.image_server_url}{href}"
-                        effect_resp = requests.get(effect_folder_url, timeout=5)
-                        if effect_resp.status_code == 200:
-                            effect_soup = BeautifulSoup(effect_resp.text, 'html.parser')
-                            for effect_link in effect_soup.find_all('a'):
-                                effect_href = effect_link.get('href')
-                                if effect_href and effect_href.endswith('.nii.gz') and not effect_href.startswith('..'):
-                                    available_effects.append(effect_folder_name)
-                                    break
-                
-                return available_effects
-        except Exception:
-            pass  # Fall through to local filesystem check
-        
-        # Fallback: Check local filesystem
-        try:
-            # New structure: output/patient/voxels/scan_name/
-            scan_voxels_folder_path = os.path.join(OUTPUT_FOLDER_ABS, patient_id, 'voxels', clean_scan_name)
-            if not os.path.exists(scan_voxels_folder_path):
-                return available_effects
-            
-            for item in os.listdir(scan_voxels_folder_path):
-                item_path = os.path.join(scan_voxels_folder_path, item)
-                if os.path.isdir(item_path):
-                    # Check if this folder contains .nii.gz files
-                    for file in os.listdir(item_path):
-                        if file.endswith('.nii.gz'):
-                            available_effects.append(item)
-                            break
-            
-            return available_effects
-        except Exception:
-            return available_effects
-
     def has_voxels_for_patient(self, patient_id: str) -> bool:
         """
         Check if there are any voxels available for the given patient.
         Returns True if voxels exist, False otherwise.
-        New structure: output/patient/voxels/scan_name/effect_name/
+        Folder structure: output/patient/voxels/scan_name/
         """
         if not patient_id:
             return False
@@ -130,7 +47,7 @@ class VoxelManager:
                     if href and not href.startswith('..') and href.endswith('/'):
                         scan_subdirs.append(href)
                 
-                # Check if any of the scan subdirectories contain effect subdirectories with .nii.gz files
+                # Check if any of the scan subdirectories contain .nii.gz files
                 for scan_subdir in scan_subdirs:
                     scan_url = f"{self.data.image_server_url}{scan_subdir}"
                     scan_resp = requests.get(scan_url, timeout=5)
@@ -138,16 +55,8 @@ class VoxelManager:
                         scan_soup = BeautifulSoup(scan_resp.text, 'html.parser')
                         for link in scan_soup.find_all('a'):
                             href = link.get('href')
-                            if href and not href.startswith('..') and href.endswith('/'):
-                                # This is an effect subdirectory, check if it contains .nii.gz files
-                                effect_url = f"{self.data.image_server_url}{href}"
-                                effect_resp = requests.get(effect_url, timeout=5)
-                                if effect_resp.status_code == 200:
-                                    effect_soup = BeautifulSoup(effect_resp.text, 'html.parser')
-                                    for effect_link in effect_soup.find_all('a'):
-                                        effect_href = effect_link.get('href')
-                                        if effect_href and effect_href.endswith('.nii.gz') and not effect_href.startswith('..'):
-                                            return True
+                            if href and href.endswith('.nii.gz') and not href.startswith('..'):
+                                return True
         except Exception:
             pass  # Fall through to local filesystem check
         
@@ -158,18 +67,14 @@ class VoxelManager:
             if not os.path.exists(voxels_folder_path):
                 return False
             
-            # Check if there are any scan subdirectories with effect subdirectories containing .nii.gz files
+            # Check if there are any scan subdirectories containing .nii.gz files
             for scan_item in os.listdir(voxels_folder_path):
                 scan_path = os.path.join(voxels_folder_path, scan_item)
                 if os.path.isdir(scan_path):
-                    # This is a scan directory, check for effect subdirectories
-                    for effect_item in os.listdir(scan_path):
-                        effect_path = os.path.join(scan_path, effect_item)
-                        if os.path.isdir(effect_path):
-                            # Check if this effect directory contains .nii.gz files
-                            for file in os.listdir(effect_path):
-                                if file.endswith('.nii.gz'):
-                                    return True
+                    # This is a scan directory, check for .nii.gz files
+                    for file in os.listdir(scan_path):
+                        if file.endswith('.nii.gz'):
+                            return True
             
             return False
             
@@ -180,8 +85,7 @@ class VoxelManager:
         self,
         patient_id: str,
         filename: str,
-        voxel_mode: str,
-        selected_effect: Optional[str] = None
+        voxel_mode: str
     ) -> Tuple[Set[int], Dict[int, str], List[str]]:
         """
         Get available voxel information for the given patient and file.
@@ -215,16 +119,9 @@ class VoxelManager:
         elif voxel_mode == "Individual Voxels":
             # Query server for actually available voxel files
             filename_to_id = self.config.create_filename_to_id_mapping()
-            
-            # Use effect-based folder if effect is selected
-            query_filename = filename
-            if selected_effect:
-                # For new structure, we need to modify the query to look in the effect folder
-                # This is handled by the data manager's fetch_available_voxel_labels method
-                pass
                 
             available_ids, id_to_name_map = self.data.fetch_available_voxel_labels(
-                patient_id, query_filename, filename_to_id, selected_effect
+                patient_id, filename, filename_to_id
             )
 
             # Get names for available labels, filtered by modality
@@ -246,12 +143,11 @@ class VoxelManager:
         filename: str,
         voxel_mode: str,
         selected_voxels: Optional[List[str]] = None,
-        external_url: Optional[str] = None,
-        selected_effect: Optional[str] = None
+        external_url: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Create overlay configuration based on voxel mode and selection.
-        New structure: output/patient/voxels/scan_name/effect_name/
+        Folder structure: output/patient/voxels/scan_name/
         """
         overlays = []
         
@@ -262,12 +158,8 @@ class VoxelManager:
         # Use external URL for browser access if provided, otherwise use internal URL
         base_url = external_url if external_url else self.data.image_server_url
 
-        # Determine the folder structure based on whether an effect is selected
+        # Determine the folder structure
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
-        
-        # Default to original if no effect is selected
-        if not selected_effect:
-            selected_effect = 'original'
 
         # Detect scan modality to filter appropriate anatomical structures
         scan_modality = self._detect_scan_modality(patient_id, filename)
@@ -277,7 +169,7 @@ class VoxelManager:
             if scan_modality == 'brain':
                 # Create filtered segmentation for brain scans
                 filtered_overlay = self._create_brain_filtered_overlay(
-                    patient_id, filename, selected_effect, base_url
+                    patient_id, filename, base_url
                 )
                 if filtered_overlay:
                     overlays = [filtered_overlay]
@@ -285,16 +177,16 @@ class VoxelManager:
                     # Fallback to original if filtering fails
                     overlays = [{
                         'label_id': 'all',
-                        'label_name': 'All Segmentation (Brain Filtered)' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
+                        'label_name': 'All Segmentation (Brain Filtered)',
+                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
                         'is_all_segmentation': True
                     }]
             else:
                 # For non-brain scans, show complete segmentation
                 overlays = [{
                     'label_id': 'all',
-                    'label_name': 'All Segmentation' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
+                    'label_name': 'All Segmentation',
+                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
                     'is_all_segmentation': True
                 }]
 
@@ -316,8 +208,8 @@ class VoxelManager:
 
                     overlays.append({
                         'label_id': label_id,
-                        'label_name': voxel_name + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/{voxel_filename}",
+                        'label_name': voxel_name,
+                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
                         'color': label_color
                     })
 
@@ -334,16 +226,16 @@ class VoxelManager:
                         
                         overlays.append({
                             'label_id': label_id,
-                            'label_name': structure_name + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                            'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/{voxel_filename}",
+                            'label_name': structure_name,
+                            'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
                             'color': label_color
                         })
             else:
                 # For non-brain scans, show base segmentation
                 overlays = [{
                     'label_id': 'all',
-                    'label_name': 'All Segmentation' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/all.nii.gz",
+                    'label_name': 'All Segmentation',
+                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
                     'is_all_segmentation': True
                 }]
 
@@ -516,7 +408,7 @@ class VoxelManager:
                 
         return brain_structures
 
-    def _create_brain_filtered_overlay(self, patient_id: str, filename: str, selected_effect: str, base_url: str) -> Optional[Dict[str, Any]]:
+    def _create_brain_filtered_overlay(self, patient_id: str, filename: str, base_url: str) -> Optional[Dict[str, Any]]:
         """
         Create a filtered overlay that only shows brain-relevant structures.
         For brain scans where Vista3D has misclassified structures, create a proper brain segmentation.
@@ -527,11 +419,11 @@ class VoxelManager:
             import numpy as np
             from .constants import OUTPUT_FOLDER_ABS, OUTPUT_DIR, VOXELS_DIR
             
-            # Path to original segmentation
+            # Path to segmentation
             ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
             original_seg_path = os.path.join(
                 OUTPUT_FOLDER_ABS, patient_id, VOXELS_DIR, ct_scan_folder_name, 
-                selected_effect, 'all.nii.gz'
+                'all.nii.gz'
             )
             
             if not os.path.exists(original_seg_path):
@@ -657,8 +549,8 @@ class VoxelManager:
             
             return {
                 'label_id': 'brain_filtered',
-                'label_name': 'Brain Structures Only' + (f' ({self.get_effect_display_name(selected_effect)})' if selected_effect else ''),
-                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{selected_effect}/brain_filtered.nii.gz",
+                'label_name': 'Brain Structures Only',
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/brain_filtered.nii.gz",
                 'is_all_segmentation': True
             }
             

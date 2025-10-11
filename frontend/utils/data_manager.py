@@ -161,27 +161,22 @@ class DataManager:
         self,
         patient_id: str,
         filename: str,
-        filename_to_id_mapping: Dict[str, int],
-        selected_effect: Optional[str] = None
+        filename_to_id_mapping: Dict[str, int]
     ) -> Tuple[Set[int], Dict[int, str]]:
         """
         Query image server for available voxel files.
         Returns (available_label_ids, id_to_name_map).
-        New structure: output/patient/voxels/scan_name/effect_name/
+        Folder structure: output/patient/voxels/scan_name/
         """
         if not patient_id or not filename:
             return set(), {}
 
         try:
-            # New structure: /output/patient/voxels/scan_name/effect_name/
+            # Folder structure: /output/patient/voxels/scan_name/
             ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '')
             
-            # Default to original if no effect is selected
-            if not selected_effect:
-                selected_effect = 'original'
-            
-            voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/{selected_effect}/"
-            print(f"DEBUG: Using new structure voxel directory: {voxels_folder_url}")
+            voxels_folder_url = f"{self.image_server_url}/output/{patient_id}/voxels/{ct_scan_folder_name}/"
+            print(f"DEBUG: Using voxel directory: {voxels_folder_url}")
 
             resp = requests.get(voxels_folder_url, timeout=SERVER_TIMEOUT)
             print(f"DEBUG: Response status: {resp.status_code}")

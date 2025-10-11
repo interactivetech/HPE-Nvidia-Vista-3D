@@ -108,9 +108,9 @@ def create_patient_folder_structure(patient_id: str):
 
 def create_individual_voxel_files(segmentation_img, ct_scan_name: str, voxels_base_dir: Path, target_vessel_ids: list):
     """Create individual voxel files for each label in the segmentation."""
-    # Create folder for this CT scan's voxels with original subfolder
+    # Create folder for this CT scan's voxels
     ct_scan_folder_name = ct_scan_name.replace('.nii.gz', '').replace('.nii', '')
-    ct_voxels_dir = voxels_base_dir / ct_scan_folder_name / "original"
+    ct_voxels_dir = voxels_base_dir / ct_scan_folder_name
     ct_voxels_dir.mkdir(parents=True, exist_ok=True)
     
     # Get the segmentation data
@@ -245,9 +245,9 @@ def main():
             # The copy step is no longer needed.
             
             # Define segmentation output path in voxels directory:
-            # Save into per-scan folder with original subfolder as 'all.nii.gz'
+            # Save into per-scan folder as 'all.nii.gz'
             ct_scan_folder_name = nifti_file_path.name.replace('.nii.gz', '').replace('.nii', '')
-            ct_voxels_dir = patient_dirs['voxels'] / ct_scan_folder_name / "original"
+            ct_voxels_dir = patient_dirs['voxels'] / ct_scan_folder_name
             ct_voxels_dir.mkdir(parents=True, exist_ok=True)
             segmentation_output_path = ct_voxels_dir / 'all.nii.gz'
 

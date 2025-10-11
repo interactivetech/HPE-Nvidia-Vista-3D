@@ -207,16 +207,16 @@ IMAGE_SERVER="http://203.0.113.1:8888"
   - Example: `/filtered-scans/PA00000002/segmentation.nii.gz?label_ids=1,5,10`
 
 ### **Voxel Data Filtering**
-- **`GET /filtered-scans/{patient_id}/voxels/{scan_name}/original/{filename}?label_ids=1,2,3`**
+- **`GET /filtered-scans/{patient_id}/voxels/{scan_name}/{filename}?label_ids=1,2,3`**
   - Filter voxel data files by anatomical label IDs
   - Returns filtered voxel data for specific structures
-  - Example: `/filtered-scans/PA00000002/voxels/2.5MM_ARTERIAL_3/original/aorta.nii.gz?label_ids=1,5,10`
+  - Example: `/filtered-scans/PA00000002/voxels/2.5MM_ARTERIAL_3/aorta.nii.gz?label_ids=1,5,10`
 
 ### **Label Metadata**
-- **`GET /output/{patient_id}/voxels/{scan_name}/original/{filename}/labels`**
+- **`GET /output/{patient_id}/voxels/{scan_name}/{filename}/labels`**
   - Get available label IDs and anatomical names from voxel files
   - Returns JSON with label ID to anatomical name mappings
-  - Example: `/output/PA00000002/voxels/2.5MM_ARTERIAL_3/original/aorta.nii.gz/labels`
+  - Example: `/output/PA00000002/voxels/2.5MM_ARTERIAL_3/aorta.nii.gz/labels`
 
 ### **Static File Serving**
 - **`GET /{path}`** - Serve any file from project root with security restrictions
@@ -277,7 +277,7 @@ python image_server.py --disable-dir-listing
 
 #### Get Available Labels for a Patient
 ```bash
-curl "http://localhost:8888/output/PA00000002/voxels/2.5MM_ARTERIAL_3/original/aorta.nii.gz/labels"
+curl "http://localhost:8888/output/PA00000002/voxels/2.5MM_ARTERIAL_3/aorta.nii.gz/labels"
 # Returns: {"labels": [{"id": 1, "name": "Aorta"}, ...], "voxel_filename": "aorta.nii.gz"}
 ```
 
@@ -289,7 +289,7 @@ curl "http://localhost:8888/filtered-scans/PA00000002/segmentation.nii.gz?label_
 
 #### Filter Voxel Data
 ```bash
-curl "http://localhost:8888/filtered-scans/PA00000002/voxels/2.5MM_ARTERIAL_3/original/aorta.nii.gz?label_ids=1,5" -o filtered_voxels.nii.gz
+curl "http://localhost:8888/filtered-scans/PA00000002/voxels/2.5MM_ARTERIAL_3/aorta.nii.gz?label_ids=1,5" -o filtered_voxels.nii.gz
 # Downloads voxel data with only labels 1 and 5
 ```
 
@@ -460,7 +460,7 @@ python utils/image_server.py
 # Vista3D can then access:
 # - Original NIFTI files: http://localhost:8888/output/{patient_id}/nifti/
 # - Filtered scans: http://localhost:8888/filtered-scans/{patient_id}/{file}?label_ids=1,2,3
-# - Label metadata: http://localhost:8888/output/{patient_id}/voxels/{scan_name}/original/{file}/labels
+# - Label metadata: http://localhost:8888/output/{patient_id}/voxels/{scan_name}/{file}/labels
 ```
 
 ### Vista3D Integration Benefits

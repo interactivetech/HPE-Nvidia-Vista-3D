@@ -72,16 +72,6 @@ class ViewerConfig:
         """Set selected individual voxels."""
         self._selected_individual_voxels = voxels.copy()
 
-    @property
-    def selected_effect(self) -> Optional[str]:
-        """Get selected effect."""
-        return self._selected_effect
-
-    @selected_effect.setter
-    def selected_effect(self, effect: Optional[str]):
-        """Set selected effect."""
-        self._selected_effect = effect
-
     def get_slice_type_index(self) -> int:
         """Get the numeric slice type index for NiiVue."""
         slice_type = self._settings.get('slice_type', 'Multiplanar')
@@ -135,13 +125,11 @@ class ViewerConfig:
         self._settings = DEFAULT_VIEWER_SETTINGS.copy()
         self._voxel_mode = "all"
         self._selected_individual_voxels = []
-        self._selected_effect = None
 
     def to_session_state(self):
         """Update Streamlit session state with current settings."""
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
-        st.session_state.selected_effect = self._selected_effect
         # Note: slice_type, orientation, and color_map are now managed by widgets
         # and should not be manually set here to avoid StreamlitAPIException
 
@@ -156,7 +144,6 @@ class ViewerConfig:
         
         st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
-        st.session_state.selected_effect = self._selected_effect
 
     def _preserve_slice_view_settings(self):
         """Preserve current slice view settings in session state.
@@ -177,7 +164,6 @@ class ViewerConfig:
         """Load settings from Streamlit session state."""
         self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         self._selected_individual_voxels = getattr(st.session_state, 'selected_individual_voxels', [])
-        self._selected_effect = getattr(st.session_state, 'selected_effect', None)
         self._settings['slice_type'] = getattr(st.session_state, 'slice_type', 'Multiplanar')
         self._settings['orientation'] = getattr(st.session_state, 'orientation', 'Axial')
         self._settings['color_map'] = getattr(st.session_state, 'color_map', 'niivue-ct_translucent')

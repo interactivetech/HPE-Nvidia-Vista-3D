@@ -208,34 +208,8 @@ def render_sidebar():
 
         # Only show voxel settings if there are voxels available for this patient
         if has_voxels:
-            # Check for available effects even when overlay is disabled (only if both patient and file are selected)
-            available_effects = []
-            if selected_patient and selected_file:
-                available_effects = voxel_manager.detect_effect_folders(selected_patient, selected_file)
-            
-            # Default to original if it's available, otherwise use the first available effect
-            if available_effects:
-                if 'original' in available_effects:
-                    default_effect = 'original'
-                else:
-                    default_effect = available_effects[0]
-            else:
-                default_effect = None
-            
-            # Set default effect in viewer config
-            if default_effect and not hasattr(viewer_config, 'selected_effect'):
-                viewer_config.selected_effect = default_effect
-            
-            # Show hint about available effects if overlay is disabled
-            if available_effects and not viewer_config.settings.get('show_overlay', False):
-                effect_names = [voxel_manager.get_effect_display_name(effect) for effect in available_effects]
-                st.info(f"✨ Enhanced voxel effects available: {', '.join(effect_names)}. Enable 'Show Voxels' to use them.")
-            
             # Voxel selection (after show_overlay is set)
             if viewer_config.settings.get('show_overlay', False):
-                # Effect selection (available for both All Voxels and Individual Voxels modes)
-                render_voxel_effect_selection(selected_patient, selected_file, available_effects)
-                
                 # Voxel selection mode and individual voxel selection
                 render_voxel_selection(selected_patient, selected_file)
                 
@@ -256,50 +230,6 @@ def render_sidebar():
     return selected_patient, selected_file
 
 
-def render_voxel_effect_selection(selected_patient: str, selected_file: str, available_effects: List[str]):
-    """Render the voxel effect selection interface."""
-    if available_effects:
-        st.subheader("Voxel Effects")
-        
-        # Sort effects with original first if available
-        sorted_effects = []
-        if 'original' in available_effects:
-            sorted_effects.append('original')
-        for effect in available_effects:
-            if effect != 'original':
-                sorted_effects.append(effect)
-        
-        effect_display_names = [voxel_manager.get_effect_display_name(effect) for effect in sorted_effects]
-        
-        # Get current selection from session state or default to original
-        current_effect = st.session_state.get('selected_effect', None)
-        if not current_effect and 'original' in sorted_effects:
-            current_effect = 'original'
-        elif not current_effect and sorted_effects:
-            current_effect = sorted_effects[0]
-        
-        default_index = 0
-        if current_effect and current_effect in sorted_effects:
-            default_index = sorted_effects.index(current_effect)
-        
-        selected_effect_index = st.selectbox(
-            "Select Effect:",
-            range(len(sorted_effects)),
-            index=default_index,
-            format_func=lambda x: effect_display_names[x],
-            help="Choose an effect to apply to the voxel data (works with both All Voxels and Individual Voxels modes)"
-        )
-        
-        selected_effect = sorted_effects[selected_effect_index]
-        st.info(f"✨ Using effect: {voxel_manager.get_effect_display_name(selected_effect)}")
-        
-        # Store in viewer_config
-        viewer_config.selected_effect = selected_effect
-    else:
-        # No effects available, clear selection
-        viewer_config.selected_effect = None
-
-
 def render_voxel_selection(selected_patient: str, selected_file: str):
     """Render the voxel selection interface."""
     with st.expander("Select Voxels", expanded=False):
@@ -314,7 +244,7 @@ def render_voxel_selection(selected_patient: str, selected_file: str):
 
         # Get available voxel information
         available_ids, id_to_name_map, available_voxel_names = voxel_manager.get_available_voxels(
-            selected_patient, selected_file, voxel_mode, viewer_config.selected_effect
+            selected_patient, selected_file, voxel_mode
         )
 
         # Handle voxel mode selection
@@ -376,8 +306,7 @@ def render_viewer(selected_patient: str, selected_file: str):
             selected_file,
             viewer_config.voxel_mode,
             viewer_config.selected_individual_voxels,
-            external_url=EXTERNAL_IMAGE_SERVER_URL,
-            selected_effect=viewer_config.selected_effect
+            external_url=EXTERNAL_IMAGE_SERVER_URL
         )
 
     # Build volume list for NiiVue
