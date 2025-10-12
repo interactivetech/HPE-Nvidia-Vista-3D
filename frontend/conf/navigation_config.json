@@ -34,13 +34,23 @@
         "description": "Medical image viewer interface"
       },
       {
+        "key": "obj_viewer",
+        "label": "OBJ Viewer",
+        "page_key": "obj_viewer",
+        "icon": "🫁",
+        "is_image": false,
+        "enabled": true,
+        "order": 4,
+        "description": "3D object mesh viewer for anatomical structures"
+      },
+      {
         "key": "tools",
         "label": "Tools",
         "page_key": "tools",
         "icon": "🛠️",
         "is_image": false,
         "enabled": true,
-        "order": 4,
+        "order": 5,
         "description": "Tools and utilities for medical image processing"
       }
     ],

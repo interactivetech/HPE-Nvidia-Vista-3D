@@ -164,6 +164,7 @@ if current_page == 'home':
     
     - **📥 Image Data**: Browse and analyze patient medical imaging data
     - **🩻 NiiVue Viewer**: Interactive medical image viewer for NIfTI files
+    - **🫁 OBJ Viewer**: Interactive 3D mesh viewer for anatomical structures
     - **🛠️ Tools**: Utilities for medical image processing
     """)
     
@@ -179,6 +180,12 @@ elif current_page == 'niivue':
     sys.path.append(str(Path(__file__).parent))
     from NiiVue_Viewer import main as niivue_viewer_main
     niivue_viewer_main()
+
+elif current_page == 'obj_viewer':
+    # Import and run OBJ Viewer content
+    sys.path.append(str(Path(__file__).parent))
+    from OBJ_Viewer import main as obj_viewer_main
+    obj_viewer_main()
 
 elif current_page == 'tools':
     # Import and run Tools content

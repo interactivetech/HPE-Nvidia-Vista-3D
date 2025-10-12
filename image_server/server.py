@@ -91,6 +91,29 @@ server_config = load_image_server_config()
 
 def generate_directory_listing(directory_path: Path, request_path: str) -> str:
     items = []
+    server_settings = server_config.get("server_settings", {})
+    dark_theme = server_settings.get("dark_theme", False)
+    
+    # Define theme colors
+    if dark_theme:
+        bg_color = "#1e1e1e"
+        text_color = "#e0e0e0"
+        heading_color = "#ffffff"
+        border_color = "#444"
+        header_bg = "#2d2d2d"
+        link_color = "#58a6ff"
+        meta_color = "#888"
+        error_color = "#ff6b6b"
+    else:
+        bg_color = "#ffffff"
+        text_color = "#333"
+        heading_color = "#333"
+        border_color = "#ddd"
+        header_bg = "#f5f5f5"
+        link_color = "#0066cc"
+        meta_color = "#666"
+        error_color = "#cc0000"
+    
     try:
         if request_path != "/":
             parent_path = str(Path(request_path).parent)
@@ -110,10 +133,10 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
                 item_path = f"{request_path.rstrip('/')}/{item_name}"
                 file_size = item.stat().st_size
                 size_str = f"({file_size:,} bytes)" if file_size < 1024*1024 else f"({file_size/(1024*1024):.1f} MB)"
-                items.append(f'<li><a href="{item_path}">📄 {item_name}</a> <span style="color: #666; font-size: 0.8em;">{size_str}</span></li>')
+                items.append(f'<li><a href="{item_path}">📄 {item_name}</a> <span class="meta">{size_str}</span></li>')
 
     except Exception as e:
-        items.append(f'<li><span style="color: #cc0000;">Error reading directory: {e}</span></li>')
+        items.append(f'<li><span class="error">Error reading directory: {e}</span></li>')
 
     items_html = "\n".join(items)
 
@@ -123,15 +146,18 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
     <head>
         <title>Directory listing for {request_path}</title>
         <meta charset="utf-8">
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩻</text></svg>">
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
-            h1 {{ color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }}
+            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; background-color: {bg_color}; color: {text_color}; }}
+            h1 {{ color: {heading_color}; border-bottom: 1px solid {border_color}; padding-bottom: 10px; }}
             ul {{ list-style: none; padding: 0; }}
             li {{ margin: 5px 0; }}
-            a {{ text-decoration: none; color: #0066cc; }}
+            a {{ text-decoration: none; color: {link_color}; }}
             a:hover {{ text-decoration: underline; }}
-            .header {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
-            .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }}
+            .header {{ background: {header_bg}; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+            .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid {border_color}; color: {meta_color}; font-size: 0.9em; }}
+            .meta {{ color: {meta_color}; font-size: 0.8em; }}
+            .error {{ color: {error_color}; }}
         </style>
     </head>
     <body>
@@ -143,7 +169,7 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
             {items_html}
         </ul>
         <div class="footer">
-            <p>🏥 Medical Imaging Server | FastAPI + Uvicorn</p>
+            <p>🩻 Medical Imaging Server | FastAPI + Uvicorn</p>
         </div>
     </body>
     </html>
@@ -345,6 +371,26 @@ def generate_restricted_root_listing() -> HTMLResponse:
     server_settings = server_config.get("server_settings", {})
     title = server_settings.get("title", "Medical Imaging Server")
     description = server_settings.get("description", "HTTP server for medical imaging files with directory browsing")
+    dark_theme = server_settings.get("dark_theme", False)
+    
+    # Define theme colors
+    if dark_theme:
+        bg_color = "#1e1e1e"
+        text_color = "#e0e0e0"
+        heading_color = "#ffffff"
+        border_color = "#444"
+        header_bg = "#2d2d2d"
+        link_color = "#58a6ff"
+        meta_color = "#888"
+    else:
+        bg_color = "#ffffff"
+        text_color = "#333"
+        heading_color = "#333"
+        border_color = "#ddd"
+        header_bg = "#f5f5f5"
+        link_color = "#0066cc"
+        meta_color = "#666"
+    
     for folder_config in server_config.get("viewable_folders", []):
         folder_name = folder_config.get("name", "")
         folder_path = folder_config.get("path", "")
@@ -353,9 +399,9 @@ def generate_restricted_root_listing() -> HTMLResponse:
         folder_icon = folder_config.get("icon", "📁")
         full_path = Path(folder_path)
         if full_path.exists() and full_path.is_dir():
-            items.append(f'<li><a href="/{folder_url_path}/">{folder_icon} {folder_name}/</a> <span style="color: #666; font-size: 0.8em;">({folder_description})</span></li>')
+            items.append(f'<li><a href="/{folder_url_path}/">{folder_icon} {folder_name}/</a> <span class="meta">({folder_description})</span></li>')
     if not items:
-        items.append('<li><span style="color: #666;">No accessible folders found</span></li>')
+        items.append('<li><span class="meta">No accessible folders found</span></li>')
     items_html = "\n".join(items)
     folder_names = [folder["name"] for folder in server_config.get("viewable_folders", [])]
     folder_list = ", ".join(folder_names) if folder_names else "none"
@@ -365,20 +411,22 @@ def generate_restricted_root_listing() -> HTMLResponse:
     <head>
         <title>{title}</title>
         <meta charset="utf-8">
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🩻</text></svg>">
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }}
-            h1 {{ color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }}
+            body {{ font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; background-color: {bg_color}; color: {text_color}; }}
+            h1 {{ color: {heading_color}; border-bottom: 1px solid {border_color}; padding-bottom: 10px; }}
             ul {{ list-style: none; padding: 0; }}
             li {{ margin: 5px 0; }}
-            a {{ text-decoration: none; color: #0066cc; }}
+            a {{ text-decoration: none; color: {link_color}; }}
             a:hover {{ text-decoration: underline; }}
-            .header {{ background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
-            .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em; }}
+            .header {{ background: {header_bg}; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+            .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid {border_color}; color: {meta_color}; font-size: 0.9em; }}
+            .meta {{ color: {meta_color}; font-size: 0.8em; }}
         </style>
     </head>
     <body>
         <div class="header">
-            <h1>🏥 {title}</h1>
+            <h1>🩻 {title}</h1>
             <p>{description}</p>
             <p>Accessible folders: {folder_list}</p>
         </div>
@@ -386,7 +434,7 @@ def generate_restricted_root_listing() -> HTMLResponse:
             {items_html}
         </ul>
         <div class="footer">
-            <p>🏥 {title} | FastAPI + Uvicorn</p>
+            <p>🩻 {title} | FastAPI + Uvicorn</p>
         </div>
     </body>
     </html>

@@ -13,13 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for fast dependency management
 RUN pip install --no-cache-dir uv
 
-# Copy minimal project metadata and install deps
-COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen
+# Create unprivileged user early
+RUN useradd -m appuser && chown -R appuser:appuser /srv
 
-# Create unprivileged user
-RUN useradd -m appuser
+# Switch to unprivileged user
 USER appuser
+
+# Copy minimal project metadata and install deps
+COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen
 
 # Copy server code (will be overridden by volume mount in development)
 COPY --chown=appuser:appuser main.py ./main.py

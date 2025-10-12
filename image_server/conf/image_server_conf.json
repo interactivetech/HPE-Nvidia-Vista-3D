@@ -19,7 +19,8 @@
     "title": "Medical Imaging Server",
     "description": "HTTP server for medical imaging files with directory browsing",
     "show_file_sizes": true,
-    "show_hidden_files": false
+    "show_hidden_files": false,
+    "dark_theme": true
   }
 }
 

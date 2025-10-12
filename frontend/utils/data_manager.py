@@ -235,6 +235,20 @@ class DataManager:
         ct_scan_folder_name = filename.replace('.nii.gz', '').replace('.nii', '') if filename else ''
         return f"{self.image_server_url}/output/{patient_id}/ply/{ct_scan_folder_name}/"
     
+    def get_obj_directory_url(self, patient_id: str, scan_name: str) -> str:
+        """Generate the URL for the OBJ directory."""
+        return f"{self.image_server_url}/output/{patient_id}/obj/{scan_name}/"
+    
+    def get_obj_scans(self, patient_id: str) -> List[str]:
+        """Get list of scan folders containing OBJ files for a patient."""
+        obj_folders = self.get_server_data(f"{patient_id}/obj", 'folders', ('',))
+        return sorted(obj_folders) if obj_folders else []
+    
+    def get_obj_files(self, patient_id: str, scan_name: str) -> List[str]:
+        """Get list of OBJ files for a specific patient and scan."""
+        obj_files = self.get_server_data(f"{patient_id}/obj/{scan_name}", 'files', ('.obj',))
+        return sorted(obj_files) if obj_files else []
+    
     def get_file_url(self, patient_id: str, file_path: str) -> str:
         """Generate the full URL for a file within a patient's directory."""
         return f"{self.image_server_url}/output/{patient_id}/{file_path}"
