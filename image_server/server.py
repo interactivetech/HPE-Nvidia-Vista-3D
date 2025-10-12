@@ -89,6 +89,26 @@ def load_image_server_config():
 server_config = load_image_server_config()
 
 
+def calculate_directory_size(directory_path: Path) -> int:
+    """Recursively calculate total size of all files in directory and subdirectories."""
+    total_size = 0
+    try:
+        for item in directory_path.iterdir():
+            if item.name.startswith('.'):
+                continue
+            try:
+                if item.is_file():
+                    total_size += item.stat().st_size
+                elif item.is_dir():
+                    total_size += calculate_directory_size(item)
+            except (PermissionError, OSError):
+                # Skip files/directories we can't access
+                continue
+    except (PermissionError, OSError):
+        pass
+    return total_size
+
+
 def generate_directory_listing(directory_path: Path, request_path: str) -> str:
     items = []
     server_settings = server_config.get("server_settings", {})
@@ -114,6 +134,11 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
         meta_color = "#666"
         error_color = "#cc0000"
     
+    # Calculate total size (including subdirectories) and counts
+    total_size = calculate_directory_size(directory_path)
+    file_count = 0
+    dir_count = 0
+    
     try:
         if request_path != "/":
             parent_path = str(Path(request_path).parent)
@@ -126,17 +151,29 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
                 item_name = item.name
                 item_path = f"{request_path.rstrip('/')}/{item_name}/"
                 items.append(f'<li><a href="{item_path}">📁 {item_name}/</a></li>')
+                dir_count += 1
 
         for item in sorted(directory_path.iterdir()):
             if item.is_file() and not item.name.startswith('.'):
                 item_name = item.name
                 item_path = f"{request_path.rstrip('/')}/{item_name}"
                 file_size = item.stat().st_size
+                file_count += 1
                 size_str = f"({file_size:,} bytes)" if file_size < 1024*1024 else f"({file_size/(1024*1024):.1f} MB)"
                 items.append(f'<li><a href="{item_path}">📄 {item_name}</a> <span class="meta">{size_str}</span></li>')
 
     except Exception as e:
         items.append(f'<li><span class="error">Error reading directory: {e}</span></li>')
+    
+    # Format total size
+    if total_size < 1024:
+        total_size_str = f"{total_size} bytes"
+    elif total_size < 1024 * 1024:
+        total_size_str = f"{total_size / 1024:.1f} KB"
+    elif total_size < 1024 * 1024 * 1024:
+        total_size_str = f"{total_size / (1024 * 1024):.1f} MB"
+    else:
+        total_size_str = f"{total_size / (1024 * 1024 * 1024):.2f} GB"
 
     items_html = "\n".join(items)
 
@@ -164,6 +201,7 @@ def generate_directory_listing(directory_path: Path, request_path: str) -> str:
         <div class="header">
             <h1>📁 Directory listing for {request_path}</h1>
             <p>Image Server - Medical Imaging Files</p>
+            <p class="meta">📊 {file_count} files, {dir_count} directories | Total size (including subdirectories): {total_size_str}</p>
         </div>
         <ul>
             {items_html}

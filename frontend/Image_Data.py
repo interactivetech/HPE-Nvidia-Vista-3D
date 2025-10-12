@@ -1,26 +1,12 @@
 #!/usr/bin/env python3
 """
-Image Data Page - Dedicated page for viewing and managing medical imaging data.
-This page provides a focused interface for browsing patient data, CT scans, and related files.
+Image Data Page - Embeds the image server interface in an iframe.
 """
 
 import streamlit as st
-from pathlib import Path
-import sys
+import streamlit.components.v1 as components
 import requests
 import os
-from urllib.parse import urlparse
-import subprocess
-import json
-import base64
-import mimetypes
-from typing import List, Dict, Optional
-import pandas as pd
-import extra_streamlit_components as stx
-import numpy as np
-import tempfile
-from bs4 import BeautifulSoup
-import plotly.graph_objects as go
 
 # Load environment variables from .env file
 try:
@@ -30,8 +16,6 @@ except ImportError:
     # Fallback if python-dotenv is not available
     pass
 
-# Add utils to path for imports
-sys.path.append(str(Path(__file__).parent / 'utils'))
 from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
 
@@ -136,68 +120,21 @@ def main():
     # Render server status widgets in sidebar
     render_server_status_sidebar()
     
-    # Main content
-    st.title("📥 Image Data")
+    # Get image server URLs
+    # For browser access (iframe), we need the external URL that the browser can reach
+    # For server-side checks, we use the internal URL (works within Docker network)
+    external_image_server_url = os.getenv("EXTERNAL_IMAGE_SERVER", os.getenv("IMAGE_SERVER", "http://localhost:8888"))
     
-    with st.spinner("Analyzing server data..."):
-        try:
-            # Clear any cached data and import fresh
-            import importlib
-            import utils.analyze_server_data
-            importlib.reload(utils.analyze_server_data)
-            from utils.analyze_server_data import get_patient_cards_data, load_environment_config, get_patient_folders, format_file_size
-            
-            # Load configuration
-            image_server_url = load_environment_config()
-            
-            # Initialize data manager
-            from utils.data_manager import DataManager
-            data_manager = DataManager(image_server_url)
-            
-            # Get patient folders
-            patient_folders = get_patient_folders(data_manager)
-            
-            if not patient_folders:
-                st.warning("❌ No patient folders found in output directory")
-                return
-            
-            # Display the analysis results in a clean format
-            
-            # Create a summary section
-            total_size = sum(folder['size_bytes'] for folder in patient_folders)
-            total_scans = sum(folder['scan_count'] for folder in patient_folders)
-            total_voxels = sum(sum(scan_info['total_voxels'] for scan_info in folder['scan_voxels'].values()) for folder in patient_folders if folder['scan_voxels'])
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Patient Folders", len(patient_folders))
-            with col2:
-                st.metric("Total Scans", total_scans)
-            with col3:
-                st.metric("Total Voxels", total_voxels)
-            with col4:
-                st.metric("Total Size", format_file_size(total_size))
-            
-            st.markdown("---")
-            
-            # Display detailed patient information
-            for i, folder_info in enumerate(patient_folders, 1):
-                with st.expander(f"{i:2d}. {folder_info['name']} - {folder_info['scan_count']} scans - {folder_info['size_display']}", expanded=False):
-                    st.write(f"**Folder Name:** {folder_info['name']}")
-                    st.write(f"**Size:** {folder_info['size_display']}")
-                    st.write(f"**NIfTI Scans:** {folder_info['scan_count']}")
-                    
-                    if folder_info['scan_voxels']:
-                        st.write("**Voxel Data by Scan:**")
-                        for scan_name, voxel_count in folder_info['scan_voxels'].items():
-                            st.write(f"  └─ {scan_name}: {voxel_count} voxels")
-                    else:
-                        st.write("**Voxel Data:** No voxel data found")
-            
-            
-        except Exception as e:
-            st.error(f"❌ Error analyzing server data: {str(e)}")
-            st.code("python utils/analyze_server_data.py", language="bash")
+    # Check if image server is running
+    if check_image_server_status():
+        # Embed the image server in an iframe using the external URL (accessible from browser)
+        components.iframe(external_image_server_url, height=800, scrolling=True)
+    else:
+        st.error(f"❌ **Image Server is Offline**")
+        st.write(f"The image server at `{external_image_server_url}` is not responding.")
+        st.write("Please start the image server using:")
+        st.code("python image_server/server.py", language="bash")
+        st.write("Or check your `.env` file to ensure `IMAGE_SERVER` is set correctly.")
 
 if __name__ == "__main__":
     main()
