@@ -374,9 +374,6 @@ class _ColormapAccessor:
 
 AVAILABLE_COLOR_MAPS = _ColormapAccessor()
 
-# Voxel selection modes
-VOXEL_MODES = ["All", "Individual Voxels"]
-
 # Timeout settings
 SERVER_TIMEOUT = 10  # seconds
 
@@ -386,10 +383,8 @@ VIEWER_HEIGHT = 1000
 # UI messages
 MESSAGES = {
     'no_voxels_available': "No voxels available for this patient/file.",
-    'no_nifti_or_voxels': "Nothing to display. Enable 'Show NIfTI' or 'Show Voxels' with selected label sets.",
+    'no_nifti_or_voxels': "Nothing to display. Enable 'Show Scan' or 'Show Voxels' with selected structures.",
     'select_patient_file': "Select a patient and file to begin.",
-    'enable_voxels': "Enable 'Show Voxels' to display overlays.",
-    'no_individual_voxels_selected': "No individual voxels selected. Select specific structures to display.",
 }
 
 # Debug settings

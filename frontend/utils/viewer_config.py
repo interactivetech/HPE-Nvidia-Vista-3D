@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Tuple
 from .constants import (
     DEFAULT_VIEWER_SETTINGS, SLICE_TYPE_MAP, WINDOW_PRESETS,
     WINDOW_PRESETS_CT, WINDOW_PRESETS_MRI, get_optimal_window_settings,
-    detect_modality_from_data, load_colormaps, VOXEL_MODES, MESSAGES,
+    detect_modality_from_data, load_colormaps,
     load_3d_render_config
 )
 
@@ -23,7 +23,6 @@ class ViewerConfig:
         self._settings = DEFAULT_VIEWER_SETTINGS.copy()
         self._selected_patient: Optional[str] = None
         self._selected_file: Optional[str] = None
-        self._voxel_mode: str = "all"
         self._selected_individual_voxels: list = []
         self._selected_effect: Optional[str] = None
 
@@ -51,16 +50,6 @@ class ViewerConfig:
     def selected_file(self, file: Optional[str]):
         """Set selected file."""
         self._selected_file = file
-
-    @property
-    def voxel_mode(self) -> str:
-        """Get current voxel selection mode."""
-        return self._voxel_mode
-
-    @voxel_mode.setter
-    def voxel_mode(self, mode: str):
-        """Set voxel selection mode."""
-        self._voxel_mode = mode
 
     @property
     def selected_individual_voxels(self) -> list:
@@ -123,12 +112,10 @@ class ViewerConfig:
     def reset_to_defaults(self):
         """Reset all settings to defaults."""
         self._settings = DEFAULT_VIEWER_SETTINGS.copy()
-        self._voxel_mode = "all"
         self._selected_individual_voxels = []
 
     def to_session_state(self):
         """Update Streamlit session state with current settings."""
-        st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
         # Note: slice_type, orientation, and color_map are now managed by widgets
         # and should not be manually set here to avoid StreamlitAPIException
@@ -142,7 +129,6 @@ class ViewerConfig:
         # Preserve current slice view settings before updating voxel settings
         self._preserve_slice_view_settings()
         
-        st.session_state.voxel_mode = self._voxel_mode
         st.session_state.selected_individual_voxels = self._selected_individual_voxels
 
     def _preserve_slice_view_settings(self):
@@ -162,7 +148,6 @@ class ViewerConfig:
 
     def from_session_state(self):
         """Load settings from Streamlit session state."""
-        self._voxel_mode = getattr(st.session_state, 'voxel_mode', 'all')
         self._selected_individual_voxels = getattr(st.session_state, 'selected_individual_voxels', [])
         self._settings['slice_type'] = getattr(st.session_state, 'slice_type', 'Multiplanar')
         self._settings['orientation'] = getattr(st.session_state, 'orientation', 'Axial')
@@ -508,10 +493,6 @@ class ViewerConfig:
 
     def get_status_message(self) -> Optional[str]:
         """Get appropriate status message based on current state."""
-        if not self._settings.get('show_overlay', False):
-            return MESSAGES['enable_voxels']
-
-        if self._voxel_mode == "individual_voxels" and not self._selected_individual_voxels:
-            return MESSAGES['no_individual_voxels_selected']
-
+        if self._settings.get('show_overlay', False) and not self._selected_individual_voxels:
+            return "Select anatomical structures to display."
         return None

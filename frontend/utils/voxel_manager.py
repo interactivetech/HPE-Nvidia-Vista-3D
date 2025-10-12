@@ -84,8 +84,7 @@ class VoxelManager:
     def get_available_voxels(
         self,
         patient_id: str,
-        filename: str,
-        voxel_mode: str
+        filename: str
     ) -> Tuple[Set[int], Dict[int, str], List[str]]:
         """
         Get available voxel information for the given patient and file.
@@ -98,61 +97,39 @@ class VoxelManager:
         # Detect scan modality to filter appropriate structures
         scan_modality = self._detect_scan_modality(patient_id, filename)
             
-        if voxel_mode == "All":
-            # For "All" mode, return all configured labels (filtered by modality)
-            available_ids = set()
-            id_to_name_map = {}
-            available_voxel_names = []
+        # Query server for actually available voxel files
+        filename_to_id = self.config.create_filename_to_id_mapping()
+            
+        available_ids, id_to_name_map = self.data.fetch_available_voxel_labels(
+            patient_id, filename, filename_to_id
+        )
 
-            for name, label_id in self.config.label_dict.items():
-                if isinstance(label_id, int):
-                    # Filter out inappropriate structures for brain scans
-                    if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, name):
-                        continue
-                        
-                    available_ids.add(label_id)
-                    id_to_name_map[label_id] = name
-                    available_voxel_names.append(name)
+        # Get names for available labels, filtered by modality
+        available_voxel_names = []
+        for name, label_id in self.config.label_dict.items():
+            if isinstance(label_id, int) and label_id in available_ids:
+                # Filter out inappropriate structures for brain scans
+                if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, name):
+                    continue
+                available_voxel_names.append(name)
 
-            return available_ids, id_to_name_map, sorted(available_voxel_names)
-
-        elif voxel_mode == "Individual Voxels":
-            # Query server for actually available voxel files
-            filename_to_id = self.config.create_filename_to_id_mapping()
-                
-            available_ids, id_to_name_map = self.data.fetch_available_voxel_labels(
-                patient_id, filename, filename_to_id
-            )
-
-            # Get names for available labels, filtered by modality
-            available_voxel_names = []
-            for name, label_id in self.config.label_dict.items():
-                if isinstance(label_id, int) and label_id in available_ids:
-                    # Filter out inappropriate structures for brain scans
-                    if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, name):
-                        continue
-                    available_voxel_names.append(name)
-
-            return available_ids, id_to_name_map, sorted(available_voxel_names)
-
-        return set(), {}, []
+        return available_ids, id_to_name_map, sorted(available_voxel_names)
 
     def create_overlays(
         self,
         patient_id: str,
         filename: str,
-        voxel_mode: str,
         selected_voxels: Optional[List[str]] = None,
         external_url: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Create overlay configuration based on voxel mode and selection.
+        Create overlay configuration based on selected voxels.
         Folder structure: output/patient/voxels/scan_name/
         """
         overlays = []
         
-        # Return empty list if filename is None
-        if filename is None:
+        # Return empty list if filename is None or no voxels selected
+        if filename is None or not selected_voxels:
             return overlays
         
         # Use external URL for browser access if provided, otherwise use internal URL
@@ -164,81 +141,46 @@ class VoxelManager:
         # Detect scan modality to filter appropriate anatomical structures
         scan_modality = self._detect_scan_modality(patient_id, filename)
         
-        if voxel_mode == "all":
-            # For brain scans, filter out inappropriate anatomical structures
-            if scan_modality == 'brain':
-                # Create filtered segmentation for brain scans
-                filtered_overlay = self._create_brain_filtered_overlay(
-                    patient_id, filename, base_url
-                )
-                if filtered_overlay:
-                    overlays = [filtered_overlay]
-                else:
-                    # Fallback to original if filtering fails
-                    overlays = [{
-                        'label_id': 'all',
-                        'label_name': 'All Segmentation (Brain Filtered)',
-                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
-                        'is_all_segmentation': True
-                    }]
-            else:
-                # For non-brain scans, show complete segmentation
-                overlays = [{
-                    'label_id': 'all',
-                    'label_name': 'All Segmentation',
-                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
-                    'is_all_segmentation': True
-                }]
+        # Get available voxels to check if all are selected
+        available_ids, id_to_name_map, available_voxel_names = self.get_available_voxels(
+            patient_id, filename
+        )
+        
+        # If all available voxels are selected, use all.nii.gz for better performance
+        if available_voxel_names and set(selected_voxels) == set(available_voxel_names):
+            print(f"DEBUG: All {len(available_voxel_names)} voxels selected - loading all.nii.gz")
+            overlays.append({
+                'label_id': 'all',
+                'label_name': 'All Segmentation',
+                'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
+                'use_custom_colormap': True  # Flag to use customSegmentationColormap
+            })
+            return overlays
+        
+        # Otherwise, create overlays for individual selected voxels
+        print(f"DEBUG: Creating individual overlays for {len(selected_voxels)} voxels")
+        for voxel_name in selected_voxels:
+            if voxel_name in self.config.label_dict:
+                label_id = self.config.label_dict[voxel_name]
+                
+                # Filter out inappropriate structures for brain scans
+                if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, voxel_name):
+                    continue
 
-        elif voxel_mode == "individual_voxels" and selected_voxels:
-            # Show individual voxels from selection, filtered by modality
-            for voxel_name in selected_voxels:
-                if voxel_name in self.config.label_dict:
-                    label_id = self.config.label_dict[voxel_name]
-                    
-                    # Filter out inappropriate structures for brain scans
-                    if scan_modality == 'brain' and not self._is_brain_relevant_structure(label_id, voxel_name):
-                        continue
+                # Convert voxel name to filename format
+                voxel_filename = voxel_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
 
-                    # Convert voxel name to filename format
-                    voxel_filename = voxel_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
+                # Get color for this label
+                label_color = self.config.get_label_color(label_id)
 
-                    # Get color for this label
-                    label_color = self.config.get_label_color(label_id)
-
-                    overlays.append({
-                        'label_id': label_id,
-                        'label_name': voxel_name,
-                        'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
-                        'color': label_color
-                    })
-
-        elif voxel_mode == "individual_voxels" and not selected_voxels:
-            # No individual voxels selected, show base segmentation with modality filtering
-            if scan_modality == 'brain':
-                # For brain scans, show only brain-relevant structures
-                brain_structures = self._get_brain_relevant_structures()
-                for structure_name in brain_structures:
-                    if structure_name in self.config.label_dict:
-                        label_id = self.config.label_dict[structure_name]
-                        voxel_filename = structure_name.lower().replace(' ', '_').replace('-', '_') + '.nii.gz'
-                        label_color = self.config.get_label_color(label_id)
-                        
-                        overlays.append({
-                            'label_id': label_id,
-                            'label_name': structure_name,
-                            'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
-                            'color': label_color
-                        })
-            else:
-                # For non-brain scans, show base segmentation
-                overlays = [{
-                    'label_id': 'all',
-                    'label_name': 'All Segmentation',
-                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/all.nii.gz",
-                    'is_all_segmentation': True
-                }]
-
+                overlays.append({
+                    'label_id': label_id,
+                    'label_name': voxel_name,
+                    'url': f"{base_url}/{OUTPUT_DIR}/{patient_id}/{VOXELS_DIR}/{ct_scan_folder_name}/{voxel_filename}",
+                    'color': label_color
+                })
+        
+        print(f"DEBUG: Created {len(overlays)} overlays from {len(selected_voxels)} selected voxels")
         return overlays
 
     def create_custom_colormap_js(self) -> str:
@@ -246,8 +188,11 @@ class VoxelManager:
         try:
             label_colors_list = self.config.label_colors
             if not label_colors_list:
+                print("ERROR: No label colors found in config!")
                 return ""
 
+            print(f"DEBUG (VoxelManager): Creating colormap from {len(label_colors_list)} labels")
+            
             r_values, g_values, b_values, a_values, labels = [0]*256, [0]*256, [0]*256, [0]*256, [""]*256
             r_values[0], g_values[0], b_values[0], a_values[0], labels[0] = 0, 0, 0, 0, "Background"
 
@@ -266,13 +211,23 @@ class VoxelManager:
 
                 if idx > max_id:
                     max_id = idx
+            
+            # Debug: Print first few colors
+            print(f"DEBUG (VoxelManager): Sample colors:")
+            print(f"  ID 1 (liver): RGB({r_values[1]}, {g_values[1]}, {b_values[1]})")
+            print(f"  ID 3 (spleen): RGB({r_values[3]}, {g_values[3]}, {b_values[3]})")
+            print(f"  ID 5 (right kidney): RGB({r_values[5]}, {g_values[5]}, {b_values[5]})")
+            print(f"  ID 6 (aorta): RGB({r_values[6]}, {g_values[6]}, {b_values[6]})")
+            print(f"  Max ID: {max_id}")
 
-            # Trim arrays to max_id + 1
+            # Trim arrays to max_id + 1 for efficiency
             r_values = r_values[:max_id+1]
             g_values = g_values[:max_id+1]
             b_values = b_values[:max_id+1]
             a_values = a_values[:max_id+1]
             labels = labels[:max_id+1]
+            
+            print(f"DEBUG (VoxelManager): Trimmed colormap to {len(r_values)} entries")
 
             # Format labels for JavaScript
             js_labels = []
@@ -287,9 +242,11 @@ class VoxelManager:
                 G: [{",".join(map(str, g_values))}],
                 B: [{",".join(map(str, b_values))}],
                 A: [{",".join(map(str, a_values))}],
-                labels: [{labels_string}]
+                labels: [{labels_string}],
+                maxLabelId: {max_id}
             }};
             console.log('Vista3D colormap loaded from vista3d_label_colors.json:', customSegmentationColormap);
+            console.log('  Colormap has', customSegmentationColormap.R.length, 'entries, max label ID:', customSegmentationColormap.maxLabelId);
             """
 
         except Exception as e:

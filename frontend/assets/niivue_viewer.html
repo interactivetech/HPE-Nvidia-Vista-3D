@@ -40,7 +40,14 @@
             {{ custom_colormap_js|safe }}
             if (typeof customSegmentationColormap !== 'undefined') {
                 nv.addColormap('custom_segmentation', customSegmentationColormap);
-                console.log('Custom segmentation colormap added');
+                console.log('Custom segmentation colormap added with', customSegmentationColormap.R.length, 'entries');
+                console.log('Sample colors from colormap:');
+                console.log('  ID 1 (liver):', customSegmentationColormap.R[1], customSegmentationColormap.G[1], customSegmentationColormap.B[1]);
+                console.log('  ID 3 (spleen):', customSegmentationColormap.R[3], customSegmentationColormap.G[3], customSegmentationColormap.B[3]);
+                console.log('  ID 5 (right kidney):', customSegmentationColormap.R[5], customSegmentationColormap.G[5], customSegmentationColormap.B[5]);
+                console.log('  ID 6 (aorta):', customSegmentationColormap.R[6], customSegmentationColormap.G[6], customSegmentationColormap.B[6]);
+            } else {
+                console.error('customSegmentationColormap was NOT defined!');
             }
 
             // Add the main volume colormap
@@ -64,10 +71,16 @@
                 setTimeout(() => {
                     if (nv.volumes && nv.volumes.length > 0) {
                         const mainVol = nv.volumes[0];
-                        if (mainVol && mainVol.img) {
+                        if (mainVol && mainVol.img && mainVol.dims && mainVol.mm) {
                             // Calculate volume dimensions and spacing
                             const dims = mainVol.dims;
                             const mm = mainVol.mm;
+                            
+                            // Check if dims and mm are valid arrays
+                            if (!dims || dims.length < 3 || !mm || mm.length < 3) {
+                                console.warn('Invalid dims or mm arrays for view fit calculation');
+                                return;
+                            }
                             
                             // Calculate the physical size of the volume
                             const physicalSize = [
@@ -162,20 +175,35 @@
                         // Get the corresponding overlay color info
                         const overlayIndex = i - {{ overlay_start_index }};
 
-                        // Check if this is the "all segmentation" mode
-                        if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].is_all_segmentation) {
-                            // Use the same colormap as individual voxels for consistency
+                        // Check if this overlay should use the full custom segmentation colormap (all.nii.gz)
+                        if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].use_custom_colormap) {
+                            // This is all.nii.gz - apply the full custom segmentation colormap
                             if (typeof customSegmentationColormap !== 'undefined') {
                                 nv.setColormap(overlayVol.id, 'custom_segmentation');
-                                
-                                // Set the volume range to encompass all possible label IDs (0-255)
                                 overlayVol.cal_min = 0;
-                                overlayVol.cal_max = 255;
+                                overlayVol.cal_max = customSegmentationColormap.maxLabelId || 255;
+                                console.log('Applied custom_segmentation colormap to all.nii.gz');
+                                console.log(`  Colormap range: 0 to ${overlayVol.cal_max}`);
+                                console.log(`  Colormap entries: ${customSegmentationColormap.R.length}`);
                                 
-                                console.log('Applied custom_segmentation colormap to all segmentation overlay');
-                                console.log(`Set volume range: ${overlayVol.cal_min} to ${overlayVol.cal_max}`);
+                                // Debug: Check actual voxel values in all.nii.gz
+                                if (overlayVol.img && overlayVol.img.length > 0) {
+                                    const data = overlayVol.img;
+                                    const uniqueValues = new Set();
+                                    for (let i = 0; i < Math.min(10000, data.length); i++) {
+                                        if (data[i] !== 0) {
+                                            uniqueValues.add(data[i]);
+                                        }
+                                    }
+                                    const sortedValues = Array.from(uniqueValues).sort((a, b) => a - b);
+                                    console.log(`  Unique label IDs in all.nii.gz:`, sortedValues);
+                                    console.log(`  Total unique labels: ${sortedValues.length}`);
+                                }
+                            } else {
+                                console.error('ERROR: customSegmentationColormap not defined for all.nii.gz!');
                             }
                         } else if (overlayIndex < overlayColors.length && overlayColors[overlayIndex].color) {
+                            // Individual voxel file - create a colormap for the specific label
                             const color = overlayColors[overlayIndex].color;
                             const labelName = overlayColors[overlayIndex].label_name;
                             const labelId = overlayColors[overlayIndex].label_id;
@@ -183,7 +211,8 @@
                             // For individual voxel files, create a colormap that maps the label ID to the correct color
                             // Individual voxel files contain the label ID as the non-zero value
                             // We need to create a colormap that maps the specific label ID to the color
-                            const maxId = Math.max(labelId, 255);
+                            // Use minimal array size (labelId + 1) for efficiency and set cal_max to match
+                            const maxId = labelId;
                             const rValues = new Array(maxId + 1).fill(0);
                             const gValues = new Array(maxId + 1).fill(0);
                             const bValues = new Array(maxId + 1).fill(0);
@@ -209,17 +238,39 @@
                             nv.addColormap(colormapName, customColormap);
                             nv.setColormap(overlayVol.id, colormapName);
                             
-                            // Set the volume range to encompass all possible label IDs (0-255)
+                            // Set the volume range to match the colormap size for direct indexing
                             overlayVol.cal_min = 0;
-                            overlayVol.cal_max = 255;
+                            overlayVol.cal_max = maxId;
                             
                             console.log(`Applied custom color to overlay ${overlayIndex}: ${labelName} (ID: ${labelId})`, color);
+                            console.log(`  Colormap has ${rValues.length} entries`);
+                            console.log(`  Color at index ${labelId}: RGB(${rValues[labelId]}, ${gValues[labelId]}, ${bValues[labelId]}), A=${aValues[labelId]}`);
+                            console.log(`  Overlay volume opacity: ${overlayVol.opacity}`);
+                            console.log(`  Overlay volume renderOnTop: ${overlayVol.renderOnTop}`);
                             console.log(`Set volume range: ${overlayVol.cal_min} to ${overlayVol.cal_max}`);
+                            
+                            // Debug: Check actual voxel values
+                            if (overlayVol.img && overlayVol.img.length > 0) {
+                                const data = overlayVol.img;
+                                const uniqueValues = new Set();
+                                for (let i = 0; i < Math.min(10000, data.length); i++) {
+                                    if (data[i] !== 0) {
+                                        uniqueValues.add(data[i]);
+                                    }
+                                }
+                                console.log(`  Unique values in individual voxel file:`, Array.from(uniqueValues).sort((a, b) => a - b));
+                            }
                         } else {
-                            // Fallback to generic segmentation colormap
+                            // Fallback for overlays without proper color info
+                            console.warn('WARNING: Overlay without proper color information:', overlayVol.url);
+                            console.warn('  This indicates a potential issue with overlay creation');
+                            
+                            // Fallback: try to apply generic segmentation colormap
                             if (typeof customSegmentationColormap !== 'undefined') {
                                 nv.setColormap(overlayVol.id, 'custom_segmentation');
-                                console.log('Applied custom_segmentation colormap to overlay volume:', overlayVol.id, 'Name:', overlayVol.name || 'Unnamed');
+                                overlayVol.cal_min = 0;
+                                overlayVol.cal_max = customSegmentationColormap.maxLabelId || 255;
+                                console.log('  Applied fallback custom_segmentation colormap');
                             }
                         }
                     }
@@ -286,22 +337,25 @@
                     if (nv.volumes && nv.volumes.length > 0) {
                         // Get the main volume bounds and fit the view
                         const mainVol = nv.volumes[0];
-                        if (mainVol && mainVol.img) {
+                        if (mainVol && mainVol.img && mainVol.dims && mainVol.mm) {
                             // Calculate the bounding box of the volume
                             const dims = mainVol.dims;
                             const mm = mainVol.mm;
                             
-                            // Set clip planes to show more of the volume
-                            nv.clipPlane = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-                            
-                            // Adjust zoom to fit more of the volume
-                            if (nv.scene && nv.scene.cameras) {
-                                const camera = nv.scene.cameras[0];
-                                if (camera) {
-                                    // Calculate distance to fit the volume
-                                    const maxDim = Math.max(dims[0] * mm[0], dims[1] * mm[1], dims[2] * mm[2]);
-                                    const zoomFactor = {{ view_fit_zoom|default(3.0) }};
-                                    camera.distance = maxDim * zoomFactor; // Show more of the volume
+                            // Check if dims and mm are valid arrays
+                            if (dims && dims.length >= 3 && mm && mm.length >= 3) {
+                                // Set clip planes to show more of the volume
+                                nv.clipPlane = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+                                
+                                // Adjust zoom to fit more of the volume
+                                if (nv.scene && nv.scene.cameras) {
+                                    const camera = nv.scene.cameras[0];
+                                    if (camera) {
+                                        // Calculate distance to fit the volume
+                                        const maxDim = Math.max(dims[0] * mm[0], dims[1] * mm[1], dims[2] * mm[2]);
+                                        const zoomFactor = {{ view_fit_zoom|default(3.0) }};
+                                        camera.distance = maxDim * zoomFactor; // Show more of the volume
+                                    }
                                 }
                             }
                         }

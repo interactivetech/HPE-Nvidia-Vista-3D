@@ -13,7 +13,7 @@ from utils.viewer_config import ViewerConfig
 from utils.template_renderer import TemplateRenderer
 from utils.constants import (
     NIFTI_EXTENSIONS, DICOM_EXTENSIONS, IMAGE_EXTENSIONS,
-    VOXEL_MODES, MESSAGES, VIEWER_HEIGHT, detect_modality_from_data,
+    MESSAGES, VIEWER_HEIGHT, detect_modality_from_data,
     load_colormap_data, SLICE_TYPE_MAP, load_3d_render_config
 )
 
@@ -48,6 +48,11 @@ if not os.path.isabs(OUTPUT_FOLDER):
 
 # Initialize our managers with the resolved URLs
 config_manager = ConfigManager()
+# Verify label colors are loaded
+label_colors_count = len(config_manager.label_colors)
+print(f"DEBUG (NiiVue_Viewer): Loaded {label_colors_count} label colors from vista3d_label_colors.json")
+if label_colors_count > 0:
+    print(f"DEBUG (NiiVue_Viewer): Sample color - {config_manager.label_colors[0]}")
 data_manager = DataManager(IMAGE_SERVER_URL)
 # For external data manager, force it to use the external URL without trying to find working URLs
 external_data_manager = DataManager(EXTERNAL_IMAGE_SERVER_URL, force_external_url=True)
@@ -203,20 +208,82 @@ def render_sidebar():
         # Check if voxels are available for this patient
         has_voxels = bool(selected_patient and voxel_manager.has_voxels_for_patient(selected_patient))
         
+        # Top-level visibility toggles
+        show_scan = st.checkbox(
+            "Show Scan",
+            value=st.session_state.get('show_scan', True),
+            help="Toggle visibility of the main scan volume"
+        )
+        st.session_state.show_scan = show_scan
+        viewer_config._settings['show_scan'] = show_scan
+        
+        # Show Voxels checkbox - only if voxels are available
+        if has_voxels:
+            show_voxels = st.checkbox(
+                "Show Voxels",
+                value=viewer_config._settings.get('show_overlay', False),
+                help="Toggle visibility of anatomical structure overlays"
+            )
+            viewer_config._settings['show_overlay'] = show_voxels
+            
+            # Voxel selection - inline multiselect with buttons
+            if show_voxels and selected_patient and selected_file:
+                st.markdown("Select Voxels")
+                
+                # Get available voxels
+                available_ids, id_to_name_map, available_voxel_names = voxel_manager.get_available_voxels(
+                    selected_patient, selected_file
+                )
+                
+                if available_voxel_names:
+                    # Initialize default selection if not present
+                    if 'voxel_multiselect_default' not in st.session_state:
+                        st.session_state.voxel_multiselect_default = []
+                    
+                    # Select All / Clear All buttons
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Select All", use_container_width=True):
+                            st.session_state.voxel_multiselect_default = available_voxel_names.copy()
+                            st.rerun()
+                    with col2:
+                        if st.button("Clear All", use_container_width=True):
+                            st.session_state.voxel_multiselect_default = []
+                            st.rerun()
+                    
+                    # Multiselect for voxel selection
+                    selected_voxels = st.multiselect(
+                        "Choose anatomical structures:",
+                        available_voxel_names,
+                        default=st.session_state.voxel_multiselect_default,
+                        label_visibility="collapsed"
+                    )
+                    
+                    # Update session state and viewer config
+                    st.session_state.voxel_multiselect_default = selected_voxels
+                    st.session_state.selected_individual_voxels = selected_voxels
+                    viewer_config.selected_individual_voxels = selected_voxels
+                    
+                    # Show selection count
+                    if selected_voxels:
+                        st.caption(f"✓ {len(selected_voxels)} structure(s) selected")
+                    else:
+                        st.caption("No structures selected")
+                else:
+                    st.warning("No voxels available for this scan.")
+        else:
+            # Ensure show_overlay is False if no voxels available
+            viewer_config._settings['show_overlay'] = False
+        
         # Render viewer settings with data characteristics
         viewer_config.render_sidebar_settings(min_val, max_val, mean_val, has_voxels)
 
-        # Only show voxel settings if there are voxels available for this patient
-        if has_voxels:
-            # Voxel selection (after show_overlay is set)
-            if viewer_config.settings.get('show_overlay', False):
-                # Voxel selection mode and individual voxel selection
-                render_voxel_selection(selected_patient, selected_file)
-                
-                # Voxel image settings (after voxel selection)
-                viewer_config.render_voxel_image_settings()
+        # Voxel image settings - only show if voxels are visible
+        if has_voxels and viewer_config._settings.get('show_overlay', False):
+            viewer_config.render_voxel_image_settings()
 
-            # Voxel legend
+        # Voxel legend - always show if voxels are available
+        if has_voxels:
             viewer_config.render_voxel_legend()
 
         # Add spacing before badges
@@ -230,63 +297,6 @@ def render_sidebar():
     return selected_patient, selected_file
 
 
-def render_voxel_selection(selected_patient: str, selected_file: str):
-    """Render the voxel selection interface."""
-    with st.expander("Select Voxels", expanded=False):
-        
-        # Voxel selection mode
-        voxel_mode = st.radio(
-            "Choose voxel selection mode:",
-            VOXEL_MODES,
-            index=0,
-            help="Select how you want to choose which voxels to display"
-        )
-
-        # Get available voxel information
-        available_ids, id_to_name_map, available_voxel_names = voxel_manager.get_available_voxels(
-            selected_patient, selected_file, voxel_mode
-        )
-
-        # Handle voxel mode selection
-        if voxel_mode == "All":
-            st.info("Will display the complete base segmentation file.")
-            viewer_config.voxel_mode = "all"
-            viewer_config.selected_individual_voxels = []
-
-        elif voxel_mode == "Individual Voxels":
-            if not available_ids:
-                # Show warning if no voxels available
-                voxels_url = external_data_manager.get_voxel_directory_url(selected_patient, selected_file)
-                st.warning("No voxels available for this patient/file.")
-                st.caption(f"Voxels directory: {voxels_url}")
-                st.caption("Individual voxel files should be located in this directory.")
-            else:
-                # Show voxel selection interface
-                selected_voxels = st.multiselect(
-                    "Choose individual voxels to overlay:",
-                    available_voxel_names,
-                    default=[],
-                    help="Select specific anatomical structures to display"
-                )
-
-                # Display selection status
-                if selected_voxels:
-                    st.info(f"Will display {len(selected_voxels)} individual voxels from the voxels directory.")
-
-                viewer_config.voxel_mode = "individual_voxels"
-                viewer_config.selected_individual_voxels = selected_voxels
-
-        # Update only voxel-related session state to avoid changing view mode
-        viewer_config.to_session_state_voxels_only()
-
-    # Display current voxel selection status
-    status_message = viewer_config.get_status_message()
-    if status_message:
-        st.info(status_message)
-
-
-
-
 # --- Main Application ---
 def render_viewer(selected_patient: str, selected_file: str):
     """Render the main NiiVue viewer."""
@@ -298,28 +308,44 @@ def render_viewer(selected_patient: str, selected_file: str):
     # Regular patient file
     base_file_url = f"{EXTERNAL_IMAGE_SERVER_URL}/output/{selected_patient}/nifti/{selected_file}"
 
-    # Create overlays based on voxel mode
+    # Create overlays from selected voxels
     overlays = []
     if selected_patient:
+        # Debug: Check voxel selection state
+        print(f"DEBUG: === VOXEL STATE ===")
+        print(f"DEBUG: viewer_config.selected_individual_voxels = {viewer_config.selected_individual_voxels}")
+        print(f"DEBUG: st.session_state.selected_individual_voxels = {st.session_state.get('selected_individual_voxels', 'NOT SET')}")
+        print(f"DEBUG: === END VOXEL STATE ===")
+        
         overlays = voxel_manager.create_overlays(
             selected_patient,
             selected_file,
-            viewer_config.voxel_mode,
             viewer_config.selected_individual_voxels,
             external_url=EXTERNAL_IMAGE_SERVER_URL
         )
+        print(f"DEBUG: Created {len(overlays)} overlays")
 
     # Build volume list for NiiVue
     volume_list_entries = []
     
-    # Always include base CT scan (opacity will be adjusted dynamically based on voxel visibility)
-    volume_list_entries.append({"url": base_file_url})
+    # Include base scan only if "Show Scan" is enabled
+    if viewer_config.settings.get('show_scan', True):
+        volume_list_entries.append({"url": base_file_url})
+        print(f"DEBUG: Added base scan to volume list")
 
     # Add overlay volumes
-    if viewer_config.settings.get('show_overlay', False) and overlays:
+    show_overlay = viewer_config.settings.get('show_overlay', False)
+    print(f"DEBUG: show_overlay={show_overlay}, overlays count={len(overlays)}")
+    
+    if show_overlay and overlays:
         for overlay in overlays:
             if overlay.get('url'):
                 volume_list_entries.append({"url": overlay['url']})
+        print(f"DEBUG: Added {len(overlays)} overlays to volume list")
+    elif not show_overlay:
+        print(f"DEBUG: Show Voxels checkbox is NOT checked - voxels will not be displayed")
+    elif not overlays:
+        print(f"DEBUG: No overlays were created")
 
     if not volume_list_entries:
         st.info(MESSAGES['no_nifti_or_voxels'])
@@ -330,7 +356,8 @@ def render_viewer(selected_patient: str, selected_file: str):
     overlay_colors_js = json.dumps(overlays)
     custom_colormap_js = voxel_manager.create_custom_colormap_js()
 
-    print(f"DEBUG (NiiVue_Viewer): Prepared volume_list_js: {volume_list_js}")
+    print(f"DEBUG (NiiVue_Viewer): Total volumes to load: {len(volume_list_entries)}")
+    print(f"DEBUG (NiiVue_Viewer): Volume list preview: {volume_list_js[:200]}...")
 
 
     # Get viewer settings
@@ -416,6 +443,7 @@ def render_viewer(selected_patient: str, selected_file: str):
         render_config['vignetteRadius'] = settings['vignette_radius']
     
     # Render the viewer using our template
+    show_scan = settings.get('show_scan', True)
     html_content = template_renderer.render_template(
         'niivue_viewer.html',
         niivue_lib_content=niivue_lib_content,
@@ -424,7 +452,7 @@ def render_viewer(selected_patient: str, selected_file: str):
         custom_colormap_js=custom_colormap_js,
         image_server_url=EXTERNAL_IMAGE_SERVER_URL,
         main_is_nifti=True,
-        main_vol=True,
+        main_vol=show_scan,  # Only apply main volume logic if scan is shown
         color_map_js=json.dumps(settings.get('color_map', 'niivue-ct_translucent')),
         color_map_data_js=json.dumps(load_colormap_data(settings.get('color_map', 'niivue-ct_translucent'))),
         nifti_gamma=settings.get('nifti_gamma', 1.0),
@@ -432,7 +460,7 @@ def render_viewer(selected_patient: str, selected_file: str):
         window_center=window_center,
         window_width=window_width,
         actual_slice_type=actual_slice_type,
-        overlay_start_index=1,  # CT scan is always at index 0, overlays start at index 1
+        overlay_start_index=1 if show_scan else 0,  # Overlays start after scan if shown
         segment_opacity=segment_opacity,
         segment_gamma=segment_gamma,
         view_fit_zoom=settings.get('view_fit_zoom', 3.0),

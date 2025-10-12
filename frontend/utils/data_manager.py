@@ -211,10 +211,13 @@ class DataManager:
                 print(f"DEBUG: Available label IDs: {available_ids}")
 
             # Create id_to_name mapping for available labels
-            id_to_name = {
-                label_id: name for name, label_id in filename_to_id_mapping.items()
-                if label_id in available_ids
-            }
+            # Convert filenames back to label names by removing .nii.gz and converting underscores to spaces
+            id_to_name = {}
+            for filename, label_id in filename_to_id_mapping.items():
+                if label_id in available_ids:
+                    # Convert filename to label name: "aorta.nii.gz" -> "aorta"
+                    label_name = filename.replace('.nii.gz', '').replace('_', ' ')
+                    id_to_name[label_id] = label_name
 
             return available_ids, id_to_name
 
