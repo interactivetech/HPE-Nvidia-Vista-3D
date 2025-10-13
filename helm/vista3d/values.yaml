@@ -112,18 +112,13 @@ backend:
   volumeMounts:
     - name: output-data
       mountPath: /workspace/output
-  
-  volumes:
-    - name: output-data
-      persistentVolumeClaim:
-        claimName: vista3d-output-pvc
 
 # Frontend (Streamlit App) configuration
 frontend:
   enabled: true
   name: vista3d-frontend
   
-  replicaCount: 2
+  replicaCount: 1
   
   image:
     repository: dwtwp/vista3d-frontend
@@ -168,14 +163,6 @@ frontend:
       mountPath: /app/output
     - name: dicom-data
       mountPath: /app/dicom
-  
-  volumes:
-    - name: output-data
-      persistentVolumeClaim:
-        claimName: vista3d-output-pvc
-    - name: dicom-data
-      persistentVolumeClaim:
-        claimName: vista3d-dicom-pvc
 
 # Image Server configuration
 imageServer:
@@ -221,14 +208,6 @@ imageServer:
     - name: dicom-data
       mountPath: /data/dicom
       readOnly: true
-  
-  volumes:
-    - name: output-data
-      persistentVolumeClaim:
-        claimName: vista3d-output-pvc
-    - name: dicom-data
-      persistentVolumeClaim:
-        claimName: vista3d-dicom-pvc
 
 # Ingress configuration
 ingress:
@@ -274,7 +253,7 @@ persistence:
   output:
     enabled: true
     storageClass: ""
-    accessMode: ReadWriteMany
+    accessMode: ReadWriteOnce
     size: 100Gi
   
   dicom:

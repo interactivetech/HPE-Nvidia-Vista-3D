@@ -23,7 +23,7 @@ echo ""
 
 # Check if logged into Docker Hub
 echo -e "${YELLOW}Checking Docker Hub login...${NC}"
-if ! docker info | grep -q "Username"; then
+if ! grep -q "docker.io" ~/.docker/config.json 2>/dev/null; then
     echo -e "${RED}Not logged into Docker Hub. Please run: docker login${NC}"
     exit 1
 fi

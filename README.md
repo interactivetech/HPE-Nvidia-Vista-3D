@@ -183,7 +183,7 @@ For development work, you can use separate virtual environments to avoid downloa
 # Frontend environment (lightweight, no Triton/PyTorch)
 uv venv .venv-frontend
 source .venv-frontend/bin/activate
-uv pip install python-dotenv nibabel numpy tqdm requests beautifulsoup4 bs4 streamlit fastapi uvicorn pandas plotly streamlit-mermaid dcm2niix vtk trimesh pymeshfix stl extra-streamlit-components scikit-image plyfile
+uv pip install python-dotenv nibabel numpy tqdm requests beautifulsoup4 bs4 streamlit fastapi uvicorn pandas plotly dcm2niix vtk trimesh pymeshfix stl extra-streamlit-components scikit-image plyfile
 streamlit run app.py
 
 # Backend environment (full AI stack)

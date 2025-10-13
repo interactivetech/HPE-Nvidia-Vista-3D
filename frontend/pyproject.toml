@@ -8,7 +8,6 @@ dependencies = [
     # Core web framework
     "streamlit>=1.32.0",
     "extra-streamlit-components>=0.1.81",
-    "streamlit-mermaid>=0.3.0",
     # HTTP and web requests
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.3",

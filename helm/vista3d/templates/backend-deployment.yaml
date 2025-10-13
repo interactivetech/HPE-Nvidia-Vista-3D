@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.backend.name }}
+  name: {{ include "vista3d.backend.deploymentName" . }}
   labels:
     app.kubernetes.io/name: {{ include "vista3d.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -45,7 +45,53 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
-            {{- toYaml .Values.backend.env | nindent 12 }}
+            - name: NGC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "vista3d.fullname" . }}-secrets
+                  key: ngc-api-key
+            - name: NGC_ORG_ID
+              value: "nvidia"
+            - name: LOCAL_NIM_CACHE
+              value: "/workspace/.cache/nim"
+            - name: VISTA3D_SERVER
+              value: "http://localhost:8000"
+            - name: WORKSPACE_IMAGES_PATH
+              value: "/workspace/output/nifti"
+            - name: WORKSPACE_OUTPUTS_PATH
+              value: "/workspace/output"
+            - name: WORKSPACE_ROOT
+              value: "/workspace"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "0"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+            - name: SUPPORTED_IMAGE_EXT
+              value: '".nrrd",".nii",".nii.gz",".dcm"'
+            - name: IMAGE_SERVER
+              value: "http://vista3d-image-server:8888"
+            - name: ALLOW_LOCAL_FILES
+              value: "True"
+            - name: ENABLE_FILE_ACCESS
+              value: "True"
+            - name: ALLOW_ABSOLUTE_PATHS
+              value: "True"
+            - name: ALLOW_RELATIVE_PATHS
+              value: "True"
+            - name: ALLOW_FILE_PROTOCOL
+              value: "True"
+            - name: ALLOW_LOCAL_PATHS
+              value: "True"
+            - name: CORS_ALLOW_ORIGINS
+              value: "*"
+            - name: CORS_ALLOW_METHODS
+              value: "GET,POST,PUT,DELETE,OPTIONS"
+            - name: CORS_ALLOW_HEADERS
+              value: "*"
+            - name: CORS_ALLOW_CREDENTIALS
+              value: "True"
           livenessProbe:
             httpGet:
               path: /health
@@ -67,7 +113,9 @@ spec:
           volumeMounts:
             {{- toYaml .Values.backend.volumeMounts | nindent 12 }}
       volumes:
-        {{- toYaml .Values.backend.volumes | nindent 8 }}
+        - name: output-data
+          persistentVolumeClaim:
+            claimName: {{ include "vista3d.fullname" . }}-output-pvc
       {{- with .Values.backend.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

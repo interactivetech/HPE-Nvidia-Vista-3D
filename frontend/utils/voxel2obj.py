@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-nifti2obj.py
+voxel2obj.py
 
-A utility to convert .nii.gz files into high-quality .obj surface meshes.
+A utility to convert voxel .nii.gz files into high-quality .obj surface meshes.
 If the input is 'all.nii.gz', it generates a multi-label mesh where each
 label is colored and named according to the provided JSON color map.
 
@@ -17,7 +17,7 @@ Requirements
 
 Example
 -------
-    python nifti2obj.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 -v
+    python voxel2obj.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 -v
 """
 
 import argparse

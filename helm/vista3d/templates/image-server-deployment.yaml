@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.imageServer.name }}
+  name: {{ include "vista3d.imageServer.deploymentName" . }}
   labels:
     app.kubernetes.io/name: {{ include "vista3d.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -67,7 +67,12 @@ spec:
           volumeMounts:
             {{- toYaml .Values.imageServer.volumeMounts | nindent 12 }}
       volumes:
-        {{- toYaml .Values.imageServer.volumes | nindent 8 }}
+        - name: output-data
+          persistentVolumeClaim:
+            claimName: {{ include "vista3d.fullname" . }}-output-pvc
+        - name: dicom-data
+          persistentVolumeClaim:
+            claimName: {{ include "vista3d.fullname" . }}-dicom-pvc
       {{- with .Values.imageServer.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

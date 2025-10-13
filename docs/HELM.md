@@ -13,48 +13,6 @@ The HPE NVIDIA Vista3D Helm chart provides a complete Kubernetes deployment solu
 
 The Helm chart deploys a microservices architecture with the following components:
 
-```mermaid
-graph TB
-    subgraph "Kubernetes Cluster"
-        subgraph "Frontend Pods"
-            FE[Streamlit Frontend<br/>Port: 8501]
-        end
-        
-        subgraph "Backend Pods"
-            BE[Vista3D Server<br/>Port: 8000<br/>GPU Required]
-        end
-        
-        subgraph "Image Server Pods"
-            IS[Image Server<br/>Port: 8888]
-        end
-        
-        subgraph "Storage"
-            PVC1[Output PVC<br/>ReadWriteMany]
-            PVC2[DICOM PVC<br/>ReadOnlyMany]
-        end
-        
-        subgraph "Ingress"
-            ING[Nginx Ingress<br/>SSL/TLS]
-        end
-    end
-    
-    subgraph "External"
-        USER[Users]
-        NGC[NVIDIA NGC]
-    end
-    
-    USER --> ING
-    ING --> FE
-    ING --> BE
-    ING --> IS
-    FE --> BE
-    FE --> IS
-    BE --> PVC1
-    IS --> PVC1
-    IS --> PVC2
-    BE --> NGC
-```
-
 ### Components
 
 | Component | Purpose | Port | Resources | Scaling |

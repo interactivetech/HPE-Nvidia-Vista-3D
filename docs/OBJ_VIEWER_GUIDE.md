@@ -103,10 +103,10 @@ The OBJ viewer uses Three.js for 3D rendering and requires a modern web browser 
 
 ## Generating OBJ Files
 
-OBJ files can be generated from NIfTI voxel data using the `nifti2obj.py` utility:
+OBJ files can be generated from NIfTI voxel data using the `voxel2obj.py` utility:
 
 ```bash
-python utils/nifti2obj.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 -v
+python utils/voxel2obj.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 -v
 ```
 
 This will convert all voxel files from:
@@ -150,7 +150,7 @@ The OBJ Viewer integrates with the complete Vista3D workflow:
 
 1. **DICOM → NIfTI**: Convert medical images using Image Data tools
 2. **NIfTI → Segmentation**: Run Vista3D segmentation
-3. **Voxels → OBJ**: Convert voxel data to 3D meshes with `nifti2obj.py`
+3. **Voxels → OBJ**: Convert voxel data to 3D meshes with `voxel2obj.py`
 4. **Visualization**: View and analyze 3D anatomy in the OBJ Viewer
 
 ## API Usage
@@ -172,5 +172,5 @@ url = data_manager.get_obj_directory_url(patient_id, scan_name)
 
 - [SETUP_GUIDE.md](SETUP_GUIDE.md) - General setup instructions
 - [NIIVUE_VIEWER.md](NIIVUE_VIEWER.md) - NIfTI viewer documentation
-- See `utils/nifti2obj.py` for OBJ generation options
+- See `utils/voxel2obj.py` for OBJ generation options
 

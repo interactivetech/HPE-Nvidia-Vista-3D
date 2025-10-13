@@ -66,7 +66,7 @@ If you need to create OBJ files from voxel data:
 cd /Users/dave/AI/HPE/HPE-Nvidia-Vista-3D/frontend
 
 # Generate OBJ files for a specific patient and scan
-python utils/nifti2obj.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 -v
+python utils/voxel2obj.py --patient PA00000002 --scan 2.5MM_ARTERIAL_3 -v
 
 # Options:
 # -t, --threshold: Iso-surface threshold (default: 0.1)
@@ -123,14 +123,14 @@ The OBJ Viewer completes the medical imaging visualization pipeline:
 
 1. **DICOM → NIfTI**: Convert medical images (Image Data page)
 2. **NIfTI → Segmentation**: Run Vista3D segmentation (Tools page)
-3. **Voxels → OBJ**: Convert to 3D meshes (`nifti2obj.py`)
+3. **Voxels → OBJ**: Convert to 3D meshes (`voxel2obj.py`)
 4. **Visualization**: View in OBJ Viewer 🫁
 
 ## Next Steps
 
 1. Test the viewer by navigating to **🫁 OBJ Viewer** in the app
 2. If you already have OBJ files, select a patient and scan to view them
-3. If you need to generate OBJ files, use the `nifti2obj.py` utility
+3. If you need to generate OBJ files, use the `voxel2obj.py` utility
 4. Customize the viewer settings to your preference
 
 For detailed documentation, see: `docs/OBJ_VIEWER_GUIDE.md`

@@ -5,7 +5,8 @@ dicom
 output*
 dicom*
 .setup_state*
-pf.sh
+,genkit
+.gemini
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
