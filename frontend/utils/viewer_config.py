@@ -442,13 +442,6 @@ class ViewerConfig:
 
             if window_preset != "Custom":
                 self.apply_window_preset(window_preset)
-
-        # Voxel display settings - only show if voxels are available
-        if has_voxels:
-            self._settings['show_overlay'] = st.checkbox("Show Voxels", value=self._settings['show_overlay'])
-        else:
-            # If no voxels available, ensure show_overlay is False
-            self._settings['show_overlay'] = False
         
         # Show Scan setting removed - CT scan is now always shown with dynamic opacity
         

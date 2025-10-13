@@ -317,6 +317,7 @@ def render_viewer(selected_patient: str, selected_scan: str, selected_files: Lis
         import * as THREE from 'three';
         import {{ OrbitControls }} from 'three/addons/controls/OrbitControls.js';
         import {{ OBJLoader }} from 'three/addons/loaders/OBJLoader.js';
+        import {{ MTLLoader }} from 'three/addons/loaders/MTLLoader.js';
 
         // Initialize scene, camera, renderer
         const container = document.getElementById('viewer-container');
@@ -358,7 +359,6 @@ def render_viewer(selected_patient: str, selected_scan: str, selected_files: Lis
         
         // Load OBJ files
         const objData = {obj_data_js};
-        const loader = new OBJLoader();
         let loadedCount = 0;
         const totalObjects = objData.length;
         
@@ -366,84 +366,136 @@ def render_viewer(selected_patient: str, selected_scan: str, selected_files: Lis
         const objectGroup = new THREE.Group();
         scene.add(objectGroup);
         
-        // Load each OBJ file
-        objData.forEach((objInfo, index) => {{
-            loader.load(
+        // Function to load OBJ with MTL if available
+        function loadOBJWithMaterial(objInfo) {{
+            const isAllFile = objInfo.name.toLowerCase() === 'all';
+            
+            if (isAllFile) {{
+                // For "all.obj", try to load MTL file first
+                const mtlUrl = objInfo.url.replace('.obj', '.mtl');
+                const mtlLoader = new MTLLoader();
+                
+                mtlLoader.load(
+                    mtlUrl,
+                    function(materials) {{
+                        materials.preload();
+                        
+                        // Apply opacity to all materials
+                        Object.values(materials.materials).forEach(mat => {{
+                            mat.opacity = {object_opacity};
+                            mat.transparent = {str(object_opacity < 1.0).lower()};
+                            mat.side = THREE.DoubleSide;
+                        }});
+                        
+                        const objLoader = new OBJLoader();
+                        objLoader.setMaterials(materials);
+                        objLoader.load(
+                            objInfo.url,
+                            function(object) {{
+                                handleLoadedObject(object, objInfo, true);
+                            }},
+                            function(xhr) {{ /* progress */ }},
+                            function(error) {{
+                                console.error('Error loading OBJ with MTL:', error);
+                                loadedCount++;
+                                if (loadedCount === totalObjects) loading.style.display = 'none';
+                            }}
+                        );
+                    }},
+                    function(xhr) {{ /* MTL progress */ }},
+                    function(error) {{
+                        console.warn('MTL file not found, loading OBJ without materials:', error);
+                        // Fallback to loading without MTL
+                        loadOBJOnly(objInfo);
+                    }}
+                );
+            }} else {{
+                loadOBJOnly(objInfo);
+            }}
+        }}
+        
+        // Load OBJ without MTL
+        function loadOBJOnly(objInfo) {{
+            const objLoader = new OBJLoader();
+            objLoader.load(
                 objInfo.url,
                 function(object) {{
-                    // Set material with color
-                    const material = new THREE.MeshPhongMaterial({{
-                        color: new THREE.Color(objInfo.color[0], objInfo.color[1], objInfo.color[2]),
-                        opacity: {object_opacity},
-                        transparent: {str(object_opacity < 1.0).lower()},
-                        side: THREE.DoubleSide
-                    }});
-                    
-                    object.traverse(function(child) {{
-                        if (child instanceof THREE.Mesh) {{
-                            child.material = material;
-                        }}
-                    }});
-                    
-                    // Add wireframe if enabled
-                    if ({str(show_wireframe).lower()}) {{
-                        object.traverse(function(child) {{
-                            if (child instanceof THREE.Mesh) {{
-                                const wireframe = new THREE.WireframeGeometry(child.geometry);
-                                const lineMaterial = new THREE.LineBasicMaterial({{ 
-                                    color: 0x000000,
-                                    linewidth: 1,
-                                    opacity: 0.3,
-                                    transparent: true
-                                }});
-                                const line = new THREE.LineSegments(wireframe, lineMaterial);
-                                child.add(line);
-                            }}
-                        }});
-                    }}
-                    
-                    objectGroup.add(object);
-                    loadedCount++;
-                    
-                    if (loadedCount === totalObjects) {{
-                        loading.style.display = 'none';
-                        
-                        // Center and scale the scene
-                        const box = new THREE.Box3().setFromObject(objectGroup);
-                        const center = box.getCenter(new THREE.Vector3());
-                        const size = box.getSize(new THREE.Vector3());
-                        
-                        // Center the group
-                        objectGroup.position.sub(center);
-                        
-                        // Calculate camera distance
-                        const maxDim = Math.max(size.x, size.y, size.z);
-                        const fov = camera.fov * (Math.PI / 180);
-                        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-                        cameraZ *= 1.5; // Zoom out a bit
-                        
-                        camera.position.set(cameraZ, cameraZ * 0.5, cameraZ);
-                        camera.lookAt(0, 0, 0);
-                        controls.target.set(0, 0, 0);
-                        controls.update();
-                    }}
+                    handleLoadedObject(object, objInfo, false);
                 }},
-                function(xhr) {{
-                    // Progress callback
-                    if (xhr.lengthComputable) {{
-                        const percentComplete = xhr.loaded / xhr.total * 100;
-                        console.log(`Loading ${{objInfo.name}}: ${{percentComplete.toFixed(2)}}%`);
-                    }}
-                }},
+                function(xhr) {{ /* progress */ }},
                 function(error) {{
-                    console.error(`Error loading ${{objInfo.url}}:`, error);
+                    console.error('Error loading OBJ:', error);
                     loadedCount++;
-                    
-                    if (loadedCount === totalObjects) {{
-                        loading.style.display = 'none';
-                    }}
+                    if (loadedCount === totalObjects) loading.style.display = 'none';
                 }}
             );
+        }}
+        
+        // Handle loaded object
+        function handleLoadedObject(object, objInfo, hasMTL) {{
+            if (!hasMTL) {{
+                // Apply custom material for non-MTL objects
+                const material = new THREE.MeshPhongMaterial({{
+                    color: new THREE.Color(objInfo.color[0], objInfo.color[1], objInfo.color[2]),
+                    opacity: {object_opacity},
+                    transparent: {str(object_opacity < 1.0).lower()},
+                    side: THREE.DoubleSide
+                }});
+                
+                object.traverse(function(child) {{
+                    if (child instanceof THREE.Mesh) {{
+                        child.material = material;
+                    }}
+                }});
+            }}
+            
+            // Add wireframe if enabled
+            if ({str(show_wireframe).lower()}) {{
+                object.traverse(function(child) {{
+                    if (child instanceof THREE.Mesh) {{
+                        const wireframe = new THREE.WireframeGeometry(child.geometry);
+                        const lineMaterial = new THREE.LineBasicMaterial({{ 
+                            color: 0x000000,
+                            linewidth: 1,
+                            opacity: 0.3,
+                            transparent: true
+                        }});
+                        const line = new THREE.LineSegments(wireframe, lineMaterial);
+                        child.add(line);
+                    }}
+                }});
+            }}
+            
+            objectGroup.add(object);
+            loadedCount++;
+            
+            if (loadedCount === totalObjects) {{
+                loading.style.display = 'none';
+                
+                // Center and scale the scene
+                const box = new THREE.Box3().setFromObject(objectGroup);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                // Center the group
+                objectGroup.position.sub(center);
+                
+                // Calculate camera distance
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = camera.fov * (Math.PI / 180);
+                let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+                cameraZ *= 1.5; // Zoom out a bit
+                
+                camera.position.set(cameraZ, cameraZ * 0.5, cameraZ);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }}
+        }}
+        
+        // Load all objects
+        objData.forEach((objInfo) => {{
+            loadOBJWithMaterial(objInfo);
         }});
         
         // Animation loop

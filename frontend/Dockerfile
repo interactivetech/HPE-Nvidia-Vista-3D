@@ -10,10 +10,13 @@ ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 ENV STREAMLIT_SERVER_HEADLESS=true
 ENV STREAMLIT_THEME_BASE=dark
 
-# System deps for plotly and medical imaging
+# System deps for plotly, medical imaging, and 3D processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     dcm2niix \
+    libgomp1 \
+    libgl1 \
+    libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
 
 # Install uv for dependency management

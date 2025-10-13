@@ -171,6 +171,9 @@ def get_patients_with_voxel_files() -> List[str]:
             if not output_folder:
                 return []
         
+        # DEBUG: Print detection info
+        print(f"[DEBUG] get_patients_with_voxel_files - is_docker: {is_docker}, output_folder: {output_folder}")
+        
         output_path = Path(output_folder)
         
         # Check if output directory exists
@@ -179,10 +182,12 @@ def get_patients_with_voxel_files() -> List[str]:
         
         # Get list of patient folders that have voxel files
         patients_with_voxels = []
+        print(f"[DEBUG] Scanning directory: {output_path}")
         for entry in os.scandir(output_path):
             if entry.is_dir() and entry.name != 'uploads':
                 patient_id = entry.name
                 voxels_dir = output_path / patient_id / "voxels"
+                print(f"[DEBUG] Checking patient: {patient_id}, voxels_dir: {voxels_dir}")
                 
                 # Check if voxels directory exists and contains subdirectories with nii.gz files
                 if voxels_dir.exists() and voxels_dir.is_dir():
@@ -194,16 +199,19 @@ def get_patients_with_voxel_files() -> List[str]:
                                 for voxel_file in os.scandir(scan_dir.path):
                                     if voxel_file.is_file() and voxel_file.name.endswith('.nii.gz'):
                                         has_voxel_files = True
+                                        print(f"[DEBUG] Found voxel files in {patient_id}/{scan_dir.name}")
                                         break
                                 if has_voxel_files:
                                     break
-                    except (PermissionError, OSError):
+                    except (PermissionError, OSError) as e:
                         # Skip if we can't access the directory
+                        print(f"[DEBUG] Permission error for {patient_id}: {e}")
                         continue
                     
                     if has_voxel_files:
                         patients_with_voxels.append(patient_id)
         
+        print(f"[DEBUG] Found patients with voxels: {sorted(patients_with_voxels)}")
         return sorted(patients_with_voxels)
         
     except Exception as e:
