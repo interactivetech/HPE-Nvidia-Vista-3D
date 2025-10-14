@@ -21,9 +21,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get folder paths from environment variables - should be full paths
-def resolve_folder_path(env_var_name: str, default_path: str) -> str:
+def resolve_folder_path(env_var_name: str) -> str:
     """Resolve folder path from environment variable - expects full paths."""
-    folder_path = os.getenv(env_var_name, default_path)
+    folder_path = os.getenv(env_var_name)
+    
+    if not folder_path:
+        raise ValueError(f"{env_var_name} must be set in .env file with full absolute path")
     
     # All paths should be absolute now - no more PROJECT_ROOT
     if not os.path.isabs(folder_path):
@@ -31,8 +34,8 @@ def resolve_folder_path(env_var_name: str, default_path: str) -> str:
     
     return folder_path
 
-output_folder = resolve_folder_path('OUTPUT_FOLDER', 'output')
-dicom_folder = resolve_folder_path('DICOM_FOLDER', 'dicom')
+output_folder = resolve_folder_path('OUTPUT_FOLDER')
+dicom_folder = resolve_folder_path('DICOM_FOLDER')
 
 
 def get_server_config():

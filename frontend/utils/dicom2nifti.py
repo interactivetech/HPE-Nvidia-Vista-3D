@@ -203,8 +203,18 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s", opti
         print(f"🔧 Running dcm2niix conversion:")
         print(f"   Command: {' '.join(cmd)}")
         
-        # Run dcm2niix
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        # Run dcm2niix with byte output to handle encoding issues
+        result = subprocess.run(cmd, capture_output=True, text=False, timeout=300)
+        
+        # Decode output with error handling for non-UTF-8 characters
+        # This handles DICOM files with special characters in metadata
+        try:
+            stdout = result.stdout.decode('utf-8')
+            stderr = result.stderr.decode('utf-8')
+        except UnicodeDecodeError:
+            # Fallback: replace problematic bytes with replacement character
+            stdout = result.stdout.decode('utf-8', errors='replace')
+            stderr = result.stderr.decode('utf-8', errors='replace')
         
         if result.returncode == 0:
             print(f"✅ dcm2niix conversion successful")
@@ -219,18 +229,18 @@ def run_dcm2niix_conversion(input_dir, output_dir, filename_format="%d_%s", opti
                 'status': 'success',
                 'nifti_files': nifti_files,
                 'json_files': json_files,
-                'stdout': result.stdout,
-                'stderr': result.stderr
+                'stdout': stdout,
+                'stderr': stderr
             }
         else:
             print(f"❌ dcm2niix conversion failed (return code: {result.returncode})")
-            print(f"   stderr: {result.stderr}")
-            print(f"   stdout: {result.stdout}")
+            print(f"   stderr: {stderr}")
+            print(f"   stdout: {stdout}")
             
             return {
                 'status': 'failed',
-                'error': result.stderr,
-                'stdout': result.stdout,
+                'error': stderr,
+                'stdout': stdout,
                 'return_code': result.returncode
             }
             
