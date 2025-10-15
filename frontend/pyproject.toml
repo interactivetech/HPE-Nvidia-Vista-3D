@@ -21,6 +21,7 @@ dependencies = [
     "plotly>=5.0.0",
     # Medical imaging
     "nibabel>=5.1.0",
+    "nilearn>=0.10.0",
     "scikit-image>=0.21.0",
     "dcm2niix>=1.0.0",
     # Progress bars and utilities
