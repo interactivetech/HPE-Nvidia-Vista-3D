@@ -33,19 +33,44 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "vista3d.serviceAccountName" . }}
       securityContext:
+        {{- if .Values.frontend.podSecurityContext }}
+        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
+        {{- else }}
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- end }}
       containers:
         - name: vista3d-frontend
           image: "{{ .Values.global.imageRegistry }}{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           securityContext:
+            {{- if .Values.frontend.securityContext }}
+            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+            {{- else }}
             {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8501
               protocol: TCP
           env:
-            {{- toYaml .Values.frontend.env | nindent 12 }}
+            - name: IMAGE_SERVER
+              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
+            - name: EXTERNAL_IMAGE_SERVER
+              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
+            - name: VISTA3D_IMAGE_SERVER_URL
+              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
+            - name: OUTPUT_FOLDER
+              value: "/app/output"
+            - name: DICOM_FOLDER
+              value: "/app/dicom"
+            - name: VISTA3D_SERVER
+              value: "http://vista3d-backend:8000"
+            - name: DOCKER_CONTAINER
+              value: "false"
+            - name: STREAMLIT_SERVER_RUN_ON_SAVE
+              value: "true"
+            - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
+              value: "auto"
           livenessProbe:
             httpGet:
               path: /

@@ -21,13 +21,26 @@ persistence:
 
 # Override security context to run as root (required for local development)
 # The frontend image needs write access to /app and cache directories
-podSecurityContext:
-  runAsUser: 0
-  runAsNonRoot: false
-  fsGroup: 0
+# Note: Image server uses default security context (user 1000)
+frontend:
+  podSecurityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    fsGroup: 0
+  securityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    allowPrivilegeEscalation: true
+    readOnlyRootFilesystem: false
 
-securityContext:
-  runAsUser: 0
-  runAsNonRoot: false
-  allowPrivilegeEscalation: true
-  readOnlyRootFilesystem: false
+# Image server runs as unprivileged user (matches Dockerfile USER directive)
+imageServer:
+  podSecurityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    fsGroup: 1000
+  securityContext:
+    runAsUser: 1000
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false

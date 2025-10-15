@@ -33,8 +33,11 @@ ENV DOCKER_CONTAINER=true
 COPY app.py ./app.py
 COPY Tools.py ./Tools.py
 COPY NiiVue_Viewer.py ./NiiVue_Viewer.py
+COPY Image_Data.py ./Image_Data.py
 COPY assets ./assets
 COPY utils ./utils
+COPY conf ./conf
+COPY .streamlit ./.streamlit
 
 # Expose UI port
 EXPOSE 8501

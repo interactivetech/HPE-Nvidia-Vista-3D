@@ -24,9 +24,9 @@ VISTA3D_SERVER="http://host.docker.internal:8000"
 IMAGE_SERVER="http://localhost:8888"
 
 # Image Server URL for Vista3D Backend
-# - Backend uses host.docker.internal to reach Ubuntu host
+# - Backend uses localhost to reach SSH reverse tunnel on Ubuntu host
 # - Ubuntu host's localhost:8888 is the SSH reverse tunnel back to Mac
-VISTA3D_IMAGE_SERVER_URL="http://host.docker.internal:8888"
+VISTA3D_IMAGE_SERVER_URL="http://localhost:8888"
 
 # Frontend and Image Server Ports
 FRONTEND_PORT="8501"

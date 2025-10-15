@@ -2,14 +2,14 @@
   "viewable_folders": [
     {
       "name": "dicom",
-      "path": "dicom",
+      "path": "/data/dicom",
       "url_path": "dicom",
       "description": "DICOM medical imaging files",
       "icon": "📁"
     },
     {
       "name": "output",
-      "path": "output",
+      "path": "/data/output",
       "url_path": "output",
       "description": "Processed medical imaging output files",
       "icon": "📁"

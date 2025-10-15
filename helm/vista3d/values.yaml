@@ -152,7 +152,7 @@ frontend:
     - name: VISTA3D_IMAGE_SERVER_URL
       value: "http://vista3d-image-server:8888"
     - name: DOCKER_CONTAINER
-      value: "true"
+      value: "false"
     - name: STREAMLIT_SERVER_RUN_ON_SAVE
       value: "true"
     - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
