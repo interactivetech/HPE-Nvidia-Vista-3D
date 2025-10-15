@@ -89,10 +89,10 @@ OUTPUT_FOLDER={output_folder}
 
 # Server URLs (SSH tunnel setup)
 # Frontend: host.docker.internal:8000 -> Mac's localhost:8000 -> SSH tunnel -> Ubuntu backend
-# Backend: localhost:8888 -> Ubuntu's localhost:8888 -> SSH reverse tunnel -> Mac image server
+# Backend: host.docker.internal:8888 -> Ubuntu host -> SSH reverse tunnel -> Mac image server
 VISTA3D_SERVER=http://host.docker.internal:8000
 IMAGE_SERVER=http://localhost:8888
-VISTA3D_IMAGE_SERVER_URL=http://localhost:8888
+VISTA3D_IMAGE_SERVER_URL=http://host.docker.internal:8888
 
 # Ports
 FRONTEND_PORT=8501

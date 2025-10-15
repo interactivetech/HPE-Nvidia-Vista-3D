@@ -38,11 +38,11 @@ COMPOSE_PROJECT_NAME=vista3d-frontend
 - Mac's `localhost:8000` is the SSH forward tunnel to Ubuntu backend
 - ✅ This works because Docker Desktop on Mac maps `host.docker.internal` to host
 
-**`VISTA3D_IMAGE_SERVER_URL=http://localhost:8888`**
+**`VISTA3D_IMAGE_SERVER_URL=http://host.docker.internal:8888`**
 - This URL is sent to the Vista3D backend
-- Backend (on Ubuntu) uses `localhost` to reach SSH reverse tunnel on Ubuntu host
+- Backend (on Ubuntu) uses `host.docker.internal` to reach Ubuntu host
 - Ubuntu host's `localhost:8888` is the SSH reverse tunnel back to Mac
-- ✅ Backend connects directly to localhost (no need for host.docker.internal mapping)
+- ✅ Backend docker-compose.yml has `extra_hosts: ["host.docker.internal:host-gateway"]`
 
 **`IMAGE_SERVER=http://localhost:8888`**
 - Used by browser and local scripts
