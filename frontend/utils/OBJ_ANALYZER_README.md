@@ -328,6 +328,5 @@ def process_mesh(obj_path):
 
 - `obj_analyzer.py` - Main analyzer script
 - `obj_analyzer_example.py` - Usage examples
-- `voxel2obj.py` - Voxel to OBJ converter (creates OBJ files)
 - `OBJ_Viewer.py` - 3D viewer for OBJ files
 
