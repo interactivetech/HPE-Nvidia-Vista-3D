@@ -455,10 +455,10 @@ def render_smoothing_tools():
     """Render voxel smoothing tools."""
     st.subheader("✨ Voxel Smoothing")
     st.markdown("""
-    Apply Gaussian smoothing to segmented voxel files to reduce blockiness and improve anatomical accuracy.
+    Apply binary morphological smoothing to segmented voxel files to reduce blockiness and improve anatomical accuracy.
     This tool smooths the voxel segmentations created by Vista3D to make them appear more natural and less blocky.
     
-    **Note:** Vista3D segmentations have continuous values (0-62), so stronger smoothing is needed for visible effects.
+    **How it works:** The tool preserves discrete label IDs while smoothing the surface geometry using morphological operations and Gaussian blur on binary masks. This creates smooth 3D surfaces that work correctly with NiiVue's isosurface rendering.
     """)
     
     # Smoothing options
@@ -544,18 +544,18 @@ def render_smoothing_tools():
         
         # Smoothing level selection
         smoothing_options = {
-            "Light (4mm FWHM)": "light",
-            "Medium (8mm FWHM)": "medium",
-            "Heavy (12mm FWHM)": "heavy",
-            "Extra Heavy (20mm FWHM)": "extra_heavy",
-            "Ultra Heavy (50mm FWHM) - Very Smooth": "ultra_heavy"
+            "Light (Small Kernel)": "light",
+            "Medium (Medium Kernel)": "medium",
+            "Heavy (Large Kernel)": "heavy",
+            "Extra Heavy (Very Large Kernel)": "extra_heavy",
+            "Ultra Heavy (Maximum Kernel) - Very Smooth": "ultra_heavy"
         }
         
         smoothing_display = st.selectbox(
             "Smoothing Level",
             options=list(smoothing_options.keys()),
             index=1,  # Default to Medium
-            help="Select the smoothing strength. Medium is recommended for most cases."
+            help="Select the smoothing strength based on kernel size. Medium is recommended for most cases. Larger kernels create smoother surfaces but may lose fine details."
         )
         smoothing_level = smoothing_options[smoothing_display]
     
