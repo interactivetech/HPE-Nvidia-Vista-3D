@@ -884,8 +884,8 @@ def main():
     
     st.markdown("---")
     
-    # Voxel Smoothing Section
-    render_smoothing_tools()
+    # Voxel Smoothing Section - COMMENTED OUT
+    # render_smoothing_tools()
     
     
     # Render badges in sidebar
