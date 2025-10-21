@@ -24,8 +24,7 @@ spec:
         app.kubernetes.io/component: frontend
         app.kubernetes.io/part-of: vista3d
         app.kubernetes.io/managed-by: {{ .Release.Service }}
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      annotations: {}
     spec:
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:

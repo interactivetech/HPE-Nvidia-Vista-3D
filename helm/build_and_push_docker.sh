@@ -2,6 +2,7 @@
 
 # Docker Build and Push Script for Vista3D
 # This script builds and pushes both the image_server and frontend Docker images
+# For Linux ARM64 platform
 
 set -e  # Exit on error
 
@@ -56,10 +57,10 @@ build_and_push() {
 }
 
 # Build and push image_server
-build_and_push "image-server" "image_server"
+build_and_push "image-server" "../image_server"
 
 # Build and push frontend
-build_and_push "frontend" "frontend"
+build_and_push "frontend" "../frontend"
 
 echo -e "${GREEN}=== All images built and pushed successfully! ===${NC}"
 echo ""

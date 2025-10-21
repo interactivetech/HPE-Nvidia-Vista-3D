@@ -2,34 +2,19 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+replicaCount: 1
+namespace: "vista3d"
+
 # Global configuration
 global:
   imageRegistry: ""
   imagePullSecrets: []
   storageClass: ""
 
-# Image configuration
-images:
-  frontend:
-    repository: dwtwp/vista3d-frontend
-    tag: latest
-    pullPolicy: IfNotPresent
-  
-  imageServer:
-    repository: dwtwp/vista3d-image-server
-    tag: latest
-    pullPolicy: IfNotPresent
-  
-  backend:
-    repository: nvcr.io/nim/nvidia/vista3d
-    tag: "1.0.0"
-    pullPolicy: IfNotPresent
-
 # Backend (Vista3D Server) configuration
 backend:
   enabled: true
   name: vista3d-backend
-  
   replicaCount: 1
   
   image:
@@ -41,6 +26,8 @@ backend:
     type: ClusterIP
     port: 8000
     targetPort: 8000
+    protocol: TCP
+    name: backend-service
   
   resources:
     limits:
@@ -59,65 +46,11 @@ backend:
     - key: nvidia.com/gpu
       operator: Exists
       effect: NoSchedule
-  
-  env:
-    - name: NGC_API_KEY
-      valueFrom:
-        secretKeyRef:
-          name: vista3d-secrets
-          key: ngc-api-key
-    - name: NGC_ORG_ID
-      value: "nvidia"
-    - name: LOCAL_NIM_CACHE
-      value: "/workspace/.cache/nim"
-    - name: VISTA3D_SERVER
-      value: "http://localhost:8000"
-    - name: WORKSPACE_IMAGES_PATH
-      value: "/workspace/output/nifti"
-    - name: WORKSPACE_OUTPUTS_PATH
-      value: "/workspace/output"
-    - name: WORKSPACE_ROOT
-      value: "/workspace"
-    - name: CUDA_VISIBLE_DEVICES
-      value: "0"
-    - name: NVIDIA_VISIBLE_DEVICES
-      value: "0"
-    - name: NVIDIA_DRIVER_CAPABILITIES
-      value: "compute,utility"
-    - name: SUPPORTED_IMAGE_EXT
-      value: '".nrrd",".nii",".nii.gz",".dcm"'
-    - name: IMAGE_SERVER
-      value: "http://vista3d-image-server:8888"
-    - name: ALLOW_LOCAL_FILES
-      value: "True"
-    - name: ENABLE_FILE_ACCESS
-      value: "True"
-    - name: ALLOW_ABSOLUTE_PATHS
-      value: "True"
-    - name: ALLOW_RELATIVE_PATHS
-      value: "True"
-    - name: ALLOW_FILE_PROTOCOL
-      value: "True"
-    - name: ALLOW_LOCAL_PATHS
-      value: "True"
-    - name: CORS_ALLOW_ORIGINS
-      value: "*"
-    - name: CORS_ALLOW_METHODS
-      value: "GET,POST,PUT,DELETE,OPTIONS"
-    - name: CORS_ALLOW_HEADERS
-      value: "*"
-    - name: CORS_ALLOW_CREDENTIALS
-      value: "True"
-  
-  volumeMounts:
-    - name: output-data
-      mountPath: /workspace/output
 
 # Frontend (Streamlit App) configuration
 frontend:
   enabled: true
   name: vista3d-frontend
-  
   replicaCount: 1
   
   image:
@@ -129,6 +62,8 @@ frontend:
     type: ClusterIP
     port: 8501
     targetPort: 8501
+    protocol: TCP
+    name: frontend-service
   
   resources:
     limits:
@@ -137,38 +72,11 @@ frontend:
     requests:
       memory: "2Gi"
       cpu: "1"
-  
-  env:
-    - name: IMAGE_SERVER
-      value: "http://vista3d-image-server:8888"
-    - name: EXTERNAL_IMAGE_SERVER
-      value: "http://vista3d-image-server:8888"
-    - name: OUTPUT_FOLDER
-      value: "/app/output"
-    - name: DICOM_FOLDER
-      value: "/app/dicom"
-    - name: VISTA3D_SERVER
-      value: "http://vista3d-backend:8000"
-    - name: VISTA3D_IMAGE_SERVER_URL
-      value: "http://vista3d-image-server:8888"
-    - name: DOCKER_CONTAINER
-      value: "false"
-    - name: STREAMLIT_SERVER_RUN_ON_SAVE
-      value: "true"
-    - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
-      value: "auto"
-  
-  volumeMounts:
-    - name: output-data
-      mountPath: /app/output
-    - name: dicom-data
-      mountPath: /app/dicom
 
 # Image Server configuration
 imageServer:
   enabled: true
   name: vista3d-image-server
-  
   replicaCount: 1
   
   image:
@@ -180,6 +88,8 @@ imageServer:
     type: ClusterIP
     port: 8888
     targetPort: 8888
+    protocol: TCP
+    name: image-server-service
   
   resources:
     limits:
@@ -188,26 +98,6 @@ imageServer:
     requests:
       memory: "1Gi"
       cpu: "0.5"
-  
-  env:
-    - name: OUTPUT_FOLDER
-      value: "/data/output"
-    - name: DICOM_FOLDER
-      value: "/data/dicom"
-    - name: IMAGE_SERVER
-      value: "http://localhost:8888"
-    - name: PYTHONUNBUFFERED
-      value: "1"
-    - name: PYTHONDONTWRITEBYTECODE
-      value: "1"
-  
-  volumeMounts:
-    - name: output-data
-      mountPath: /data/output
-      readOnly: true
-    - name: dicom-data
-      mountPath: /data/dicom
-      readOnly: true
 
 # Ingress configuration
 ingress:
@@ -246,18 +136,24 @@ ingress:
 # Persistent Volume configuration
 persistence:
   enabled: true
-  storageClass: ""
-  accessMode: ReadWriteMany
-  size: 100Gi
+  existingClaim: ""
+  mountPath: "/data"
+  subPath: ""
   
   output:
     enabled: true
+    existingClaim: ""
+    mountPath: "/workspace/output"
+    subPath: ""
     storageClass: ""
     accessMode: ReadWriteOnce
     size: 100Gi
   
   dicom:
     enabled: true
+    existingClaim: ""
+    mountPath: "/workspace/dicom"
+    subPath: ""
     storageClass: ""
     accessMode: ReadOnlyMany
     size: 50Gi
@@ -274,6 +170,19 @@ serviceAccount:
   create: true
   annotations: {}
   name: ""
+
+# Global environment variables
+env:
+  PYTHONUNBUFFERED: "1"
+  HTTP_PROXY: ""
+  HTTPS_PROXY: ""
+  NO_PROXY: "localhost,127.0.0.1,0.0.0.0,::1,frontend-service,backend-service,image-server-service"
+  REQUESTS_CA_BUNDLE: ""
+  CURL_CA_BUNDLE: ""
+
+# API Key configuration
+apiKey:
+  value: "vista3d-api-key"
 
 # Pod Security Context
 podSecurityContext:
@@ -300,39 +209,10 @@ tolerations: []
 # Affinity
 affinity: {}
 
-# Pod Disruption Budget
-podDisruptionBudget:
-  enabled: false
-  minAvailable: 1
-
-# Horizontal Pod Autoscaler
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
-
-# Network Policy
-networkPolicy:
-  enabled: false
-  ingress:
-    - from:
-      - namespaceSelector:
-          matchLabels:
-            name: ingress-nginx
-      ports:
-      - protocol: TCP
-        port: 8501
-      - protocol: TCP
-        port: 8888
-      - protocol: TCP
-        port: 8000
-
-# Monitoring
-monitoring:
-  enabled: false
-  serviceMonitor:
-    enabled: false
-    interval: 30s
-    scrapeTimeout: 10s
+# EZUA configuration
+ezua:
+  enabled: true
+  virtualService:
+    endpoint: "vista3d.${DOMAIN_NAME}"
+    backendEndpoint: "vista3d-backend.${DOMAIN_NAME}"
+    istioGateway: "istio-system/ezaf-gateway"
