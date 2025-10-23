@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 python:3.11-slim
+FROM python:3.11-slim
 
 WORKDIR /srv
 
@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Install uv for fast dependency management
-RUN pip install --no-cache-dir uv
+# uv is causing an 'exec format error', so we are removing it and using pip directly.
 
 # Create unprivileged user early
 RUN useradd -m appuser && chown -R appuser:appuser /srv
@@ -21,7 +20,7 @@ USER appuser
 
 # Copy minimal project metadata and install deps
 COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen
+RUN pip install .
 
 # Copy server code (will be overridden by volume mount in development)
 COPY --chown=appuser:appuser main.py ./main.py
@@ -33,4 +32,4 @@ EXPOSE 8888
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8888/health || exit 1
 
-CMD ["uv", "run", "python", "server.py"]
+CMD ["python", "server.py"]

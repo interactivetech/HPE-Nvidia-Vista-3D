@@ -2,217 +2,107 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 1
-namespace: "vista3d"
-
-# Global configuration
 global:
   imageRegistry: ""
   imagePullSecrets: []
-  storageClass: ""
 
-# Backend (Vista3D Server) configuration
 backend:
-  enabled: true
+  enabled: false
   name: vista3d-backend
   replicaCount: 1
-  
   image:
     repository: nvcr.io/nim/nvidia/vista3d
     tag: "1.0.0"
     pullPolicy: IfNotPresent
-  
   service:
     type: ClusterIP
     port: 8000
     targetPort: 8000
-    protocol: TCP
-    name: backend-service
-  
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-      memory: "16Gi"
-      cpu: "4"
-    requests:
-      nvidia.com/gpu: 1
-      memory: "8Gi"
-      cpu: "2"
-  
-  nodeSelector:
-    nvidia.com/gpu: "true"
-  
-  tolerations:
-    - key: nvidia.com/gpu
-      operator: Exists
-      effect: NoSchedule
 
-# Frontend (Streamlit App) configuration
 frontend:
   enabled: true
   name: vista3d-frontend
   replicaCount: 1
-  
   image:
     repository: dwtwp/vista3d-frontend
     tag: latest
     pullPolicy: IfNotPresent
-  
   service:
     type: ClusterIP
     port: 8501
     targetPort: 8501
-    protocol: TCP
-    name: frontend-service
-  
-  resources:
-    limits:
-      memory: "4Gi"
-      cpu: "2"
-    requests:
-      memory: "2Gi"
-      cpu: "1"
+  env:
+    IMAGE_SERVER: "http://vista3d-image-server:8888"
+    EXTERNAL_IMAGE_SERVER: "http://vista3d-image-server:8888"
+    VISTA3D_IMAGE_SERVER_URL: "http://vista3d-image-server:8888"
+    OUTPUT_FOLDER: "/app/output"
+    DICOM_FOLDER: "/app/dicom"
+    DOCKER_CONTAINER: "true"
+    STREAMLIT_SERVER_RUN_ON_SAVE: "true"
+    STREAMLIT_SERVER_FILE_WATCHER_TYPE: "auto"
+  volumeMounts:
+    - name: output-data
+      mountPath: /app/output
+    - name: dicom-data
+      mountPath: /app/dicom
 
-# Image Server configuration
 imageServer:
   enabled: true
   name: vista3d-image-server
   replicaCount: 1
-  
   image:
     repository: dwtwp/vista3d-image-server
     tag: latest
     pullPolicy: IfNotPresent
-  
   service:
     type: ClusterIP
     port: 8888
     targetPort: 8888
-    protocol: TCP
-    name: image-server-service
-  
-  resources:
-    limits:
-      memory: "2Gi"
-      cpu: "1"
-    requests:
-      memory: "1Gi"
-      cpu: "0.5"
+  env:
+    OUTPUT_FOLDER: "/data/output"
+    DICOM_FOLDER: "/data/dicom"
+    IMAGE_SERVER: "http://localhost:8888" # This is for the image server itself, not the frontend
+    PYTHONUNBUFFERED: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+  volumeMounts:
+    - name: output-data
+      mountPath: /data/output
+      readOnly: true
+    - name: dicom-data
+      mountPath: /data/dicom
+      readOnly: true
 
-# Ingress configuration
-ingress:
-  enabled: false
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
-    nginx.ingress.kubernetes.io/client-max-body-size: "500m"
-    nginx.ingress.kubernetes.io/enable-cors: "true"
-    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
-    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
-    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
-  hosts:
-    - host: vista3d.local
-      paths:
-        - path: /
-          pathType: Prefix
-          service: vista3d-frontend
-        - path: /api/vista3d
-          pathType: Prefix
-          service: vista3d-backend
-        - path: /images
-          pathType: Prefix
-          service: vista3d-image-server
-        - path: /health
-          pathType: Prefix
-          service: vista3d-image-server
-  tls: []
-
-# Persistent Volume configuration
 persistence:
   enabled: true
-  existingClaim: ""
-  mountPath: "/data"
-  subPath: ""
-  
   output:
     enabled: true
-    existingClaim: ""
-    mountPath: "/workspace/output"
-    subPath: ""
-    storageClass: ""
     accessMode: ReadWriteOnce
     size: 100Gi
-  
   dicom:
     enabled: true
-    existingClaim: ""
-    mountPath: "/workspace/dicom"
-    subPath: ""
-    storageClass: ""
     accessMode: ReadOnlyMany
     size: 50Gi
 
-# Secrets configuration
-secrets:
-  create: true
-  ngcApiKey: ""
-  # You can also provide existing secret name
-  # existingSecret: ""
+sampleData:
+  enabled: true
+  url: "https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/releases/download/v1.0.0/sample_data.tgz"
 
-# Service Account configuration
 serviceAccount:
   create: true
   annotations: {}
   name: ""
 
-# Global environment variables
-env:
-  PYTHONUNBUFFERED: "1"
-  HTTP_PROXY: ""
-  HTTPS_PROXY: ""
-  NO_PROXY: "localhost,127.0.0.1,0.0.0.0,::1,frontend-service,backend-service,image-server-service"
-  REQUESTS_CA_BUNDLE: ""
-  CURL_CA_BUNDLE: ""
+secrets:
+  create: true
+  ngcApiKey: "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" # User must provide their NGC API Key here or via --set
 
-# API Key configuration
-apiKey:
-  value: "vista3d-api-key"
-
-# Pod Security Context
-podSecurityContext:
-  fsGroup: 1000
-  runAsUser: 1000
-  runAsNonRoot: true
-
-# Security Context
-securityContext:
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop:
-    - ALL
-  readOnlyRootFilesystem: false
-  runAsNonRoot: true
-  runAsUser: 1000
-
-# Node selection
-nodeSelector: {}
-
-# Tolerations
-tolerations: []
-
-# Affinity
-affinity: {}
-
-# EZUA configuration
-ezua:
-  enabled: true
-  virtualService:
-    endpoint: "vista3d.${DOMAIN_NAME}"
-    backendEndpoint: "vista3d-backend.${DOMAIN_NAME}"
-    istioGateway: "istio-system/ezaf-gateway"
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: vista3d.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []

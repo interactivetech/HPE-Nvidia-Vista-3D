@@ -26,13 +26,13 @@ sys.path.append(str(Path(__file__).parent))
 from constants import MIN_FILE_SIZE_MB
 
 
-# Smoothing presets (kernel sizes for morphological operations)
+# Smoothing presets (FWHM in mm)
 SMOOTHING_PRESETS = {
-    'light': 3,      # Small kernel - gentle smoothing
-    'medium': 5,     # Medium kernel - moderate smoothing  
-    'heavy': 7,      # Large kernel - strong smoothing
-    'extra_heavy': 9, # Very large kernel - very strong smoothing
-    'ultra_heavy': 11 # Extra large kernel - maximum smoothing
+    'light': 4.0,
+    'medium': 8.0,   
+    'heavy': 12.0,
+    'extra_heavy': 20.0,
+    'ultra_heavy': 50.0  # For very visible smoothing effects
 }
 
 
@@ -79,14 +79,14 @@ def get_voxel_files(patient_id: str, scan_name: str, output_folder: Path):
     return sorted(voxel_files)
 
 
-def smooth_voxel_file(file_path: Path, kernel_size: int, method: str = "morphological"):
+def smooth_voxel_file(file_path: Path, fwhm: float, method: str = "gaussian"):
     """
     Apply smoothing to a voxel file and overwrite it.
     
     Args:
         file_path: Path to the voxel NIfTI file
-        kernel_size: Kernel size for morphological operations (integer)
-        method: Smoothing method - "gaussian" or "morphological" (default: morphological)
+        fwhm: Full-Width Half Maximum for Gaussian kernel (in mm) or kernel size for morphological
+        method: Smoothing method - "gaussian" or "morphological"
     
     Returns:
         bool: True if successful, False otherwise
@@ -97,7 +97,7 @@ def smooth_voxel_file(file_path: Path, kernel_size: int, method: str = "morpholo
         data = img.get_fdata()
         
         if method == "morphological":
-            # Enhanced binary morphological smoothing for segmentation voxels
+            # Morphological smoothing (better for isosurface rendering)
             from scipy import ndimage
             import numpy as np
             
@@ -113,32 +113,27 @@ def smooth_voxel_file(file_path: Path, kernel_size: int, method: str = "morpholo
                 label_id = non_zero_vals[0] if len(non_zero_vals) == 1 else int(np.median(non_zero_vals))
                 
                 # Create binary mask
-                binary_mask = (data > 0).astype(np.float32)
+                binary_mask = (data > 0).astype(np.uint8)
                 
-                # Step 1: Morphological opening to remove small protrusions
-                structure = np.ones((kernel_size, kernel_size, kernel_size))
-                opened = ndimage.binary_opening(binary_mask, structure=structure)
+                # Apply morphological operations
+                kernel_size = max(3, int(fwhm))
                 
-                # Step 2: Morphological closing to fill small holes
-                closed = ndimage.binary_closing(opened, structure=structure)
+                # Opening: erosion followed by dilation (removes small protrusions)
+                opened = ndimage.binary_opening(binary_mask, structure=np.ones((kernel_size, kernel_size, kernel_size)))
                 
-                # Step 3: Apply Gaussian filter to smooth the boundary
-                # Use sigma proportional to kernel size for consistent smoothing
-                sigma = kernel_size / 3.0
-                gaussian_smoothed = ndimage.gaussian_filter(closed.astype(np.float32), sigma=sigma)
+                # Closing: dilation followed by erosion (fills small holes)
+                closed = ndimage.binary_closing(opened, structure=np.ones((kernel_size+2, kernel_size+2, kernel_size+2)))
                 
-                # Step 4: Threshold to get clean binary mask
-                smoothed_mask = (gaussian_smoothed > 0.5).astype(np.uint8)
+                # Additional smoothing with larger kernel
+                smoothed_mask = ndimage.binary_closing(closed, structure=np.ones((kernel_size+4, kernel_size+4, kernel_size+4)))
                 
-                # Step 5: Convert back to label ID format
-                smoothed_data = smoothed_mask.astype(np.int16) * label_id
+                # Convert back to label ID format
+                smoothed_data = smoothed_mask.astype(np.uint8) * label_id
                 
                 # Create new image
                 smoothed_img = nib.Nifti1Image(smoothed_data, img.affine, img.header)
         else:
-            # Gaussian smoothing (fallback for continuous data)
-            # Convert kernel size to approximate FWHM for Gaussian smoothing
-            fwhm = kernel_size * 2.0  # Rough approximation
+            # Gaussian smoothing
             smoothed_img = nimage.smooth_img(img, fwhm=fwhm)
         
         # Save back to the same file (overwrite)
@@ -176,13 +171,13 @@ def process_patients(patient_ids: list, selected_scans: list, smoothing_level: s
         smoothing_level: Smoothing preset level ('light', 'medium', 'heavy')
         output_folder: Path to output folder
     """
-    # Get kernel size from preset
-    kernel_size = SMOOTHING_PRESETS.get(smoothing_level, SMOOTHING_PRESETS['medium'])
+    # Get FWHM value from preset
+    fwhm = SMOOTHING_PRESETS.get(smoothing_level, SMOOTHING_PRESETS['medium'])
     
     print("=" * 80)
     print("Voxel Smoothing Tool")
     print("=" * 80)
-    print(f"Smoothing level: {smoothing_level} (Kernel size: {kernel_size})")
+    print(f"Smoothing level: {smoothing_level} (FWHM: {fwhm}mm)")
     print(f"Processing {len(patient_ids)} patient(s)")
     print("=" * 80)
     
@@ -231,7 +226,7 @@ def process_patients(patient_ids: list, selected_scans: list, smoothing_level: s
             # Process each voxel file with progress bar
             for voxel_file in tqdm(voxel_files, desc=f"    Smoothing", unit="file"):
                 total_files += 1
-                if smooth_voxel_file(voxel_file, kernel_size):
+                if smooth_voxel_file(voxel_file, fwhm):
                     successful_files += 1
                 else:
                     failed_files += 1
@@ -252,7 +247,7 @@ def process_patients(patient_ids: list, selected_scans: list, smoothing_level: s
 def main():
     """Main function for command-line execution."""
     parser = argparse.ArgumentParser(
-        description="Apply binary morphological smoothing to Vista3D voxel segmentations"
+        description="Apply Gaussian smoothing to Vista3D voxel segmentations"
     )
     parser.add_argument(
         'patients',
@@ -263,7 +258,7 @@ def main():
         '--smoothing',
         choices=['light', 'medium', 'heavy', 'extra_heavy', 'ultra_heavy'],
         default='medium',
-        help='Smoothing level preset - kernel size for morphological operations (default: medium)'
+        help='Smoothing level preset (default: medium)'
     )
     
     args = parser.parse_args()

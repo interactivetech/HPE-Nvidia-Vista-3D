@@ -137,7 +137,6 @@ OUTPUT_FOLDER={output_folder}
 # Server Configuration
 VISTA3D_SERVER=http://localhost:8000
 IMAGE_SERVER=http://localhost:8888
-VISTA3D_IMAGE_SERVER_URL=http://host.docker.internal:8888
 
 # Docker Configuration
 COMPOSE_PROJECT_NAME=vista3d-backend

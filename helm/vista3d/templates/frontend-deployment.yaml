@@ -2,92 +2,47 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "vista3d.frontend.deploymentName" . }}
+  name: {{ include "vista3d.fullname" . }}-frontend
   labels:
-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "vista3d.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
-    app.kubernetes.io/part-of: vista3d
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   replicas: {{ .Values.frontend.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "vista3d.name" . }}
-      app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- include "vista3d.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: frontend
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "vista3d.name" . }}
-        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- include "vista3d.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: frontend
-        app.kubernetes.io/part-of: vista3d
-        app.kubernetes.io/managed-by: {{ .Release.Service }}
-      annotations: {}
     spec:
-      {{- with .Values.global.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "vista3d.serviceAccountName" . }}
-      securityContext:
-        {{- if .Values.frontend.podSecurityContext }}
-        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
-        {{- else }}
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-        {{- end }}
       containers:
-        - name: vista3d-frontend
-          image: "{{ .Values.global.imageRegistry }}{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
+        - name: {{ .Values.frontend.name }}
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
-          securityContext:
-            {{- if .Values.frontend.securityContext }}
-            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
-            {{- else }}
-            {{- toYaml .Values.securityContext | nindent 12 }}
-            {{- end }}
           ports:
             - name: http
-              containerPort: 8501
+              containerPort: {{ .Values.frontend.service.port }}
               protocol: TCP
           env:
             - name: IMAGE_SERVER
-              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
+              value: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
             - name: EXTERNAL_IMAGE_SERVER
-              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
+              value: "http://localhost:8888"
             - name: VISTA3D_IMAGE_SERVER_URL
-              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
+              value: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
             - name: OUTPUT_FOLDER
-              value: "/app/output"
+              value: {{ .Values.frontend.env.OUTPUT_FOLDER | quote }}
             - name: DICOM_FOLDER
-              value: "/app/dicom"
-            - name: VISTA3D_SERVER
-              value: "http://vista3d-backend:8000"
+              value: {{ .Values.frontend.env.DICOM_FOLDER | quote }}
             - name: DOCKER_CONTAINER
-              value: "false"
+              value: {{ .Values.frontend.env.DOCKER_CONTAINER | quote }}
             - name: STREAMLIT_SERVER_RUN_ON_SAVE
-              value: "true"
+              value: {{ .Values.frontend.env.STREAMLIT_SERVER_RUN_ON_SAVE | quote }}
             - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
-              value: "auto"
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-          resources:
-            {{- toYaml .Values.frontend.resources | nindent 12 }}
+              value: {{ .Values.frontend.env.STREAMLIT_SERVER_FILE_WATCHER_TYPE | quote }}
           volumeMounts:
             {{- toYaml .Values.frontend.volumeMounts | nindent 12 }}
       volumes:
@@ -97,16 +52,4 @@ spec:
         - name: dicom-data
           persistentVolumeClaim:
             claimName: {{ include "vista3d.fullname" . }}-dicom-pvc
-      {{- with .Values.frontend.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.frontend.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.frontend.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
 {{- end }}

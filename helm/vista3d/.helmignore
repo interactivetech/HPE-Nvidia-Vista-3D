@@ -1,0 +1,3 @@
+# Exclude packaged Helm charts
+*.tgz
+*.tar.gz

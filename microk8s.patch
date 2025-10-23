@@ -1,0 +1,4809 @@
+diff --git a/.genkit/traces_idx/genkit.metadata b/.genkit/traces_idx/genkit.metadata
+new file mode 100644
+index 0000000..d297703
+--- /dev/null
++++ b/.genkit/traces_idx/genkit.metadata
+@@ -0,0 +1 @@
++{"version":"1.21.0"}
+\ No newline at end of file
+diff --git a/.gitignore b/.gitignore
+index 144dd83..1e28757 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,5 @@
+ # Project Specific
++GEMINMI.md
+ output
+ dicom
+ .DS_Store
+diff --git a/backend/setup.py b/backend/setup.py
+index 0ab00ab..153bc73 100755
+--- a/backend/setup.py
++++ b/backend/setup.py
+@@ -137,7 +137,6 @@ OUTPUT_FOLDER={output_folder}
+ # Server Configuration
+ VISTA3D_SERVER=http://localhost:8000
+ IMAGE_SERVER=http://localhost:8888
+-VISTA3D_IMAGE_SERVER_URL=http://host.docker.internal:8888
+ 
+ # Docker Configuration
+ COMPOSE_PROJECT_NAME=vista3d-backend
+diff --git a/frontend/Dockerfile b/frontend/Dockerfile
+index 7f1128d..63f7443 100644
+--- a/frontend/Dockerfile
++++ b/frontend/Dockerfile
+@@ -1,4 +1,4 @@
+-FROM --platform=linux/arm64 python:3.11-slim
++FROM python:3.11-slim
+ 
+ WORKDIR /app
+ 
+@@ -19,32 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
+     libglib2.0-0 \
+   && rm -rf /var/lib/apt/lists/*
+ 
+-# Install uv for dependency management
+-RUN pip install --no-cache-dir uv
++# uv is causing an 'exec format error', so we are removing it and using pip directly.
+ 
+ # Install only frontend deps
+-COPY pyproject.toml uv.lock ./
+-RUN uv sync --frozen
+-
+-# Runtime env
+-ENV DOCKER_CONTAINER=true
+-
+-# Copy minimal app code into image to avoid bind mounts in production
++COPY requirements.txt ./requirements.txt
++RUN pip install --no-cache-dir -r requirements.txt
+ COPY app.py ./app.py
+-COPY Tools.py ./Tools.py
+-COPY NiiVue_Viewer.py ./NiiVue_Viewer.py
+-COPY Image_Data.py ./Image_Data.py
+-COPY assets ./assets
+-COPY utils ./utils
+-COPY conf ./conf
+-COPY .streamlit ./.streamlit
+-
+-# Expose UI port
+-EXPOSE 8501
+-
+-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+-  CMD curl -f http://localhost:8501/_stcore/health || exit 1
+-
+-CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
++CMD ["/usr/local/bin/streamlit", "run", "/app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ 
+ 
+diff --git a/frontend/Image_Data.py b/frontend/Image_Data.py
+index f03ec05..aa97e1c 100644
+--- a/frontend/Image_Data.py
++++ b/frontend/Image_Data.py
+@@ -19,88 +19,7 @@ except ImportError:
+ from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vista_card
+ from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
+ 
+-def check_image_server_status():
+-    """Check if the image server is available."""
+-    # Get server URL from environment variable (matching image_server.py)
+-    image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
+-    
+-    # If running in Docker container, try multiple approaches
+-    if os.getenv("DOCKER_CONTAINER") == "true":
+-        # List of URLs to try in order
+-        urls_to_try = [
+-            image_server_url,  # Configured URL (likely host.docker.internal:8888)
+-            "http://localhost:8888",  # localhost fallback
+-            "http://127.0.0.1:8888",  # IP fallback
+-            "http://image-server:8888",  # Container name (if image server is in same compose)
+-        ]
+-        
+-        for url in urls_to_try:
+-            try:
+-                response = requests.head(url, timeout=2)
+-                if response.status_code == 200:
+-                    return True
+-            except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+-                continue
+-        return False
+-    else:
+-        # Running outside Docker, use the configured URL
+-        try:
+-            response = requests.head(image_server_url, timeout=3)
+-            return True if response.status_code == 200 else False
+-        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+-            return False
+-
+-def check_vista3d_server_status():
+-    """Check if the Vista3D server is available."""
+-    # Get server URL from environment variable
+-    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
+-    
+-    # If running in Docker container, try multiple approaches
+-    if os.getenv("DOCKER_CONTAINER") == "true":
+-        # List of URLs to try in order
+-        urls_to_try = [
+-            vista3d_server_url,  # Configured URL (likely host.docker.internal:8000)
+-            "http://localhost:8000",  # localhost fallback
+-            "http://127.0.0.1:8000",  # IP fallback
+-        ]
+-        
+-        for base_url in urls_to_try:
+-            try:
+-                response = requests.get(f"{base_url}/v1/vista3d/info", timeout=3)
+-                if response.status_code == 200:
+-                    return True
+-                # Log the specific error for debugging
+-                print(f"Vista3D status check - {base_url}: HTTP {response.status_code}")
+-            except requests.exceptions.RequestException as e:
+-                print(f"Vista3D status check - {base_url}: {type(e).__name__}: {e}")
+-                continue
+-        return False
+-    else:
+-        # Running outside Docker, use the configured URL
+-        try:
+-            response = requests.get(f"{vista3d_server_url}/v1/vista3d/info", timeout=5)
+-            return True if response.status_code == 200 else False
+-        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+-            return False
+-
+-
+-
+-def render_server_status_sidebar():
+-    """Render server status message in sidebar."""
+-    
+-    if check_image_server_status():
+-        image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
+-        
+-        st.sidebar.info(f"🖥️ **Image Server**  \n🟢 Online • {image_server_url}")
+-    else:
+-        st.sidebar.error(f"🖥️ **Image Server**  \n❌ Offline  \nStart with: `python utils/image_server.py`")
+-    
+-    # Vista3D Server Status
+-    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
+-    if check_vista3d_server_status():
+-        st.sidebar.info(f"🧠 **Vista3D Server**  \n🟢 Online • {vista3d_server_url}")
+-    else:
+-        st.sidebar.error(f"🧠 **Vista3D Server**  \n❌ Offline • {vista3d_server_url}")
++from utils.server_status import check_image_server_status, render_server_status_sidebar
+ 
+ def render_nvidia_vista_card():
+     """Delegate rendering to assets.vista3d_badge module."""
+@@ -123,7 +42,7 @@ def main():
+     # Get image server URLs
+     # For browser access (iframe), we need the external URL that the browser can reach
+     # For server-side checks, we use the internal URL (works within Docker network)
+-    external_image_server_url = os.getenv("EXTERNAL_IMAGE_SERVER", os.getenv("IMAGE_SERVER", "http://localhost:8888"))
++    external_image_server_url = os.getenv("EXTERNAL_IMAGE_SERVER", "http://localhost:8888")
+     
+     # Check if image server is running
+     if check_image_server_status():
+diff --git a/frontend/Tools.py b/frontend/Tools.py
+index fe89a42..2a34414 100644
+--- a/frontend/Tools.py
++++ b/frontend/Tools.py
+@@ -455,10 +455,10 @@ def render_smoothing_tools():
+     """Render voxel smoothing tools."""
+     st.subheader("✨ Voxel Smoothing")
+     st.markdown("""
+-    Apply binary morphological smoothing to segmented voxel files to reduce blockiness and improve anatomical accuracy.
++    Apply Gaussian smoothing to segmented voxel files to reduce blockiness and improve anatomical accuracy.
+     This tool smooths the voxel segmentations created by Vista3D to make them appear more natural and less blocky.
+     
+-    **How it works:** The tool preserves discrete label IDs while smoothing the surface geometry using morphological operations and Gaussian blur on binary masks. This creates smooth 3D surfaces that work correctly with NiiVue's isosurface rendering.
++    **Note:** Vista3D segmentations have continuous values (0-62), so stronger smoothing is needed for visible effects.
+     """)
+     
+     # Smoothing options
+@@ -544,18 +544,18 @@ def render_smoothing_tools():
+         
+         # Smoothing level selection
+         smoothing_options = {
+-            "Light (Small Kernel)": "light",
+-            "Medium (Medium Kernel)": "medium",
+-            "Heavy (Large Kernel)": "heavy",
+-            "Extra Heavy (Very Large Kernel)": "extra_heavy",
+-            "Ultra Heavy (Maximum Kernel) - Very Smooth": "ultra_heavy"
++            "Light (4mm FWHM)": "light",
++            "Medium (8mm FWHM)": "medium",
++            "Heavy (12mm FWHM)": "heavy",
++            "Extra Heavy (20mm FWHM)": "extra_heavy",
++            "Ultra Heavy (50mm FWHM) - Very Smooth": "ultra_heavy"
+         }
+         
+         smoothing_display = st.selectbox(
+             "Smoothing Level",
+             options=list(smoothing_options.keys()),
+             index=1,  # Default to Medium
+-            help="Select the smoothing strength based on kernel size. Medium is recommended for most cases. Larger kernels create smoother surfaces but may lose fine details."
++            help="Select the smoothing strength. Medium is recommended for most cases."
+         )
+         smoothing_level = smoothing_options[smoothing_display]
+     
+@@ -884,8 +884,8 @@ def main():
+     
+     st.markdown("---")
+     
+-    # Voxel Smoothing Section - COMMENTED OUT
+-    # render_smoothing_tools()
++    # Voxel Smoothing Section
++    render_smoothing_tools()
+     
+     
+     # Render badges in sidebar
+diff --git a/frontend/app.py b/frontend/app.py
+index 3b3e35c..c8d1477 100644
+--- a/frontend/app.py
++++ b/frontend/app.py
+@@ -29,95 +29,11 @@ from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vist
+ from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
+ #from assets.niivue_badge import render_niivue_badge as _render_niivue_badge
+ 
+-def check_image_server_status():
+-    """Check if the image server is available."""
+-    # Get server URL from environment variable (matching image_server.py)
+-    image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
+-    
+-    # If running in Docker container, try multiple approaches
+-    if os.getenv("DOCKER_CONTAINER") == "true":
+-        # List of URLs to try in order of preference for health checks
+-        urls_to_try = [
+-            "http://image-server:8888",  # Container name (primary for Docker Compose)
+-            image_server_url,  # Configured URL
+-            "http://localhost:8888",  # localhost fallback
+-            "http://127.0.0.1:8888",  # IP fallback
+-        ]
+-        
+-        for url in urls_to_try:
+-            try:
+-                response = requests.head(url, timeout=2)
+-                if response.status_code == 200:
+-                    # Keep the external URL for browser access, don't change IMAGE_SERVER
+-                    return True
+-            except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+-                continue
+-        return False
+-    else:
+-        # Running outside Docker, use the configured URL
+-        try:
+-            response = requests.head(image_server_url, timeout=3)
+-            return True if response.status_code == 200 else False
+-        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+-            return False
+-
+-def check_vista3d_server_status():
+-    """Check if the Vista3D server is available."""
+-    # Get server URL from environment variable
+-    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
+-    
+-    # If running in Docker container, try multiple approaches
+-    if os.getenv("DOCKER_CONTAINER") == "true":
+-        # List of URLs to try in order of preference
+-        urls_to_try = [
+-            vista3d_server_url,  # Configured URL (likely host.docker.internal:8000)
+-            "http://vista3d-server:8000",  # Container name (if Vista3D is in same compose)
+-            "http://localhost:8000",  # localhost fallback
+-            "http://127.0.0.1:8000",  # IP fallback
+-        ]
+-        
+-        for base_url in urls_to_try:
+-            try:
+-                response = requests.get(f"{base_url}/v1/vista3d/info", timeout=3)
+-                if response.status_code == 200:
+-                    # Keep the configured URL for browser access, don't change VISTA3D_SERVER
+-                    return True
+-                # Log the specific error for debugging
+-                print(f"Vista3D status check - {base_url}: HTTP {response.status_code}")
+-            except requests.exceptions.RequestException as e:
+-                print(f"Vista3D status check - {base_url}: {type(e).__name__}: {e}")
+-                continue
+-        return False
+-    else:
+-        # Running outside Docker, use the configured URL
+-        try:
+-            response = requests.get(f"{vista3d_server_url}/v1/vista3d/info", timeout=5)
+-            return True if response.status_code == 200 else False
+-        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
+-            return False
++from utils.server_status import render_server_status_sidebar
+ 
+ def render_nvidia_vista_card():
+     """Delegate rendering to assets.vista3d_badge module."""
+     _render_nvidia_vista_card()
+-    
+-
+-def render_server_status_sidebar():
+-    """Render server status message in sidebar."""
+-    
+-    if check_image_server_status():
+-        image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
+-        
+-        st.sidebar.info(f"🖥️ **Image Server**  \n✅ Online • {image_server_url}")
+-    else:
+-        st.sidebar.error(f"🖥️ **Image Server**  \n❌ Offline  \nStart with: `python utils/image_server.py`")
+-    
+-    # Vista3D Server Status
+-    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
+-    if check_vista3d_server_status():
+-        st.sidebar.info(f"🫁 **Vista3D Server**  \n✅ Online • {vista3d_server_url}")
+-    else:
+-        st.sidebar.error(f"🫁 **Vista3D Server**  \n❌ Offline • {vista3d_server_url}")
+-
+ st.set_page_config(
+     page_title="NIfTI Vessel Segmentation and Viewer",
+     page_icon="🩻",
+diff --git a/frontend/requirements.txt b/frontend/requirements.txt
+new file mode 100644
+index 0000000..9d97e7f
+--- /dev/null
++++ b/frontend/requirements.txt
+@@ -0,0 +1,25 @@
++# Core web framework
++streamlit>=1.32.0
++extra-streamlit-components>=0.1.81
++# HTTP and web requests
++requests>=2.31.0
++beautifulsoup4>=4.12.3
++fastapi>=0.104.0
++uvicorn>=0.24.0
++# Data processing and analysis
++pandas>=2.0.0
++numpy>=2.0.0
++scipy>=1.11.0
++# Visualization and plotting
++plotly>=5.0.0
++# Medical imaging
++nibabel>=5.1.0
++nilearn>=0.10.0
++scikit-image>=0.21.0
++dcm2niix>=1.0.0
++# Progress bars and utilities
++tqdm>=4.66.0
++# Template rendering
++jinja2>=3.1.0
++# Environment and configuration
++python-dotenv>=1.0.0
+diff --git a/frontend/utils/navigation.py b/frontend/utils/navigation.py
+index 3fb5aa3..b69c6fd 100644
+--- a/frontend/utils/navigation.py
++++ b/frontend/utils/navigation.py
+@@ -75,12 +75,15 @@ class Navigation:
+                             is_image=item_config.get('is_image', False)
+                         )
+                         self.items.append(nav_item)
+-            else:
++            
++            # If no items were loaded from config, load defaults
++            if not self.items:
+                 self._load_default_items()
+                 
+         except Exception as e:
+             st.warning(f"Error loading navigation config: {e}. Using default navigation.")
+-            self._load_default_items()
++            if not self.items:
++                self._load_default_items()
+     
+     def _load_default_items(self) -> None:
+         """Load default navigation items when config file is not available."""
+diff --git a/frontend/utils/server_status.py b/frontend/utils/server_status.py
+new file mode 100644
+index 0000000..3238be8
+--- /dev/null
++++ b/frontend/utils/server_status.py
+@@ -0,0 +1,94 @@
++
++import streamlit as st
++import os
++import requests
++
++def check_image_server_status():
++    """Check if the image server is available."""
++    # Get server URL from environment variable (matching image_server.py)
++    image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
++    
++    # If running in Docker container, try multiple approaches
++    if os.getenv("DOCKER_CONTAINER") == "true":
++        # List of URLs to try in order of preference for health checks
++        urls_to_try = [
++            "http://image-server:8888",  # Container name (primary for Docker Compose)
++            image_server_url,  # Configured URL
++            "http://localhost:8888",  # localhost fallback
++            "http://127.0.0.1:8888",  # IP fallback
++        ]
++        
++        for url in urls_to_try:
++            try:
++                response = requests.head(url, timeout=2)
++                if response.status_code == 200:
++                    # Keep the external URL for browser access, don't change IMAGE_SERVER
++                    return True
++            except (requests.exceptions.RequestException, requests.exceptions.Timeout):
++                continue
++        return False
++    else:
++        # Running outside Docker, use the configured URL
++        try:
++            response = requests.head(image_server_url, timeout=3)
++            return True if response.status_code == 200 else False
++        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
++            return False
++
++def check_vista3d_server_status():
++    """Check if the Vista3D server is available."""
++    # Get server URL from environment variable
++    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
++    
++    # If running in Docker container, try multiple approaches
++    if os.getenv("DOCKER_CONTAINER") == "true":
++        # List of URLs to try in order of preference
++        urls_to_try = [
++            vista3d_server_url,  # Configured URL (likely host.docker.internal:8000)
++            "http://vista3d-server:8000",  # Container name (if Vista3D is in same compose)
++            "http://localhost:8000",  # localhost fallback
++            "http://127.0.0.1:8000",  # IP fallback
++        ]
++        
++        for base_url in urls_to_try:
++            try:
++                response = requests.get(f"{base_url}/v1/vista3d/info", timeout=3)
++                if response.status_code == 200:
++                    # Keep the configured URL for browser access, don't change VISTA3D_SERVER
++                    return True
++                # Log the specific error for debugging
++                print(f"Vista3D status check - {base_url}: HTTP {response.status_code}")
++            except requests.exceptions.RequestException as e:
++                print(f"Vista3D status check - {base_url}: {type(e).__name__}: {e}")
++                continue
++        return False
++    else:
++        # Running outside Docker, use the configured URL
++        try:
++            response = requests.get(f"{vista3d_server_url}/v1/vista3d/info", timeout=5)
++            return True if response.status_code == 200 else False
++        except (requests.exceptions.RequestException, requests.exceptions.Timeout):
++            return False
++
++def render_server_status_sidebar():
++    """Render server status message in sidebar."""
++
++    if check_image_server_status():
++        # Prioritize EXTERNAL_IMAGE_SERVER for display if available, otherwise use IMAGE_SERVER
++        display_image_server_url = os.getenv("EXTERNAL_IMAGE_SERVER", os.getenv("IMAGE_SERVER", "http://localhost:8888"))
++
++        st.sidebar.info(f"""🖥️ **Image Server**  
++✅ Online • {display_image_server_url}""")
++    else:
++        st.sidebar.error(f"""🖥️ **Image Server**  
++❌ Offline  
++Start with: `python utils/image_server.py`""")
++
++    # Vista3D Server Status
++    vista3d_server_url = os.getenv("VISTA3D_SERVER", "http://localhost:8000")
++    if check_vista3d_server_status():
++        st.sidebar.info(f"""🫁 **Vista3D Server**  
++✅ Online • {vista3d_server_url}""")
++    else:
++        st.sidebar.error(f"""🫁 **Vista3D Server**  
++❌ Offline • {vista3d_server_url}""")
+diff --git a/frontend/utils/smooth_voxels.py b/frontend/utils/smooth_voxels.py
+index 1196982..6f9c87c 100644
+--- a/frontend/utils/smooth_voxels.py
++++ b/frontend/utils/smooth_voxels.py
+@@ -26,13 +26,13 @@ sys.path.append(str(Path(__file__).parent))
+ from constants import MIN_FILE_SIZE_MB
+ 
+ 
+-# Smoothing presets (kernel sizes for morphological operations)
++# Smoothing presets (FWHM in mm)
+ SMOOTHING_PRESETS = {
+-    'light': 3,      # Small kernel - gentle smoothing
+-    'medium': 5,     # Medium kernel - moderate smoothing  
+-    'heavy': 7,      # Large kernel - strong smoothing
+-    'extra_heavy': 9, # Very large kernel - very strong smoothing
+-    'ultra_heavy': 11 # Extra large kernel - maximum smoothing
++    'light': 4.0,
++    'medium': 8.0,   
++    'heavy': 12.0,
++    'extra_heavy': 20.0,
++    'ultra_heavy': 50.0  # For very visible smoothing effects
+ }
+ 
+ 
+@@ -79,14 +79,14 @@ def get_voxel_files(patient_id: str, scan_name: str, output_folder: Path):
+     return sorted(voxel_files)
+ 
+ 
+-def smooth_voxel_file(file_path: Path, kernel_size: int, method: str = "morphological"):
++def smooth_voxel_file(file_path: Path, fwhm: float, method: str = "gaussian"):
+     """
+     Apply smoothing to a voxel file and overwrite it.
+     
+     Args:
+         file_path: Path to the voxel NIfTI file
+-        kernel_size: Kernel size for morphological operations (integer)
+-        method: Smoothing method - "gaussian" or "morphological" (default: morphological)
++        fwhm: Full-Width Half Maximum for Gaussian kernel (in mm) or kernel size for morphological
++        method: Smoothing method - "gaussian" or "morphological"
+     
+     Returns:
+         bool: True if successful, False otherwise
+@@ -97,7 +97,7 @@ def smooth_voxel_file(file_path: Path, kernel_size: int, method: str = "morpholo
+         data = img.get_fdata()
+         
+         if method == "morphological":
+-            # Enhanced binary morphological smoothing for segmentation voxels
++            # Morphological smoothing (better for isosurface rendering)
+             from scipy import ndimage
+             import numpy as np
+             
+@@ -113,32 +113,27 @@ def smooth_voxel_file(file_path: Path, kernel_size: int, method: str = "morpholo
+                 label_id = non_zero_vals[0] if len(non_zero_vals) == 1 else int(np.median(non_zero_vals))
+                 
+                 # Create binary mask
+-                binary_mask = (data > 0).astype(np.float32)
++                binary_mask = (data > 0).astype(np.uint8)
+                 
+-                # Step 1: Morphological opening to remove small protrusions
+-                structure = np.ones((kernel_size, kernel_size, kernel_size))
+-                opened = ndimage.binary_opening(binary_mask, structure=structure)
++                # Apply morphological operations
++                kernel_size = max(3, int(fwhm))
+                 
+-                # Step 2: Morphological closing to fill small holes
+-                closed = ndimage.binary_closing(opened, structure=structure)
++                # Opening: erosion followed by dilation (removes small protrusions)
++                opened = ndimage.binary_opening(binary_mask, structure=np.ones((kernel_size, kernel_size, kernel_size)))
+                 
+-                # Step 3: Apply Gaussian filter to smooth the boundary
+-                # Use sigma proportional to kernel size for consistent smoothing
+-                sigma = kernel_size / 3.0
+-                gaussian_smoothed = ndimage.gaussian_filter(closed.astype(np.float32), sigma=sigma)
++                # Closing: dilation followed by erosion (fills small holes)
++                closed = ndimage.binary_closing(opened, structure=np.ones((kernel_size+2, kernel_size+2, kernel_size+2)))
+                 
+-                # Step 4: Threshold to get clean binary mask
+-                smoothed_mask = (gaussian_smoothed > 0.5).astype(np.uint8)
++                # Additional smoothing with larger kernel
++                smoothed_mask = ndimage.binary_closing(closed, structure=np.ones((kernel_size+4, kernel_size+4, kernel_size+4)))
+                 
+-                # Step 5: Convert back to label ID format
+-                smoothed_data = smoothed_mask.astype(np.int16) * label_id
++                # Convert back to label ID format
++                smoothed_data = smoothed_mask.astype(np.uint8) * label_id
+                 
+                 # Create new image
+                 smoothed_img = nib.Nifti1Image(smoothed_data, img.affine, img.header)
+         else:
+-            # Gaussian smoothing (fallback for continuous data)
+-            # Convert kernel size to approximate FWHM for Gaussian smoothing
+-            fwhm = kernel_size * 2.0  # Rough approximation
++            # Gaussian smoothing
+             smoothed_img = nimage.smooth_img(img, fwhm=fwhm)
+         
+         # Save back to the same file (overwrite)
+@@ -176,13 +171,13 @@ def process_patients(patient_ids: list, selected_scans: list, smoothing_level: s
+         smoothing_level: Smoothing preset level ('light', 'medium', 'heavy')
+         output_folder: Path to output folder
+     """
+-    # Get kernel size from preset
+-    kernel_size = SMOOTHING_PRESETS.get(smoothing_level, SMOOTHING_PRESETS['medium'])
++    # Get FWHM value from preset
++    fwhm = SMOOTHING_PRESETS.get(smoothing_level, SMOOTHING_PRESETS['medium'])
+     
+     print("=" * 80)
+     print("Voxel Smoothing Tool")
+     print("=" * 80)
+-    print(f"Smoothing level: {smoothing_level} (Kernel size: {kernel_size})")
++    print(f"Smoothing level: {smoothing_level} (FWHM: {fwhm}mm)")
+     print(f"Processing {len(patient_ids)} patient(s)")
+     print("=" * 80)
+     
+@@ -231,7 +226,7 @@ def process_patients(patient_ids: list, selected_scans: list, smoothing_level: s
+             # Process each voxel file with progress bar
+             for voxel_file in tqdm(voxel_files, desc=f"    Smoothing", unit="file"):
+                 total_files += 1
+-                if smooth_voxel_file(voxel_file, kernel_size):
++                if smooth_voxel_file(voxel_file, fwhm):
+                     successful_files += 1
+                 else:
+                     failed_files += 1
+@@ -252,7 +247,7 @@ def process_patients(patient_ids: list, selected_scans: list, smoothing_level: s
+ def main():
+     """Main function for command-line execution."""
+     parser = argparse.ArgumentParser(
+-        description="Apply binary morphological smoothing to Vista3D voxel segmentations"
++        description="Apply Gaussian smoothing to Vista3D voxel segmentations"
+     )
+     parser.add_argument(
+         'patients',
+@@ -263,7 +258,7 @@ def main():
+         '--smoothing',
+         choices=['light', 'medium', 'heavy', 'extra_heavy', 'ultra_heavy'],
+         default='medium',
+-        help='Smoothing level preset - kernel size for morphological operations (default: medium)'
++        help='Smoothing level preset (default: medium)'
+     )
+     
+     args = parser.parse_args()
+diff --git a/helm/CHANGES.txt b/helm/CHANGES.txt
+deleted file mode 100644
+index 9ac7e1e..0000000
+--- a/helm/CHANGES.txt
++++ /dev/null
+@@ -1,198 +0,0 @@
+-═══════════════════════════════════════════════════════════════════════════
+-  HELM CHART UPDATE SUMMARY - v1.2.0
+-═══════════════════════════════════════════════════════════════════════════
+-
+-📅 Date: October 10, 2025
+-🎯 Version: 1.1.0 → 1.2.0
+-✅ Status: COMPLETE & VALIDATED
+-
+-───────────────────────────────────────────────────────────────────────────
+-📝 MODIFIED FILES (4)
+-───────────────────────────────────────────────────────────────────────────
+-
+-1. helm/vista3d/Chart.yaml
+-   ✓ Version bumped: 1.1.0 → 1.2.0
+-   ✓ App version: 1.1.0 → 1.2.0
+-   ✓ Fixed typo: Helathcare → Healthcare
+-   ✓ Removed nginx-ingress dependency
+-   ✓ Added ingress controller note
+-
+-2. helm/vista3d/README.md
+-   ✓ Updated version numbers
+-   ✓ Added "What's New in v1.2.0" section
+-   ✓ Documented colormap enhancements
+-
+-3. helm/README.md
+-   ✓ Enhanced frontend architecture description
+-   ✓ Added colormap features
+-   ✓ Listed 23+ built-in colormaps
+-
+-4. helm/vista3d/templates/NOTES.txt
+-   ✓ Added "New Features in v1.2.0" section
+-   ✓ Highlighted colormap improvements
+-
+-───────────────────────────────────────────────────────────────────────────
+-📄 NEW FILES (4)
+-───────────────────────────────────────────────────────────────────────────
+-
+-5. helm/vista3d/CHANGELOG.md
+-   ✓ Complete change history
+-   ✓ Follows Keep a Changelog format
+-   ✓ Documents v1.2.0 and v1.1.0
+-
+-6. helm/UPGRADE_GUIDE.md
+-   ✓ Step-by-step upgrade instructions
+-   ✓ Rollback procedures
+-   ✓ Troubleshooting guide
+-   ✓ Testing checklist
+-
+-7. helm/RELEASE_NOTES_v1.2.0.md
+-   ✓ Comprehensive release notes
+-   ✓ Technical details
+-   ✓ Benefits by user type
+-   ✓ Code examples
+-
+-8. helm/UPDATE_SUMMARY.md
+-   ✓ Quick reference guide
+-   ✓ Impact assessment
+-   ✓ Validation results
+-
+-───────────────────────────────────────────────────────────────────────────
+-✨ KEY FEATURES ADDED
+-───────────────────────────────────────────────────────────────────────────
+-
+-Frontend Enhancements:
+-• 23+ Built-in NiiVue colormaps
+-  - gray, jet, hot, cool, warm, spring, summer, autumn, winter
+-  - rainbow, viridis, plasma, magma, inferno, parula, turbo
+-  - hsv, bone, copper, cubehelix, cividis, linspecer, batlow, blues
+-
+-• Improved Performance
+-  - Faster colormap loading
+-  - Reduced memory footprint
+-  - Better caching
+-
+-• Better Organization
+-  - Medical colormaps prioritized
+-  - Built-in vs custom separation
+-  - Cleaner code structure
+-
+-───────────────────────────────────────────────────────────────────────────
+-✅ VALIDATION RESULTS
+-───────────────────────────────────────────────────────────────────────────
+-
+-Helm Lint:     ✅ PASSED (0 errors, 0 warnings)
+-Helm Package:  ✅ SUCCESS (vista3d-1.2.0.tgz)
+-Templates:     ✅ VALID
+-Compatibility: ✅ BACKWARD COMPATIBLE
+-Breaking:      ✅ NO BREAKING CHANGES
+-
+-───────────────────────────────────────────────────────────────────────────
+-🚀 DEPLOYMENT INSTRUCTIONS
+-───────────────────────────────────────────────────────────────────────────
+-
+-New Installation:
+-  cd helm/vista3d
+-  helm install vista3d . --namespace vista3d --create-namespace
+-
+-Upgrade Existing:
+-  cd helm/vista3d
+-  helm upgrade vista3d . --namespace vista3d
+-
+-Verify:
+-  kubectl get pods -n vista3d
+-  kubectl describe deployment vista3d-frontend -n vista3d
+-
+-───────────────────────────────────────────────────────────────────────────
+-📦 DOCKER IMAGE REQUIREMENTS
+-───────────────────────────────────────────────────────────────────────────
+-
+-Frontend:      dwtwp/vista3d-frontend:latest     ⚠️  REBUILD REQUIRED
+-Backend:       nvcr.io/nim/nvidia/vista3d:1.0.0  ✅  NO CHANGES
+-Image Server:  dwtwp/vista3d-image-server:latest ✅  NO CHANGES
+-
+-Rebuild Frontend:
+-  cd frontend
+-  docker build -t dwtwp/vista3d-frontend:latest .
+-  docker push dwtwp/vista3d-frontend:latest
+-
+-───────────────────────────────────────────────────────────────────────────
+-📚 DOCUMENTATION
+-───────────────────────────────────────────────────────────────────────────
+-
+-README.md              → Chart overview and quick start
+-CHANGELOG.md           → Complete version history
+-UPGRADE_GUIDE.md       → Upgrade procedures and troubleshooting
+-RELEASE_NOTES_v1.2.0.md → Detailed release information
+-UPDATE_SUMMARY.md      → This update summary
+-
+-───────────────────────────────────────────────────────────────────────────
+-🎯 FRONTEND CHANGES REFLECTED
+-───────────────────────────────────────────────────────────────────────────
+-
+-frontend/utils/constants.py
+-  ✓ Added BUILTIN_NIIVUE_COLORMAPS dictionary
+-  ✓ Updated load_colormap_data() function
+-  ✓ Enhanced load_colormaps() function
+-
+-frontend/assets/niivue_viewer.html
+-  ✓ Skip addColormap for built-ins
+-  ✓ Improved initialization logic
+-
+-───────────────────────────────────────────────────────────────────────────
+-🔧 BACKEND STATUS
+-───────────────────────────────────────────────────────────────────────────
+-
+-Backend Code:           ✅ NO CHANGES NEEDED
+-ConfigMap:              ✅ ALREADY UP TO DATE
+-Environment Variables:  ✅ ALL PRESENT
+-Health Checks:          ✅ WORKING
+-GPU Configuration:      ✅ CORRECT
+-
+-───────────────────────────────────────────────────────────────────────────
+-📊 IMPACT ASSESSMENT
+-───────────────────────────────────────────────────────────────────────────
+-
+-User Impact:        ✅ ZERO BREAKING CHANGES
+-Upgrade Time:       ~2-5 minutes (rolling update)
+-Downtime:           ✅ NONE (rolling update)
+-Config Changes:     ✅ NONE REQUIRED
+-Data Migration:     ✅ NOT NEEDED
+-
+-Performance:
+-  • Colormap Loading: ⬆️ IMPROVED
+-  • Memory Usage:     ⬇️ REDUCED
+-  • UI Responsiveness: ⬆️ FASTER
+-
+-───────────────────────────────────────────────────────────────────────────
+-🔍 GIT STATUS
+-───────────────────────────────────────────────────────────────────────────
+-
+-Modified:
+-  • helm/README.md
+-  • helm/vista3d/Chart.yaml
+-  • helm/vista3d/README.md
+-  • helm/vista3d/templates/NOTES.txt
+-
+-New Files:
+-  • helm/RELEASE_NOTES_v1.2.0.md
+-  • helm/UPDATE_SUMMARY.md
+-  • helm/UPGRADE_GUIDE.md
+-  • helm/vista3d/CHANGELOG.md
+-
+-───────────────────────────────────────────────────────────────────────────
+-✨ SUMMARY
+-───────────────────────────────────────────────────────────────────────────
+-
+-The Helm charts have been successfully updated to version 1.2.0, reflecting
+-the enhanced colormap support added to the frontend. The update includes:
+-
+-  ✅ 4 files modified
+-  ✅ 4 new documentation files
+-  ✅ Helm validation passed
+-  ✅ Backward compatible
+-  ✅ No breaking changes
+-  ✅ Ready for deployment
+-
+-═══════════════════════════════════════════════════════════════════════════
+-
+diff --git a/helm/README.md b/helm/README.md
+deleted file mode 100644
+index 0179661..0000000
+--- a/helm/README.md
++++ /dev/null
+@@ -1,278 +0,0 @@
+-# HPE NVIDIA Vista3D Helm Chart
+-
+-This directory contains the Helm chart for deploying the HPE NVIDIA Vista3D Medical AI Platform on Kubernetes.
+-
+-## 📁 Chart Structure
+-
+-```
+-helm/vista3d/
+-├── Chart.yaml                    # Chart metadata
+-├── values.yaml                   # Default configuration values
+-├── values-production.yaml        # Production configuration example
+-├── README.md                     # Chart documentation
+-└── templates/                    # Kubernetes resource templates
+-    ├── _helpers.tpl             # Template helpers
+-    ├── backend-deployment.yaml   # Vista3D backend deployment
+-    ├── backend-service.yaml      # Vista3D backend service
+-    ├── frontend-deployment.yaml  # Streamlit frontend deployment
+-    ├── frontend-service.yaml     # Streamlit frontend service
+-    ├── image-server-deployment.yaml # Image server deployment
+-    ├── image-server-service.yaml    # Image server service
+-    ├── ingress.yaml             # Ingress configuration
+-    ├── configmap.yaml           # Application configuration
+-    ├── secret.yaml              # Secrets (NGC API key)
+-    ├── pvc.yaml                 # Persistent volume claims
+-    ├── serviceaccount.yaml      # Service account
+-    └── NOTES.txt                # Post-installation notes
+-```
+-
+-## 🚀 Quick Start
+-
+-### Prerequisites
+-
+-- Kubernetes 1.19+
+-- Helm 3.0+
+-- NVIDIA GPU nodes with Container Toolkit
+-- NVIDIA NGC account and API key
+-
+-### Installation
+-
+-```bash
+-# Clone the repository
+-git clone https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D.git
+-cd HPE-Nvidia-Vista-3D/helm/vista3d
+-
+-# Install with default values
+-helm install vista3d . --namespace vista3d --create-namespace
+-
+-# Install with custom values
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --create-namespace \
+-  --set secrets.ngcApiKey="your-ngc-api-key" \
+-  --set ingress.enabled=true \
+-  --set ingress.hosts[0].host="vista3d.yourdomain.com"
+-
+-# Install with production values
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --create-namespace \
+-  --values values-production.yaml
+-```
+-
+-## 🏗️ Architecture
+-
+-The Helm chart deploys three main components:
+-
+-### 1. Backend (Vista3D Server)
+-- **Image**: `nvcr.io/nim/nvidia/vista3d:1.0.0`
+-- **Purpose**: AI-powered medical image segmentation
+-- **Requirements**: NVIDIA GPU nodes
+-- **Port**: 8000
+-
+-### 2. Frontend (Streamlit App)
+-- **Image**: `dwtwp/vista3d-frontend:latest`
+-- **Purpose**: Web interface for medical imaging
+-- **Port**: 8501
+-- **Scaling**: Horizontal scaling supported
+-- **Health Check**: Built-in Streamlit health endpoint
+-- **Features**: 
+-  - Enhanced NiiVue 3D viewer with 23+ built-in colormaps
+-  - Medical-specific colormaps for CT/MRI visualization
+-  - Real-time volume rendering and segmentation overlay
+-
+-### 3. Image Server
+-- **Image**: `dwtwp/vista3d-image-server:latest`
+-- **Purpose**: HTTP server for medical image files
+-- **Port**: 8888
+-- **Health Check**: `/health` endpoint for monitoring
+-
+-## ⚙️ Configuration
+-
+-### Key Configuration Options
+-
+-| Component | Key | Description | Default |
+-|-----------|-----|-------------|---------|
+-| Backend | `backend.enabled` | Enable Vista3D server | `true` |
+-| Backend | `backend.resources.limits.nvidia.com/gpu` | GPU limit | `1` |
+-| Frontend | `frontend.replicaCount` | Number of replicas | `2` |
+-| Image Server | `imageServer.enabled` | Enable image server | `true` |
+-| Ingress | `ingress.enabled` | Enable external access | `false` |
+-| Persistence | `persistence.enabled` | Enable persistent storage | `true` |
+-
+-### GPU Requirements
+-
+-The backend requires NVIDIA GPU nodes with:
+-- NVIDIA Container Toolkit installed
+-- GPU drivers configured
+-- Proper node selectors and tolerations
+-
+-### Storage Requirements
+-
+-- **Output Volume**: ReadWriteMany access for processed data
+-- **DICOM Volume**: ReadOnlyMany access for source data
+-- **Recommended**: Fast SSD storage for optimal performance
+-
+-## 🔧 Customization
+-
+-### Environment Variables
+-
+-All environment variables are configurable through the values.yaml file:
+-
+-```yaml
+-backend:
+-  env:
+-    - name: NGC_API_KEY
+-      valueFrom:
+-        secretKeyRef:
+-          name: vista3d-secrets
+-          key: ngc-api-key
+-    - name: VISTA3D_SERVER
+-      value: "http://localhost:8000"
+-```
+-
+-### Resource Limits
+-
+-Configure resource limits for each component:
+-
+-```yaml
+-backend:
+-  resources:
+-    limits:
+-      nvidia.com/gpu: 1
+-      memory: "16Gi"
+-      cpu: "4"
+-    requests:
+-      nvidia.com/gpu: 1
+-      memory: "8Gi"
+-      cpu: "2"
+-```
+-
+-### Scaling
+-
+-Enable horizontal pod autoscaling:
+-
+-```yaml
+-autoscaling:
+-  enabled: true
+-  minReplicas: 2
+-  maxReplicas: 10
+-  targetCPUUtilizationPercentage: 80
+-```
+-
+-## 🔒 Security
+-
+-### Network Policies
+-
+-Enable network policies for security:
+-
+-```yaml
+-networkPolicy:
+-  enabled: true
+-  ingress:
+-    - from:
+-      - namespaceSelector:
+-          matchLabels:
+-            name: ingress-nginx
+-      ports:
+-      - protocol: TCP
+-        port: 8501
+-```
+-
+-### Security Contexts
+-
+-Production-ready security contexts are configured:
+-
+-```yaml
+-securityContext:
+-  allowPrivilegeEscalation: false
+-  capabilities:
+-    drop:
+-    - ALL
+-  readOnlyRootFilesystem: false
+-  runAsNonRoot: true
+-  runAsUser: 1000
+-```
+-
+-## 📊 Monitoring
+-
+-### ServiceMonitor
+-
+-Enable Prometheus monitoring:
+-
+-```yaml
+-monitoring:
+-  enabled: true
+-  serviceMonitor:
+-    enabled: true
+-    interval: 30s
+-    scrapeTimeout: 10s
+-```
+-
+-### Logging
+-
+-View logs for troubleshooting:
+-
+-```bash
+-# Backend logs
+-kubectl logs -l app.kubernetes.io/component=backend --namespace vista3d
+-
+-# Frontend logs
+-kubectl logs -l app.kubernetes.io/component=frontend --namespace vista3d
+-
+-# Image server logs
+-kubectl logs -l app.kubernetes.io/component=image-server --namespace vista3d
+-```
+-
+-## 🚨 Troubleshooting
+-
+-### Common Issues
+-
+-1. **Backend pod not starting**
+-   - Check GPU node availability
+-   - Verify NVIDIA Container Toolkit
+-   - Check resource limits
+-
+-2. **Frontend not accessible**
+-   - Verify service status
+-   - Check ingress configuration
+-   - Verify port forwarding
+-
+-3. **Image server issues**
+-   - Check persistent volume claims
+-   - Verify file permissions
+-   - Check image server logs
+-
+-### Debug Commands
+-
+-```bash
+-# Check pod status
+-kubectl get pods --namespace vista3d
+-
+-# Check services
+-kubectl get svc --namespace vista3d
+-
+-# Check persistent volumes
+-kubectl get pvc --namespace vista3d
+-
+-# Check events
+-kubectl get events --namespace vista3d --sort-by='.lastTimestamp'
+-```
+-
+-## 📚 Documentation
+-
+-- **Chart README**: [helm/vista3d/README.md](vista3d/README.md)
+-- **Production Values**: [helm/vista3d/values-production.yaml](vista3d/values-production.yaml)
+-- **Main Project**: [README.md](../README.md)
+-
+-## 🤝 Contributing
+-
+-1. Fork the repository
+-2. Create a feature branch
+-3. Make your changes
+-4. Test the chart
+-5. Submit a pull request
+-
+-## 📄 License
+-
+-This Helm chart is licensed under the Apache 2.0 License.
+diff --git a/helm/build_and_push_docker.sh b/helm/build_and_push_docker.sh
+deleted file mode 100755
+index e40482d..0000000
+--- a/helm/build_and_push_docker.sh
++++ /dev/null
+@@ -1,72 +0,0 @@
+-#!/bin/bash
+-
+-# Docker Build and Push Script for Vista3D
+-# This script builds and pushes both the image_server and frontend Docker images
+-# For Linux ARM64 platform
+-
+-set -e  # Exit on error
+-
+-# Configuration
+-DOCKER_USERNAME="dwtwp"
+-VERSION="${1:-v1.0.0}"  # Default to v1.0.0 if no version specified
+-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-
+-# Colors for output
+-RED='\033[0;31m'
+-GREEN='\033[0;32m'
+-YELLOW='\033[1;33m'
+-NC='\033[0m' # No Color
+-
+-echo -e "${GREEN}=== Vista3D Docker Build and Push Script ===${NC}"
+-echo -e "Version: ${YELLOW}${VERSION}${NC}"
+-echo -e "Docker Username: ${YELLOW}${DOCKER_USERNAME}${NC}"
+-echo ""
+-
+-# Check if logged into Docker Hub
+-echo -e "${YELLOW}Checking Docker Hub login...${NC}"
+-if ! grep -q "docker.io" ~/.docker/config.json 2>/dev/null; then
+-    echo -e "${RED}Not logged into Docker Hub. Please run: docker login${NC}"
+-    exit 1
+-fi
+-echo -e "${GREEN}✓ Docker Hub login confirmed${NC}"
+-echo ""
+-
+-# Function to build and push an image
+-build_and_push() {
+-    local service_name=$1
+-    local service_path=$2
+-    local image_name="${DOCKER_USERNAME}/vista3d-${service_name}"
+-    
+-    echo -e "${GREEN}=== Building ${service_name} ===${NC}"
+-    cd "${PROJECT_ROOT}/${service_path}"
+-    
+-    echo "Building ${image_name}:${VERSION}..."
+-    docker build -t "${image_name}:${VERSION}" .
+-    
+-    echo "Tagging as latest..."
+-    docker tag "${image_name}:${VERSION}" "${image_name}:latest"
+-    
+-    echo "Pushing ${image_name}:${VERSION}..."
+-    docker push "${image_name}:${VERSION}"
+-    
+-    echo "Pushing ${image_name}:latest..."
+-    docker push "${image_name}:latest"
+-    
+-    echo -e "${GREEN}✓ Successfully built and pushed ${service_name}${NC}"
+-    echo ""
+-}
+-
+-# Build and push image_server
+-build_and_push "image-server" "../image_server"
+-
+-# Build and push frontend
+-build_and_push "frontend" "../frontend"
+-
+-echo -e "${GREEN}=== All images built and pushed successfully! ===${NC}"
+-echo ""
+-echo "Images pushed:"
+-echo "  - ${DOCKER_USERNAME}/vista3d-image-server:${VERSION}"
+-echo "  - ${DOCKER_USERNAME}/vista3d-image-server:latest"
+-echo "  - ${DOCKER_USERNAME}/vista3d-frontend:${VERSION}"
+-echo "  - ${DOCKER_USERNAME}/vista3d-frontend:latest"
+-
+diff --git a/helm/icon.png b/helm/icon.png
+deleted file mode 100644
+index 17d3033..0000000
+Binary files a/helm/icon.png and /dev/null differ
+diff --git a/helm/old/CHANGELOG.md b/helm/old/CHANGELOG.md
+deleted file mode 100644
+index 869ca87..0000000
+--- a/helm/old/CHANGELOG.md
++++ /dev/null
+@@ -1,45 +0,0 @@
+-# Changelog
+-
+-All notable changes to the Vista3D Helm chart will be documented in this file.
+-
+-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+-
+-## [1.2.0] - 2025-10-10
+-
+-### Added
+-- Built-in NiiVue colormap support with 23 pre-configured colormaps
+-- Support for the following built-in colormaps: gray, jet, hot, cool, warm, spring, summer, autumn, winter, rainbow, viridis, plasma, magma, inferno, parula, turbo, hsv, bone, copper, cubehelix, cividis, linspecer, batlow, blues
+-- Intelligent colormap loading that distinguishes between built-in and custom colormaps
+-- Enhanced colormap performance through optimized loading mechanism
+-
+-### Changed
+-- Frontend now handles built-in colormaps natively without requiring JSON definitions
+-- Improved colormap selection UI with better organization
+-- Updated frontend constants.py with BUILTIN_NIIVUE_COLORMAPS dictionary
+-
+-### Fixed
+-- Colormap loading performance issues
+-- Healthcare typo in Chart.yaml maintainer section (Helathcare → Healthcare)
+-
+-## [1.1.0] - Previous Release
+-
+-### Added
+-- Initial Helm chart for Vista3D platform
+-- Backend deployment for Vista3D AI server
+-- Frontend deployment for Streamlit interface
+-- Image server deployment for serving medical image files
+-- ConfigMap for centralized configuration
+-- PVC templates for persistent storage
+-- Ingress support for external access
+-- Service account and RBAC configuration
+-- Production-ready values file
+-
+-### Features
+-- NVIDIA GPU support for backend
+-- Horizontal pod autoscaling
+-- Network policies
+-- ServiceMonitor for Prometheus
+-- Health checks and probes
+-- Security contexts and pod security policies
+-
+diff --git a/helm/old/GREENLAKE_DEPLOYMENT.md b/helm/old/GREENLAKE_DEPLOYMENT.md
+deleted file mode 100644
+index b486145..0000000
+--- a/helm/old/GREENLAKE_DEPLOYMENT.md
++++ /dev/null
+@@ -1,515 +0,0 @@
+-# Vista3D Deployment on HPE GreenLake for Containers
+-
+-## 🎯 Overview
+-
+-This guide provides comprehensive instructions for deploying the HPE NVIDIA Vista3D Medical AI Platform on **HPE GreenLake for Containers**.
+-
+-**Platform Version:** 1.2.0  
+-**Target Platform:** HPE GreenLake for Containers  
+-**Kubernetes Version:** 1.19+
+-
+----
+-
+-## 📋 Prerequisites
+-
+-### Required Access and Tools
+-
+-- ✅ **HPE GreenLake Portal Access** - [https://common.cloud.hpe.com](https://common.cloud.hpe.com)
+-- ✅ **Kubernetes Cluster** - HPE GreenLake for Containers cluster with:
+-  - At least 1 GPU node (NVIDIA A100, A30, or T4)
+-  - 2-3 standard compute nodes
+-  - NVIDIA GPU Operator installed
+-  - HPE CSI Driver for storage
+-- ✅ **kubectl** - Configured with your cluster kubeconfig
+-- ✅ **Helm 3** - Version 3.0 or higher
+-- ✅ **NVIDIA NGC Account** - Free account at [ngc.nvidia.com](https://ngc.nvidia.com)
+-- ✅ **NGC API Key** - Starts with `nvapi-`
+-
+-### Verify Cluster Access
+-
+-```bash
+-# Test cluster connectivity
+-kubectl cluster-info
+-
+-# Check available nodes
+-kubectl get nodes -o wide
+-
+-# Verify GPU nodes
+-kubectl get nodes -o json | jq '.items[] | 
+-  select(.status.allocatable."nvidia.com/gpu" != null) | 
+-  {name: .metadata.name, gpu: .status.allocatable."nvidia.com/gpu"}'
+-
+-# Check storage classes
+-kubectl get storageclass
+-```
+-
+----
+-
+-## 🚀 Quick Start
+-
+-### Option 1: Automated Deployment (Recommended)
+-
+-```bash
+-cd helm/vista3d
+-chmod +x deploy-greenlake.sh
+-./deploy-greenlake.sh
+-```
+-
+-The script will:
+-1. ✅ Check prerequisites (kubectl, helm, cluster access)
+-2. ✅ Prompt for NGC API key
+-3. ✅ Ask for domain name
+-4. ✅ Create namespace and labels
+-5. ✅ Create secrets
+-6. ✅ Apply storage classes
+-7. ✅ Deploy Vista3D with Helm
+-8. ✅ Wait for pods to be ready
+-
+-### Option 2: Manual Deployment
+-
+-```bash
+-# 1. Create namespace
+-kubectl create namespace vista3d
+-
+-# 2. Label namespace
+-kubectl label namespace vista3d \
+-  hpe.com/project=medical-ai \
+-  hpe.com/team=healthcare \
+-  hpe.com/platform=greenlake
+-
+-# 3. Create NGC secret
+-kubectl create secret generic vista3d-secrets \
+-  --from-literal=ngc-api-key="nvapi-your-key-here" \
+-  --namespace vista3d
+-
+-# 4. Apply storage classes (optional)
+-kubectl apply -f hpe-storage.yaml
+-
+-# 5. Deploy with Helm
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --values values-hpe-greenlake.yaml \
+-  --set ingress.hosts[0].host="vista3d.greenlake.yourdomain.com"
+-```
+-
+----
+-
+-## ⚙️ Configuration
+-
+-### Core Configuration File
+-
+-The main configuration is in **`values-hpe-greenlake.yaml`**. Key sections to customize:
+-
+-#### 1. Storage Configuration
+-
+-```yaml
+-persistence:
+-  storageClass: "hpe-standard"  # Change to your HPE storage class
+-  
+-  output:
+-    size: 500Gi  # Adjust based on expected data volume
+-  
+-  dicom:
+-    size: 200Gi  # Adjust based on DICOM data size
+-```
+-
+-#### 2. Domain Configuration
+-
+-```yaml
+-ingress:
+-  hosts:
+-    - host: vista3d.greenlake.yourdomain.com  # Your domain
+-  tls:
+-    - secretName: vista3d-tls
+-      hosts:
+-        - vista3d.greenlake.yourdomain.com
+-```
+-
+-#### 3. Resource Limits
+-
+-```yaml
+-backend:
+-  resources:
+-    limits:
+-      nvidia.com/gpu: 1
+-      memory: "32Gi"  # Increase if needed
+-      cpu: "8"
+-
+-frontend:
+-  replicaCount: 3  # Adjust for load
+-  resources:
+-    limits:
+-      memory: "8Gi"
+-      cpu: "4"
+-```
+-
+-#### 4. Node Selectors
+-
+-```yaml
+-backend:
+-  nodeSelector:
+-    nvidia.com/gpu: "true"
+-    workload-type: "ai-medical"  # Custom label
+-```
+-
+----
+-
+-## 📦 Storage Classes
+-
+-### Pre-configured Storage Classes
+-
+-The `hpe-storage.yaml` file defines three storage classes:
+-
+-1. **vista3d-fast** - High-performance storage for active processing
+-2. **vista3d-standard** - Standard storage for output/results
+-3. **vista3d-archive** - Archive storage for long-term retention
+-
+-### Customize for Your Environment
+-
+-Edit `hpe-storage.yaml` to match your HPE storage configuration:
+-
+-```yaml
+-parameters:
+-  accessProtocol: "iscsi"  # or "fc" for Fibre Channel
+-  performancePolicy: "high"  # high, medium, or low
+-```
+-
+----
+-
+-## 🔐 Security
+-
+-### Secrets Management
+-
+-**Option 1: Kubernetes Secrets (Default)**
+-```bash
+-kubectl create secret generic vista3d-secrets \
+-  --from-literal=ngc-api-key="nvapi-xxx" \
+-  --namespace vista3d
+-```
+-
+-**Option 2: External Secrets Operator** (Production Recommended)
+-```yaml
+-apiVersion: external-secrets.io/v1beta1
+-kind: ExternalSecret
+-metadata:
+-  name: vista3d-ngc-secret
+-  namespace: vista3d
+-spec:
+-  secretStoreRef:
+-    name: hpe-secrets-store
+-  target:
+-    name: vista3d-secrets
+-  data:
+-  - secretKey: ngc-api-key
+-    remoteRef:
+-      key: nvidia/ngc-api-key
+-```
+-
+-### Network Policies
+-
+-Network policies are enabled by default in `values-hpe-greenlake.yaml`:
+-
+-```yaml
+-networkPolicy:
+-  enabled: true
+-  ingress:
+-    - from:
+-      - namespaceSelector:
+-          matchLabels:
+-            name: ingress-nginx
+-```
+-
+----
+-
+-## 🌐 Access and Ingress
+-
+-### DNS Configuration
+-
+-1. **Get Ingress IP:**
+-```bash
+-kubectl get ingress -n vista3d
+-# or
+-kubectl get svc -n ingress-nginx
+-```
+-
+-2. **Configure DNS:**
+-   - In your DNS provider, create an A record
+-   - Point `vista3d.greenlake.yourdomain.com` to the ingress IP
+-
+-3. **Verify:**
+-```bash
+-nslookup vista3d.greenlake.yourdomain.com
+-```
+-
+-### TLS/SSL Certificates
+-
+-**Option 1: cert-manager (Recommended)**
+-```bash
+-# Install cert-manager
+-helm repo add jetstack https://charts.jetstack.io
+-helm install cert-manager jetstack/cert-manager \
+-  --namespace cert-manager --create-namespace \
+-  --set installCRDs=true
+-
+-# Create ClusterIssuer
+-kubectl apply -f - <<EOF
+-apiVersion: cert-manager.io/v1
+-kind: ClusterIssuer
+-metadata:
+-  name: letsencrypt-prod
+-spec:
+-  acme:
+-    server: https://acme-v02.api.letsencrypt.org/directory
+-    email: your-email@yourdomain.com
+-    privateKeySecretRef:
+-      name: letsencrypt-prod
+-    solvers:
+-    - http01:
+-        ingress:
+-          class: nginx
+-EOF
+-```
+-
+-**Option 2: Manual Certificate**
+-```bash
+-kubectl create secret tls vista3d-tls \
+-  --cert=path/to/cert.crt \
+-  --key=path/to/cert.key \
+-  --namespace vista3d
+-```
+-
+-### Port Forwarding (Testing)
+-
+-```bash
+-# Forward frontend
+-kubectl port-forward -n vista3d svc/vista3d-frontend 8501:8501
+-
+-# Access at http://localhost:8501
+-```
+-
+----
+-
+-## 📊 Monitoring
+-
+-### HPE GreenLake Console
+-
+-1. Navigate to **HPE GreenLake Portal**
+-2. Go to **Containers** → **Clusters** → **Your Cluster**
+-3. Select **Monitoring** → **Services**
+-4. Find **vista3d** services
+-
+-### Prometheus/Grafana
+-
+-ServiceMonitor is enabled by default:
+-
+-```yaml
+-monitoring:
+-  enabled: true
+-  serviceMonitor:
+-    enabled: true
+-```
+-
+-View metrics in Prometheus:
+-```bash
+-# Port-forward to Prometheus
+-kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+-```
+-
+-### Viewing Logs
+-
+-```bash
+-# All Vista3D logs
+-kubectl logs -n vista3d -l app.kubernetes.io/name=vista3d --tail=100 -f
+-
+-# Backend (GPU) logs
+-kubectl logs -n vista3d -l app.kubernetes.io/component=backend --tail=50
+-
+-# Frontend logs
+-kubectl logs -n vista3d -l app.kubernetes.io/component=frontend --tail=50
+-
+-# Image server logs
+-kubectl logs -n vista3d -l app.kubernetes.io/component=image-server --tail=50
+-```
+-
+----
+-
+-## 🔧 Operations
+-
+-### Scaling
+-
+-```bash
+-# Scale frontend
+-kubectl scale deployment vista3d-frontend --replicas=5 -n vista3d
+-
+-# Scale image server
+-kubectl scale deployment vista3d-image-server --replicas=3 -n vista3d
+-
+-# Auto-scaling is enabled by default via HPA
+-kubectl get hpa -n vista3d
+-```
+-
+-### Updates
+-
+-```bash
+-# Update values
+-helm upgrade vista3d . \
+-  --namespace vista3d \
+-  --values values-hpe-greenlake.yaml \
+-  --reuse-values
+-
+-# Update just the frontend image
+-helm upgrade vista3d . \
+-  --namespace vista3d \
+-  --reuse-values \
+-  --set frontend.image.tag=v1.2.1
+-```
+-
+-### Backup and Restore
+-
+-**Create Snapshot:**
+-```bash
+-kubectl apply -f - <<EOF
+-apiVersion: snapshot.storage.k8s.io/v1
+-kind: VolumeSnapshot
+-metadata:
+-  name: vista3d-backup-$(date +%Y%m%d)
+-  namespace: vista3d
+-spec:
+-  volumeSnapshotClassName: hpe-snapshot
+-  source:
+-    persistentVolumeClaimName: vista3d-output-pvc
+-EOF
+-```
+-
+-**List Snapshots:**
+-```bash
+-kubectl get volumesnapshot -n vista3d
+-```
+-
+-### Troubleshooting
+-
+-**Check Pod Status:**
+-```bash
+-kubectl get pods -n vista3d
+-kubectl describe pod <pod-name> -n vista3d
+-```
+-
+-**Check Events:**
+-```bash
+-kubectl get events -n vista3d --sort-by='.lastTimestamp'
+-```
+-
+-**Check GPU Allocation:**
+-```bash
+-# Get backend pod name
+-BACKEND_POD=$(kubectl get pod -n vista3d -l app.kubernetes.io/component=backend -o jsonpath='{.items[0].metadata.name}')
+-
+-# Check GPU
+-kubectl exec -n vista3d $BACKEND_POD -- nvidia-smi
+-```
+-
+-**Check Storage:**
+-```bash
+-kubectl get pvc -n vista3d
+-kubectl describe pvc vista3d-output-pvc -n vista3d
+-```
+-
+----
+-
+-## 🧹 Cleanup
+-
+-### Uninstall Vista3D
+-
+-```bash
+-# Uninstall Helm release
+-helm uninstall vista3d -n vista3d
+-
+-# Delete namespace (WARNING: This deletes all data)
+-kubectl delete namespace vista3d
+-
+-# Delete storage classes (if needed)
+-kubectl delete -f hpe-storage.yaml
+-```
+-
+-### Preserve Data
+-
+-```bash
+-# Uninstall but keep PVCs
+-helm uninstall vista3d -n vista3d
+-
+-# PVCs remain - check with:
+-kubectl get pvc -n vista3d
+-
+-# Reinstall later to reuse data
+-helm install vista3d . --namespace vista3d --values values-hpe-greenlake.yaml
+-```
+-
+----
+-
+-## 📚 Additional Resources
+-
+-### Documentation
+-- [Main README](../../README.md)
+-- [Helm Chart Documentation](README.md)
+-- [Upgrade Guide](../UPGRADE_GUIDE.md)
+-- [Release Notes](../RELEASE_NOTES_v1.2.0.md)
+-
+-### HPE Resources
+-- [HPE GreenLake Documentation](https://support.hpe.com/connect/s/product?language=en_US&ismnp=0&l5oid=1013083813&kmpmoid=1013083813&cep=on&manualsAndGuidesFilter=66000109,66000108)
+-- [HPE CSI Driver](https://scod.hpedev.io/csi_driver/)
+-- [HPE Support Portal](https://support.hpe.com)
+-
+-### NVIDIA Resources
+-- [NVIDIA NGC](https://ngc.nvidia.com)
+-- [Vista3D Documentation](https://docs.nvidia.com/nim/vista3d/)
+-- [GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/)
+-
+----
+-
+-## 🆘 Support
+-
+-### For Infrastructure Issues
+-- **HPE GreenLake Support**: Contact via HPE Support Portal
+-- **HPE Storage Issues**: Check HPE CSI driver logs
+-- **GPU Issues**: Verify NVIDIA GPU Operator status
+-
+-### For Application Issues
+-- **GitHub Issues**: [HPE-Nvidia-Vista-3D Issues](https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/issues)
+-- **Email**: dave.wright@hpe.com
+-
+----
+-
+-## ✅ Checklist
+-
+-### Pre-Deployment
+-- [ ] HPE GreenLake cluster access configured
+-- [ ] kubectl and helm installed
+-- [ ] NGC API key obtained
+-- [ ] GPU nodes available and labeled
+-- [ ] Storage classes configured
+-- [ ] Domain name configured
+-- [ ] TLS certificates ready (if using custom certs)
+-
+-### Deployment
+-- [ ] Namespace created
+-- [ ] Secrets configured
+-- [ ] Helm chart deployed
+-- [ ] All pods running
+-- [ ] PVCs bound
+-- [ ] Ingress configured
+-- [ ] DNS pointing to ingress
+-
+-### Post-Deployment
+-- [ ] Web interface accessible
+-- [ ] GPU allocation verified
+-- [ ] Test DICOM upload
+-- [ ] Monitoring enabled
+-- [ ] Backups configured
+-- [ ] Documentation updated
+-- [ ] Team trained
+-
+----
+-
+-**Last Updated:** October 10, 2025  
+-**Chart Version:** 1.2.0
+-
+diff --git a/helm/old/HPE_GREENLAKE_SUMMARY.md b/helm/old/HPE_GREENLAKE_SUMMARY.md
+deleted file mode 100644
+index 0d6e4ff..0000000
+--- a/helm/old/HPE_GREENLAKE_SUMMARY.md
++++ /dev/null
+@@ -1,355 +0,0 @@
+-# HPE GreenLake Deployment Files - Summary
+-
+-## ✅ Files Created
+-
+-All HPE GreenLake for Containers deployment files have been successfully created!
+-
+-### 📁 Location
+-`/Users/dave/AI/HPE/HPE-Nvidia-Vista-3D/helm/vista3d/`
+-
+-### 📄 Files
+-
+-1. **`values-hpe-greenlake.yaml`** (14 KB)
+-   - Main Helm values file optimized for HPE GreenLake
+-   - Configured for production deployment
+-   - Includes HPE-specific labels and annotations
+-   - GPU node selectors and tolerations
+-   - Storage class configurations
+-   - Auto-scaling and monitoring enabled
+-
+-2. **`hpe-storage.yaml`** (2.3 KB)
+-   - HPE storage class definitions
+-   - Three storage tiers: fast, standard, archive
+-   - CSI driver configurations
+-   - Volume expansion enabled
+-   - Optimized for medical imaging workloads
+-
+-3. **`deploy-greenlake.sh`** (6.5 KB) ⭐ *Executable*
+-   - Automated deployment script
+-   - Interactive prompts for NGC API key and domain
+-   - Prerequisites checking
+-   - Namespace creation and labeling
+-   - Secret management
+-   - Full Helm deployment
+-
+-4. **`GREENLAKE_DEPLOYMENT.md`** (11 KB)
+-   - Comprehensive deployment guide
+-   - Quick start instructions
+-   - Configuration details
+-   - Security best practices
+-   - Monitoring and operations
+-   - Troubleshooting guide
+-   - Complete checklist
+-
+----
+-
+-## 🚀 Quick Start
+-
+-### Deploy Vista3D on HPE GreenLake
+-
+-```bash
+-cd helm/vista3d
+-./deploy-greenlake.sh
+-```
+-
+-The script will guide you through:
+-1. ✅ Checking prerequisites
+-2. ✅ Configuring NGC API key
+-3. ✅ Setting domain name
+-4. ✅ Creating namespace and secrets
+-5. ✅ Deploying Vista3D
+-
+-### Manual Deployment
+-
+-```bash
+-# 1. Create namespace
+-kubectl create namespace vista3d
+-
+-# 2. Create secret
+-kubectl create secret generic vista3d-secrets \
+-  --from-literal=ngc-api-key="nvapi-your-key" \
+-  --namespace vista3d
+-
+-# 3. Deploy
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --values values-hpe-greenlake.yaml \
+-  --set ingress.hosts[0].host="vista3d.greenlake.yourdomain.com"
+-```
+-
+----
+-
+-## 📋 Key Features
+-
+-### HPE GreenLake Optimizations
+-
+-✅ **Storage Integration**
+-- HPE CSI driver support
+-- Three storage tiers (fast/standard/archive)
+-- Automatic volume expansion
+-- Snapshot support for backups
+-
+-✅ **GPU Scheduling**
+-- Automatic GPU node detection
+-- Proper node selectors and tolerations
+-- Affinity rules for optimal placement
+-
+-✅ **High Availability**
+-- Frontend: 3 replicas with anti-affinity
+-- Image Server: 2 replicas
+-- Pod disruption budgets
+-- Auto-scaling (HPA) enabled
+-
+-✅ **Monitoring**
+-- ServiceMonitor for Prometheus
+-- HPE GreenLake console integration
+-- HPE-specific labels and annotations
+-
+-✅ **Security**
+-- Network policies enabled
+-- Security contexts configured
+-- RBAC with service accounts
+-- TLS/SSL support
+-
+----
+-
+-## 🎯 Customization
+-
+-### Common Changes
+-
+-#### 1. Update Storage Class
+-```yaml
+-# In values-hpe-greenlake.yaml
+-persistence:
+-  storageClass: "your-hpe-storage-class"
+-```
+-
+-#### 2. Adjust Storage Sizes
+-```yaml
+-persistence:
+-  output:
+-    size: 1Ti  # Increase for more data
+-  dicom:
+-    size: 500Gi
+-```
+-
+-#### 3. Change Domain
+-```yaml
+-ingress:
+-  hosts:
+-    - host: vista3d.your-domain.com
+-```
+-
+-#### 4. Scale Resources
+-```yaml
+-backend:
+-  resources:
+-    limits:
+-      memory: "64Gi"  # For larger workloads
+-      
+-frontend:
+-  replicaCount: 5  # More replicas for high traffic
+-```
+-
+----
+-
+-## 📊 Deployment Architecture
+-
+-```
+-HPE GreenLake Cluster
+-├── GPU Node(s)
+-│   └── Vista3D Backend (1 replica)
+-│       ├── NVIDIA GPU allocated
+-│       └── Connects to HPE Storage
+-├── Compute Nodes
+-│   ├── Frontend Pods (3 replicas)
+-│   │   └── Streamlit Web Interface
+-│   └── Image Server Pods (2 replicas)
+-│       └── Medical image file serving
+-├── Storage
+-│   ├── Output PVC (500Gi, ReadWriteMany)
+-│   └── DICOM PVC (200Gi, ReadOnlyMany)
+-└── Ingress
+-    └── NGINX Ingress Controller
+-        └── TLS/SSL termination
+-```
+-
+----
+-
+-## 🔍 Verification
+-
+-### Check Deployment Status
+-
+-```bash
+-# All pods
+-kubectl get pods -n vista3d
+-
+-# Services
+-kubectl get svc -n vista3d
+-
+-# Storage
+-kubectl get pvc -n vista3d
+-
+-# Ingress
+-kubectl get ingress -n vista3d
+-
+-# GPU allocation
+-kubectl describe node | grep -A 5 "nvidia.com/gpu"
+-```
+-
+-### Expected Output
+-
+-```
+-NAME                                  READY   STATUS    RESTARTS   AGE
+-vista3d-backend-xxxxxxxxx-xxxxx       1/1     Running   0          5m
+-vista3d-frontend-xxxxxxxxx-xxxxx      1/1     Running   0          5m
+-vista3d-frontend-xxxxxxxxx-xxxxx      1/1     Running   0          5m
+-vista3d-frontend-xxxxxxxxx-xxxxx      1/1     Running   0          5m
+-vista3d-image-server-xxxxxxxx-xxxxx   1/1     Running   0          5m
+-vista3d-image-server-xxxxxxxx-xxxxx   1/1     Running   0          5m
+-```
+-
+----
+-
+-## 📚 Documentation
+-
+-### Primary Documentation
+-- **`GREENLAKE_DEPLOYMENT.md`** - Complete deployment guide
+-- **`values-hpe-greenlake.yaml`** - Configuration reference (commented)
+-- **`../UPGRADE_GUIDE.md`** - Upgrade procedures
+-- **`../RELEASE_NOTES_v1.2.0.md`** - What's new
+-
+-### Related Documentation
+-- **`README.md`** - Helm chart overview
+-- **`../README.md`** - Main project README
+-- **`../../docs/HELM.md`** - Kubernetes deployment guide
+-
+----
+-
+-## 🛠️ Operations
+-
+-### Common Commands
+-
+-```bash
+-# View logs
+-kubectl logs -n vista3d -l app.kubernetes.io/name=vista3d --tail=100 -f
+-
+-# Scale frontend
+-kubectl scale deployment vista3d-frontend --replicas=5 -n vista3d
+-
+-# Check GPU usage
+-kubectl exec -n vista3d <backend-pod> -- nvidia-smi
+-
+-# Port-forward for testing
+-kubectl port-forward -n vista3d svc/vista3d-frontend 8501:8501
+-
+-# Update deployment
+-helm upgrade vista3d . \
+-  --namespace vista3d \
+-  --values values-hpe-greenlake.yaml \
+-  --reuse-values
+-
+-# Rollback
+-helm rollback vista3d -n vista3d
+-
+-# Uninstall
+-helm uninstall vista3d -n vista3d
+-```
+-
+----
+-
+-## 🆘 Troubleshooting
+-
+-### Pod Issues
+-```bash
+-# Check pod events
+-kubectl describe pod <pod-name> -n vista3d
+-
+-# Check logs
+-kubectl logs <pod-name> -n vista3d --previous
+-
+-# Check resource constraints
+-kubectl top pods -n vista3d
+-```
+-
+-### Storage Issues
+-```bash
+-# Check PVC status
+-kubectl get pvc -n vista3d
+-kubectl describe pvc <pvc-name> -n vista3d
+-
+-# Check storage class
+-kubectl get storageclass
+-```
+-
+-### GPU Issues
+-```bash
+-# Check GPU nodes
+-kubectl get nodes -o json | \
+-  jq '.items[] | select(.status.allocatable."nvidia.com/gpu" != null)'
+-
+-# Check GPU operator
+-kubectl get pods -n gpu-operator-resources
+-
+-# Verify GPU in pod
+-kubectl exec -n vista3d <backend-pod> -- nvidia-smi
+-```
+-
+----
+-
+-## ✨ Next Steps
+-
+-### 1. Prerequisites
+-- [ ] Access HPE GreenLake console
+-- [ ] Download kubeconfig
+-- [ ] Install kubectl and helm
+-- [ ] Obtain NGC API key
+-
+-### 2. Deployment
+-- [ ] Review `values-hpe-greenlake.yaml`
+-- [ ] Customize domain and storage settings
+-- [ ] Run `./deploy-greenlake.sh`
+-- [ ] Verify all pods are running
+-
+-### 3. Configuration
+-- [ ] Configure DNS for your domain
+-- [ ] Set up TLS certificates
+-- [ ] Upload test DICOM data
+-- [ ] Test AI segmentation
+-
+-### 4. Operations
+-- [ ] Set up monitoring dashboards
+-- [ ] Configure backup schedules
+-- [ ] Document access procedures
+-- [ ] Train users on the platform
+-
+----
+-
+-## 📞 Support
+-
+-### HPE Support
+-- **Infrastructure Issues**: HPE GreenLake Support
+-- **Storage Issues**: HPE CSI Driver documentation
+-- **GPU Issues**: NVIDIA GPU Operator
+-
+-### Application Support
+-- **GitHub**: [HPE-Nvidia-Vista-3D Issues](https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/issues)
+-- **Email**: dave.wright@hpe.com
+-
+----
+-
+-## 📝 Change Log
+-
+-**October 10, 2025**
+-- ✅ Created `values-hpe-greenlake.yaml`
+-- ✅ Created `hpe-storage.yaml`
+-- ✅ Created `deploy-greenlake.sh`
+-- ✅ Created `GREENLAKE_DEPLOYMENT.md`
+-- ✅ All files ready for deployment
+-
+----
+-
+-**Ready to deploy! 🚀**
+-
+-For detailed instructions, see: **`GREENLAKE_DEPLOYMENT.md`**
+-
+diff --git a/helm/old/QUICK_DEPLOY.md b/helm/old/QUICK_DEPLOY.md
+deleted file mode 100644
+index 66386c0..0000000
+--- a/helm/old/QUICK_DEPLOY.md
++++ /dev/null
+@@ -1,68 +0,0 @@
+-# 🚀 Vista3D on HPE GreenLake - Quick Deploy
+-
+-## One-Command Deployment
+-
+-```bash
+-cd helm/vista3d && ./deploy-greenlake.sh
+-```
+-
+-## Manual 3-Step Deploy
+-
+-```bash
+-# 1. Create namespace and secret
+-kubectl create namespace vista3d
+-kubectl create secret generic vista3d-secrets \
+-  --from-literal=ngc-api-key="nvapi-YOUR-KEY" \
+-  --namespace vista3d
+-
+-# 2. Deploy
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --values values-hpe-greenlake.yaml \
+-  --set ingress.hosts[0].host="vista3d.yourdomain.com"
+-
+-# 3. Verify
+-kubectl get pods -n vista3d
+-```
+-
+-## Access
+-
+-```bash
+-# Via ingress
+-https://vista3d.yourdomain.com
+-
+-# Or port-forward
+-kubectl port-forward -n vista3d svc/vista3d-frontend 8501:8501
+-# Then visit: http://localhost:8501
+-```
+-
+-## Useful Commands
+-
+-```bash
+-# Status
+-kubectl get all -n vista3d
+-
+-# Logs
+-kubectl logs -n vista3d -l app.kubernetes.io/name=vista3d -f
+-
+-# Scale
+-kubectl scale deployment vista3d-frontend --replicas=5 -n vista3d
+-
+-# Update
+-helm upgrade vista3d . --namespace vista3d --reuse-values
+-
+-# Uninstall
+-helm uninstall vista3d -n vista3d
+-```
+-
+-## Files
+-
+-- **values-hpe-greenlake.yaml** - Configuration
+-- **deploy-greenlake.sh** - Automated deployment
+-- **GREENLAKE_DEPLOYMENT.md** - Full guide
+-- **hpe-storage.yaml** - Storage classes
+-
+-## Need Help?
+-
+-See `GREENLAKE_DEPLOYMENT.md` for complete documentation.
+-
+diff --git a/helm/old/README.md b/helm/old/README.md
+deleted file mode 100644
+index 2a035ff..0000000
+--- a/helm/old/README.md
++++ /dev/null
+@@ -1,290 +0,0 @@
+-# HPE NVIDIA Vista3D Helm Chart
+-
+-This Helm chart deploys the HPE NVIDIA Vista3D Medical AI Platform on Kubernetes. The platform provides AI-powered medical image segmentation with 3D visualization capabilities.
+-
+-**Chart Version**: 1.2.0  
+-**App Version**: 1.2.0
+-
+-## What's New in v1.2.0
+-
+-- **Enhanced Colormap Support**: Added built-in NiiVue colormaps (23 colormaps including gray, jet, viridis, plasma, and more)
+-- **Improved Visualization**: Built-in colormaps are now natively supported without requiring custom JSON definitions
+-- **Better Performance**: Optimized colormap loading with intelligent caching for built-in options
+-
+-## Prerequisites
+-
+-- Kubernetes 1.19+
+-- Helm 3.0+
+-- NVIDIA GPU nodes with Container Toolkit installed
+-- NVIDIA NGC account and API key
+-
+-## Installation
+-
+-### Add the Helm repository (if published)
+-```bash
+-# Note: This chart is not yet published to a public repository
+-# Use the local installation method below instead
+-# helm repo add vista3d https://your-helm-repo.com
+-# helm repo update
+-```
+-
+-### Install from local chart
+-```bash
+-# Clone the repository
+-git clone https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D.git
+-cd HPE-Nvidia-Vista-3D/helm/vista3d
+-
+-# Install the chart
+-helm install vista3d . --namespace vista3d --create-namespace
+-```
+-
+-### Install with custom values
+-```bash
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --create-namespace \
+-  --set secrets.ngcApiKey="your-ngc-api-key" \
+-  --set ingress.enabled=true \
+-  --set ingress.hosts[0].host="vista3d.yourdomain.com"
+-```
+-
+-## Configuration
+-
+-The following table lists the configurable parameters and their default values:
+-
+-| Parameter | Description | Default |
+-|-----------|-------------|---------|
+-| `backend.enabled` | Enable Vista3D backend server | `true` |
+-| `frontend.enabled` | Enable Streamlit frontend | `true` |
+-| `imageServer.enabled` | Enable image server | `true` |
+-| `ingress.enabled` | Enable ingress | `false` |
+-| `persistence.enabled` | Enable persistent volumes | `true` |
+-| `secrets.ngcApiKey` | NVIDIA NGC API key | `""` |
+-
+-### Backend Configuration
+-
+-The backend requires NVIDIA GPU nodes. Configure node selectors and tolerations:
+-
+-```yaml
+-backend:
+-  enabled: true
+-  nodeSelector:
+-    nvidia.com/gpu: "true"
+-  tolerations:
+-    - key: nvidia.com/gpu
+-      operator: Exists
+-      effect: NoSchedule
+-  resources:
+-    limits:
+-      nvidia.com/gpu: 1
+-      memory: "16Gi"
+-      cpu: "4"
+-```
+-
+-### Frontend Configuration
+-
+-The frontend can be scaled horizontally:
+-
+-```yaml
+-frontend:
+-  enabled: true
+-  replicaCount: 2
+-  resources:
+-    limits:
+-      memory: "4Gi"
+-      cpu: "2"
+-```
+-
+-### Ingress Configuration
+-
+-Enable ingress for external access:
+-
+-```yaml
+-ingress:
+-  enabled: true
+-  className: "nginx"
+-  hosts:
+-    - host: vista3d.yourdomain.com
+-      paths:
+-        - path: /
+-          pathType: Prefix
+-          service: vista3d-frontend
+-```
+-
+-### Persistence Configuration
+-
+-Configure persistent volumes for data storage:
+-
+-```yaml
+-persistence:
+-  enabled: true
+-  storageClass: "fast-ssd"
+-  output:
+-    size: 100Gi
+-    accessMode: ReadWriteMany
+-  dicom:
+-    size: 50Gi
+-    accessMode: ReadOnlyMany
+-```
+-
+-## Values
+-
+-| Key | Type | Default | Description |
+-|-----|------|---------|-------------|
+-| `backend.enabled` | bool | `true` | Enable Vista3D backend server |
+-| `backend.replicaCount` | int | `1` | Number of backend replicas |
+-| `backend.image.repository` | string | `"nvcr.io/nim/nvidia/vista3d"` | Backend image repository |
+-| `backend.image.tag` | string | `"1.0.0"` | Backend image tag |
+-| `backend.resources.limits.nvidia.com/gpu` | int | `1` | GPU resource limit |
+-| `frontend.enabled` | bool | `true` | Enable Streamlit frontend |
+-| `frontend.replicaCount` | int | `2` | Number of frontend replicas |
+-| `frontend.image.repository` | string | `"dwtwp/vista3d-frontend"` | Frontend image repository |
+-| `imageServer.enabled` | bool | `true` | Enable image server |
+-| `imageServer.image.repository` | string | `"dwtwp/vista3d-image-server"` | Image server repository |
+-| `ingress.enabled` | bool | `false` | Enable ingress |
+-| `ingress.className` | string | `"nginx"` | Ingress class name |
+-| `persistence.enabled` | bool | `true` | Enable persistent volumes |
+-| `persistence.storageClass` | string | `""` | Storage class for PVCs |
+-| `secrets.create` | bool | `true` | Create secrets |
+-| `secrets.ngcApiKey` | string | `""` | NVIDIA NGC API key |
+-
+-## Usage
+-
+-### 1. Deploy the Chart
+-
+-```bash
+-helm install vista3d . --namespace vista3d --create-namespace
+-```
+-
+-### 2. Configure NVIDIA NGC API Key
+-
+-```bash
+-kubectl create secret generic vista3d-secrets \
+-  --from-literal=ngc-api-key="your-ngc-api-key" \
+-  --namespace vista3d
+-```
+-
+-### 3. Access the Application
+-
+-If ingress is enabled:
+-```bash
+-# Access via ingress hostname
+-curl http://vista3d.yourdomain.com
+-```
+-
+-If ingress is disabled:
+-```bash
+-# Port forward to access locally
+-kubectl port-forward service/vista3d-frontend 8501:8501 --namespace vista3d
+-```
+-
+-### 4. Upload Medical Data
+-
+-1. Access the web interface
+-2. Navigate to the Tools page
+-3. Upload DICOM or NIFTI files
+-4. Run AI segmentation
+-5. View 3D visualizations
+-
+-## Scaling
+-
+-### Horizontal Pod Autoscaling
+-
+-Enable HPA for the frontend:
+-
+-```yaml
+-autoscaling:
+-  enabled: true
+-  minReplicas: 2
+-  maxReplicas: 10
+-  targetCPUUtilizationPercentage: 80
+-```
+-
+-### Manual Scaling
+-
+-```bash
+-# Scale frontend
+-kubectl scale deployment vista3d-frontend --replicas=5 --namespace vista3d
+-
+-# Scale image server
+-kubectl scale deployment vista3d-image-server --replicas=3 --namespace vista3d
+-```
+-
+-## Monitoring
+-
+-### Enable ServiceMonitor for Prometheus
+-
+-```yaml
+-monitoring:
+-  enabled: true
+-  serviceMonitor:
+-    enabled: true
+-    interval: 30s
+-    scrapeTimeout: 10s
+-```
+-
+-### View Logs
+-
+-```bash
+-# Backend logs
+-kubectl logs -l app.kubernetes.io/component=backend --namespace vista3d
+-
+-# Frontend logs
+-kubectl logs -l app.kubernetes.io/component=frontend --namespace vista3d
+-
+-# Image server logs
+-kubectl logs -l app.kubernetes.io/component=image-server --namespace vista3d
+-```
+-
+-## Troubleshooting
+-
+-### Common Issues
+-
+-1. **Backend pod not starting**
+-   - Check if GPU nodes are available
+-   - Verify NVIDIA Container Toolkit installation
+-   - Check resource limits and requests
+-
+-2. **Frontend not accessible**
+-   - Verify service is running
+-   - Check ingress configuration
+-   - Verify port forwarding
+-
+-3. **Image server not serving files**
+-   - Check persistent volume claims
+-   - Verify file permissions
+-   - Check image server logs
+-
+-### Debug Commands
+-
+-```bash
+-# Check pod status
+-kubectl get pods --namespace vista3d
+-
+-# Check services
+-kubectl get svc --namespace vista3d
+-
+-# Check persistent volumes
+-kubectl get pvc --namespace vista3d
+-
+-# Check events
+-kubectl get events --namespace vista3d --sort-by='.lastTimestamp'
+-```
+-
+-## Uninstallation
+-
+-```bash
+-helm uninstall vista3d --namespace vista3d
+-```
+-
+-## Contributing
+-
+-1. Fork the repository
+-2. Create a feature branch
+-3. Make your changes
+-4. Test the chart
+-5. Submit a pull request
+-
+-## License
+-
+-This chart is licensed under the Apache 2.0 License.
+diff --git a/helm/old/RELEASE_NOTES_v1.2.0.md b/helm/old/RELEASE_NOTES_v1.2.0.md
+deleted file mode 100644
+index d617c45..0000000
+--- a/helm/old/RELEASE_NOTES_v1.2.0.md
++++ /dev/null
+@@ -1,242 +0,0 @@
+-# Release Notes - Vista3D Helm Chart v1.2.0
+-
+-**Release Date**: October 10, 2025  
+-**Chart Version**: 1.2.0  
+-**App Version**: 1.2.0
+-
+-## 🎉 Overview
+-
+-This release introduces enhanced colormap support for medical imaging visualization, providing better tools for CT and MRI analysis with 23+ built-in colormaps.
+-
+-## ✨ New Features
+-
+-### Enhanced Colormap Support
+-
+-The frontend now includes native support for 23 built-in NiiVue colormaps:
+-
+-#### Scientific Colormaps
+-- **Standard**: gray, jet, hot, cool, warm
+-- **Perceptually Uniform**: viridis, plasma, magma, inferno
+-- **Specialized**: parula, turbo, hsv, bone, copper, cubehelix, cividis
+-
+-#### Seasonal Colormaps
+-- spring, summer, autumn, winter
+-
+-#### Scientific Visualization
+-- rainbow, linspecer, batlow, blues
+-
+-### Technical Improvements
+-
+-1. **Intelligent Colormap Loading**
+-   - Built-in colormaps are now handled natively by NiiVue
+-   - No need to load JSON data for standard colormaps
+-   - Reduced memory footprint and faster loading times
+-
+-2. **Performance Optimization**
+-   - Colormap detection happens at load time
+-   - Built-in colormaps skip unnecessary data transfer
+-   - Improved caching mechanism
+-
+-3. **Code Quality**
+-   - Fixed typo in Chart.yaml (Healthcare maintainer name)
+-   - Better separation of built-in vs. custom colormaps
+-   - Cleaner code organization in constants.py
+-
+-## 📋 What's Changed
+-
+-### Frontend Changes
+-
+-**File**: `frontend/utils/constants.py`
+-- Added `BUILTIN_NIIVUE_COLORMAPS` dictionary with 23 colormap definitions
+-- Modified `load_colormap_data()` to check for built-ins first
+-- Improved `load_colormaps()` to include built-in options
+-- Better error handling and fallback logic
+-
+-**File**: `frontend/assets/niivue_viewer.html`
+-- Updated to skip `addColormap` call for built-in colormaps
+-- Improved colormap initialization logic
+-
+-### Helm Chart Changes
+-
+-**Updated Files**:
+-- `Chart.yaml` - Version bump to 1.2.0, fixed maintainer typo
+-- `README.md` - Updated version numbers and added "What's New" section
+-- `NOTES.txt` - Added release highlights
+-- `CHANGELOG.md` - New file documenting all changes
+-
+-**New Files**:
+-- `helm/UPGRADE_GUIDE.md` - Comprehensive upgrade instructions
+-- `helm/RELEASE_NOTES_v1.2.0.md` - This file
+-
+-**Enhanced Documentation**:
+-- `helm/README.md` - Updated architecture section with colormap features
+-
+-## 🔄 Upgrade Instructions
+-
+-### Quick Upgrade
+-
+-```bash
+-# Pull latest changes
+-git pull origin main
+-
+-# Upgrade the Helm release
+-cd helm/vista3d
+-helm upgrade vista3d . --namespace vista3d
+-```
+-
+-### Detailed Instructions
+-
+-See [UPGRADE_GUIDE.md](UPGRADE_GUIDE.md) for comprehensive upgrade instructions.
+-
+-## ✅ Compatibility
+-
+-- **Kubernetes**: 1.19+
+-- **Helm**: 3.0+
+-- **NVIDIA GPU**: Required for backend
+-- **Backward Compatibility**: ✅ Fully compatible with v1.1.0
+-
+-## 📦 Container Images
+-
+-- **Frontend**: `dwtwp/vista3d-frontend:latest` (updated)
+-- **Backend**: `nvcr.io/nim/nvidia/vista3d:1.0.0` (no changes)
+-- **Image Server**: `dwtwp/vista3d-image-server:latest` (no changes)
+-
+-**Note**: Rebuild the frontend image after pulling the latest code to get the colormap improvements.
+-
+-## 🚀 Getting Started
+-
+-### New Installation
+-
+-```bash
+-# Clone the repository
+-git clone https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D.git
+-cd HPE-Nvidia-Vista-3D/helm/vista3d
+-
+-# Install the chart
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --create-namespace \
+-  --set secrets.ngcApiKey="your-ngc-api-key"
+-```
+-
+-### Using the New Colormaps
+-
+-1. Access the Vista3D web interface
+-2. Navigate to the NiiVue Viewer
+-3. Select a patient and NIfTI file
+-4. Use the colormap dropdown to choose from:
+-   - Medical CT colormaps (niivue-ct_*)
+-   - Scientific colormaps (viridis, plasma, magma)
+-   - Standard colormaps (gray, jet, hot, cool)
+-   - Anatomical colormaps (custom medical imaging)
+-5. Observe the improved visualization options
+-
+-## 📊 Benefits
+-
+-### For Radiologists
+-- Better tissue contrast with specialized CT colormaps
+-- More intuitive color schemes for different anatomical structures
+-- Faster colormap switching without loading delays
+-
+-### For Researchers
+-- Access to scientifically validated colormaps (viridis, plasma)
+-- Perceptually uniform color scales for accurate data representation
+-- Consistent colormap behavior across sessions
+-
+-### For Developers
+-- Cleaner code with better separation of concerns
+-- Easier to add new built-in colormaps in the future
+-- Improved maintainability of colormap logic
+-
+-## 🔧 Technical Details
+-
+-### Architecture Changes
+-
+-```
+-Frontend Container:
+-├── assets/
+-│   ├── colormaps/          # Custom medical colormaps (JSON)
+-│   └── niivue_viewer.html  # Updated viewer with built-in support
+-└── utils/
+-    └── constants.py        # Added BUILTIN_NIIVUE_COLORMAPS
+-```
+-
+-### Colormap Loading Logic
+-
+-```python
+-# Old behavior: Always loaded from JSON
+-colormap_data = load_json(colormap_name)
+-
+-# New behavior: Check for built-ins first
+-if colormap_name in BUILTIN_NIIVUE_COLORMAPS:
+-    return {'__builtin__': True}  # Signal to use native NiiVue colormap
+-else:
+-    return load_json(colormap_name)  # Load custom colormap
+-```
+-
+-### Viewer HTML Changes
+-
+-```javascript
+-// Old: Always called addColormap
+-nv.addColormap(name, colormap_data)
+-
+-// New: Skip for built-ins
+-if (!colormap_data['__builtin__']) {
+-    nv.addColormap(name, colormap_data)
+-}
+-```
+-
+-## 🐛 Bug Fixes
+-
+-- Fixed typo in Chart.yaml maintainer field (Helathcare → Healthcare)
+-- Improved error handling in colormap loading functions
+-- Better fallback behavior when colormaps are not found
+-
+-## 📚 Documentation Updates
+-
+-- Updated Helm chart README with new features
+-- Added comprehensive CHANGELOG.md
+-- Created detailed UPGRADE_GUIDE.md
+-- Enhanced architecture documentation in helm/README.md
+-- Updated NOTES.txt with release highlights
+-
+-## 🔍 Testing
+-
+-All changes have been tested with:
+-- ✅ Helm lint validation passed
+-- ✅ Chart structure verified
+-- ✅ Template rendering validated
+-- ✅ Backward compatibility confirmed
+-- ✅ Frontend colormap functionality tested
+-
+-## 🤝 Contributing
+-
+-We welcome contributions! If you'd like to add more colormaps or improve the visualization:
+-
+-1. Fork the repository
+-2. Create a feature branch
+-3. Add your colormaps to `frontend/assets/colormaps/`
+-4. Update the documentation
+-5. Submit a pull request
+-
+-## 📞 Support
+-
+-- **Documentation**: [Main README](../../README.md)
+-- **Issues**: [GitHub Issues](https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/issues)
+-- **Email**: dave.wright@hpe.com
+-
+-## 🙏 Acknowledgments
+-
+-- **NiiVue Team**: For the excellent medical imaging viewer
+-- **HPE Healthcare AI Team**: For platform development
+-- **NVIDIA**: For Vista3D AI model and NIM platform
+-
+-## 📄 License
+-
+-Apache 2.0 License
+-
+----
+-
+-**Previous Version**: [v1.1.0](https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/releases/tag/v1.1.0)  
+-**Full Changelog**: See [CHANGELOG.md](vista3d/CHANGELOG.md)
+-
+diff --git a/helm/old/SAMPLE_values.yaml b/helm/old/SAMPLE_values.yaml
+deleted file mode 100644
+index 69b5c2f..0000000
+--- a/helm/old/SAMPLE_values.yaml
++++ /dev/null
+@@ -1,85 +0,0 @@
+-replicaCount: 1 
+-namespace: "docker-kube-demo"
+-
+-frontend:
+-  image:
+-    repository: dwtwp/docker-kube-demo-frontend
+-    tag: latest 
+-    pullPolicy: IfNotPresent
+-  
+-  service:
+-    type: ClusterIP
+-    port: 8501
+-    targetPort: 8501
+-    protocol: TCP
+-    name: frontend-service 
+-  
+-  resources:
+-    limits:
+-      cpu: 1000m
+-      memory: 2Gi
+-    requests:
+-      cpu: 500m
+-      memory: 1Gi
+-  
+-  app:
+-    port: 8501
+-    name: http-frontend
+-
+-serviceAccount:
+-  create: true
+-  automount: true
+-  annotations: {}
+-  name: "" 
+-
+-
+-backend:
+-  replicaCount: 1 
+-  
+-  image:
+-    repository: dwtwp/docker-kube-demo-backend
+-    pullPolicy: IfNotPresent 
+-    tag: latest 
+-  
+-  service:
+-    type: ClusterIP
+-    port: 8000
+-    targetPort: 8000
+-    protocol: TCP
+-    name: backend-service 
+-  
+-  resources:
+-    limits:
+-      cpu: 500m
+-      memory: 1Gi
+-    requests:
+-      cpu: 250m
+-      memory: 512Mi
+-  
+-  app:
+-    port: 8000
+-    name: http-backend
+-
+-env:
+-  PYTHONUNBUFFERED: "1"
+-  HTTP_PROXY: ""
+-  HTTPS_PROXY: ""
+-  NO_PROXY: "localhost,127.0.0.1,0.0.0.0,::1,frontend-service,backend-service" 
+-  REQUESTS_CA_BUNDLE: ""
+-  CURL_CA_BUNDLE: ""
+-
+-apiKey:
+-  value: "demo-api-key"
+-
+-persistence:
+-  enabled: false
+-  existingClaim: ""
+-  mountPath: "/data"
+-  subPath: ""
+-
+-ezua:
+-  enabled: true
+-  virtualService:
+-    endpoint: "docker-kube-demo.${DOMAIN_NAME}"
+-    backendEndpoint: "docker-kube-demo-backend.${DOMAIN_NAME}"
+-    istioGateway: "istio-system/ezaf-gateway"
+diff --git a/helm/old/TROUBLESHOOTING_FIXES.md b/helm/old/TROUBLESHOOTING_FIXES.md
+deleted file mode 100644
+index 8ddcb11..0000000
+--- a/helm/old/TROUBLESHOOTING_FIXES.md
++++ /dev/null
+@@ -1,130 +0,0 @@
+-# Minikube Frontend Deployment - Troubleshooting Fixes
+-
+-## Issues Found and Fixed
+-
+-### 1. **mk_guide.sh Script**
+-**Problem:** The script would fail if trying to install when a release already existed.
+-
+-**Fix:** Added logic to check if the release exists and upgrade it instead of reinstalling.
+-
+-```bash
+-# Check if the helm release already exists
+-if helm list -q | grep -q "^vista3d-frontend$"; then
+-    echo "vista3d-frontend release already exists. Upgrading..."
+-    helm upgrade vista3d-frontend ./vista3d -f vista3d/values-frontend-only.yaml
+-else
+-    echo "Installing frontend-only release (vista3d-frontend)..."
+-    helm install vista3d-frontend ./vista3d -f vista3d/values-frontend-only.yaml
+-fi
+-```
+-
+-### 2. **PVC Template (helm/vista3d/templates/pvc.yaml)**
+-**Problem:** Missing YAML document separator between the two PVC definitions, causing the second PVC to not be created.
+-
+-**Fix:** Added `---` separator between the PVCs at line 20.
+-
+-### 3. **values-frontend-only.yaml**
+-**Problem:** Multiple issues:
+-- Persistence not properly configured
+-- Access mode incompatible with minikube (ReadOnlyMany not supported)
+-- Security context preventing container from writing to required directories
+-
+-**Fix:** Created a simplified configuration:
+-```yaml
+-backend:
+-  enabled: false
+-
+-imageServer:
+-  enabled: false
+-
+-persistence:
+-  enabled: true
+-  output:
+-    enabled: true
+-    accessMode: ReadWriteOnce
+-    size: 10Gi
+-  dicom:
+-    enabled: true
+-    accessMode: ReadWriteOnce
+-    size: 10Gi
+-
+-# Override security context to run as root (required for local development)
+-podSecurityContext:
+-  runAsUser: 0
+-  runAsNonRoot: false
+-  fsGroup: 0
+-
+-securityContext:
+-  runAsUser: 0
+-  runAsNonRoot: false
+-  allowPrivilegeEscalation: true
+-  readOnlyRootFilesystem: false
+-```
+-
+-### 4. **Minikube Storage Provisioner**
+-**Problem:** The storage provisioner was crashing on startup.
+-
+-**Solution:** After recreating minikube (`minikube delete && minikube start`), the provisioner stabilizes after a few restarts.
+-
+-## Usage
+-
+-### Start the Frontend
+-```bash
+-cd helm
+-./mk_guide.sh start
+-```
+-
+-Wait 1-2 minutes for the pod to become ready, then access the service:
+-
+-```bash
+-# Option 1: Port forward (recommended)
+-kubectl port-forward service/vista3d-frontend-frontend 8501:8501
+-# Then open: http://localhost:8501
+-
+-# Option 2: Minikube service (opens tunnel)
+-minikube service vista3d-frontend-frontend
+-```
+-
+-### Stop the Frontend
+-```bash
+-cd helm
+-./mk_guide.sh stop
+-```
+-
+-### Check Status
+-```bash
+-# Check pod status
+-kubectl get pods -l app.kubernetes.io/instance=vista3d-frontend
+-
+-# Check PVCs
+-kubectl get pvc
+-
+-# Check logs
+-kubectl logs -l app.kubernetes.io/instance=vista3d-frontend
+-```
+-
+-## Important Notes
+-
+-1. **Security Context:** The frontend runs as root (UID 0) in this configuration. This is acceptable for local development but should be reconsidered for production.
+-
+-2. **Storage:** Reduced PVC sizes to 10Gi each for local testing. Adjust in `values-frontend-only.yaml` if needed.
+-
+-3. **Minikube Limitations:** 
+-   - Only supports ReadWriteOnce (RWO) access mode
+-   - Storage provisioner may restart a few times on initial startup (normal)
+-
+-4. **Image Pull:** First start may take longer as it pulls the `dwtwp/vista3d-frontend:latest` image (~800MB).
+-
+-## Verified Working Configuration
+-
+-- **Minikube Version:** 1.37.0
+-- **Kubernetes Version:** (from minikube)
+-- **Platform:** Darwin (macOS) ARM64
+-- **Driver:** Docker
+-
+-The complete flow has been tested and verified working:
+-1. `mk_guide.sh start` - ✅ Works
+-2. Pod startup with PVCs - ✅ Works  
+-3. Streamlit frontend running - ✅ Works
+-4. `mk_guide.sh stop` - ✅ Works
+-
+diff --git a/helm/old/UPDATE_SUMMARY.md b/helm/old/UPDATE_SUMMARY.md
+deleted file mode 100644
+index 2785f70..0000000
+--- a/helm/old/UPDATE_SUMMARY.md
++++ /dev/null
+@@ -1,279 +0,0 @@
+-# Helm Chart Update Summary
+-
+-## Date
+-October 10, 2025
+-
+-## Version
+-Updated from **v1.1.0** to **v1.2.0**
+-
+-## Overview
+-This update synchronizes the Helm charts with recent frontend and backend changes, primarily focusing on enhanced colormap support for medical imaging visualization.
+-
+----
+-
+-## 📝 Changes Made
+-
+-### 1. Chart Version Updates
+-
+-**File**: `helm/vista3d/Chart.yaml`
+-- ✅ Bumped chart version: `1.1.0` → `1.2.0`
+-- ✅ Bumped app version: `1.1.0` → `1.2.0`
+-- ✅ Fixed typo: "Helathcare" → "Healthcare" in maintainer name
+-- ✅ Removed nginx-ingress dependency (now documented as pre-requisite)
+-- ✅ Added annotation about ingress controller requirements
+-
+-### 2. Documentation Updates
+-
+-**File**: `helm/vista3d/README.md`
+-- ✅ Updated version numbers to 1.2.0
+-- ✅ Added "What's New in v1.2.0" section highlighting:
+-  - Enhanced Colormap Support (23+ built-in colormaps)
+-  - Improved Visualization capabilities
+-  - Better Performance with optimized loading
+-
+-**File**: `helm/README.md`
+-- ✅ Enhanced Architecture section for Frontend component
+-- ✅ Added feature highlights:
+-  - Enhanced NiiVue 3D viewer with 23+ built-in colormaps
+-  - Medical-specific colormaps for CT/MRI visualization
+-  - Real-time volume rendering and segmentation overlay
+-
+-**File**: `helm/vista3d/templates/NOTES.txt`
+-- ✅ Added "New Features in v1.2.0" section
+-- ✅ Highlighted colormap improvements
+-- ✅ Updated next steps to mention enhanced colormaps
+-
+-### 3. New Documentation Files
+-
+-**File**: `helm/vista3d/CHANGELOG.md` (NEW)
+-- ✅ Comprehensive changelog following Keep a Changelog format
+-- ✅ Documented all v1.2.0 changes
+-- ✅ Maintained history of v1.1.0 features
+-
+-**File**: `helm/UPGRADE_GUIDE.md` (NEW)
+-- ✅ Step-by-step upgrade instructions
+-- ✅ Rollback procedures
+-- ✅ Troubleshooting guide
+-- ✅ Testing procedures
+-- ✅ Docker image rebuild instructions
+-
+-**File**: `helm/RELEASE_NOTES_v1.2.0.md` (NEW)
+-- ✅ Comprehensive release notes
+-- ✅ Technical details of changes
+-- ✅ Benefits for different user types
+-- ✅ Architecture diagrams
+-- ✅ Code examples
+-
+-**File**: `helm/UPDATE_SUMMARY.md` (NEW - this file)
+-- ✅ Quick reference for all changes made
+-
+----
+-
+-## 🎯 Frontend Changes Reflected
+-
+-The Helm chart updates reflect these frontend improvements:
+-
+-### Built-in Colormap Support
+-**File**: `frontend/utils/constants.py`
+-- Added `BUILTIN_NIIVUE_COLORMAPS` dictionary with 23 colormaps:
+-  - gray, jet, hot, cool, warm, spring, summer, autumn, winter
+-  - rainbow, viridis, plasma, magma, inferno, parula, turbo
+-  - hsv, bone, copper, cubehelix, cividis, linspecer, batlow, blues
+-
+-### Enhanced Colormap Loading
+-- Modified `load_colormap_data()` to check built-ins first
+-- Returns `{'__builtin__': True}` for native NiiVue colormaps
+-- Falls back to JSON loading for custom colormaps
+-
+-### Viewer Integration
+-**File**: `frontend/assets/niivue_viewer.html`
+-- Updated to skip `addColormap()` for built-in colormaps
+-- Improved initialization logic
+-
+----
+-
+-## 🔧 Backend Changes Reflected
+-
+-No backend code changes were required. The existing Helm configuration already includes:
+-
+-### Environment Variables (already in configmap.yaml)
+-- ✅ All CORS settings
+-- ✅ File access configurations
+-- ✅ Network access permissions
+-- ✅ Vista3D specific settings
+-
+-### Backend Deployment
+-- ✅ Correct image: `nvcr.io/nim/nvidia/vista3d:1.0.0`
+-- ✅ GPU resource allocation
+-- ✅ Volume mounts
+-- ✅ Health checks
+-
+----
+-
+-## ✅ Validation Steps Completed
+-
+-### 1. Helm Lint
+-```bash
+-helm lint .
+-# Result: ✅ PASSED (1 chart linted, 0 failed)
+-```
+-
+-### 2. Helm Package
+-```bash
+-helm package vista3d/
+-# Result: ✅ SUCCESS (vista3d-1.2.0.tgz created)
+-```
+-
+-### 3. Version Consistency Check
+-- ✅ Chart.yaml version matches README
+-- ✅ All documentation references updated
+-- ✅ CHANGELOG properly formatted
+-
+-### 4. Template Validation
+-- ✅ All templates properly reference values
+-- ✅ ConfigMap has all required environment variables
+-- ✅ Deployments use correct images
+-- ✅ Services properly configured
+-
+----
+-
+-## 📦 Container Image Requirements
+-
+-### Images That Need Rebuilding
+-- **Frontend**: `dwtwp/vista3d-frontend:latest`
+-  - ⚠️ Must be rebuilt to include new colormap changes
+-  - Includes updated `constants.py` and `niivue_viewer.html`
+-
+-### Images That Don't Need Changes
+-- **Backend**: `nvcr.io/nim/nvidia/vista3d:1.0.0` ✅
+-- **Image Server**: `dwtwp/vista3d-image-server:latest` ✅
+-
+----
+-
+-## 🚀 Deployment Instructions
+-
+-### For New Deployments
+-```bash
+-cd helm/vista3d
+-helm install vista3d . \
+-  --namespace vista3d \
+-  --create-namespace \
+-  --set secrets.ngcApiKey="your-ngc-api-key"
+-```
+-
+-### For Existing Deployments (Upgrade)
+-```bash
+-cd helm/vista3d
+-helm upgrade vista3d . --namespace vista3d
+-```
+-
+-### Verification
+-```bash
+-# Check deployment status
+-kubectl get pods -n vista3d
+-
+-# Verify frontend version
+-kubectl describe deployment vista3d-frontend -n vista3d | grep Image
+-```
+-
+----
+-
+-## 📋 Files Modified
+-
+-### Modified Files (6)
+-1. ✅ `helm/vista3d/Chart.yaml` - Version bump, typo fix, dependency removal
+-2. ✅ `helm/vista3d/README.md` - Version and feature updates
+-3. ✅ `helm/README.md` - Architecture enhancements
+-4. ✅ `helm/vista3d/templates/NOTES.txt` - Release highlights
+-
+-### New Files (4)
+-5. ✅ `helm/vista3d/CHANGELOG.md` - Complete change history
+-6. ✅ `helm/UPGRADE_GUIDE.md` - Upgrade procedures
+-7. ✅ `helm/RELEASE_NOTES_v1.2.0.md` - Detailed release notes
+-8. ✅ `helm/UPDATE_SUMMARY.md` - This summary
+-
+-### Unchanged Files
+-- ✅ `helm/vista3d/values.yaml` - No changes needed
+-- ✅ `helm/vista3d/values-production.yaml` - No changes needed
+-- ✅ `helm/vista3d/templates/*.yaml` - All templates remain valid
+-- ✅ `helm/vista3d/templates/configmap.yaml` - Already has correct env vars
+-
+----
+-
+-## 🔍 Testing Checklist
+-
+-- ✅ Helm lint validation passed
+-- ✅ Chart packaging successful
+-- ✅ All documentation updated
+-- ✅ Version numbers consistent
+-- ✅ No breaking changes introduced
+-- ✅ Backward compatibility maintained
+-- ✅ Templates valid and working
+-
+----
+-
+-## 📊 Impact Assessment
+-
+-### User Impact
+-- ✅ **Zero Breaking Changes** - Fully backward compatible
+-- ✅ **Seamless Upgrade** - No configuration changes required
+-- ✅ **Enhanced Features** - Better visualization options available immediately
+-
+-### Deployment Impact
+-- ✅ **Frontend** - Requires image rebuild and rolling update
+-- ✅ **Backend** - No changes needed
+-- ✅ **Image Server** - No changes needed
+-- ✅ **Configuration** - No changes needed
+-- ✅ **Secrets** - No changes needed
+-- ✅ **Volumes** - No changes needed
+-
+-### Performance Impact
+-- ✅ **Improved** - Faster colormap loading
+-- ✅ **Optimized** - Reduced memory usage for built-in colormaps
+-- ✅ **Enhanced** - Better caching mechanism
+-
+----
+-
+-## 🎯 Next Steps
+-
+-### For Developers
+-1. ✅ Rebuild frontend Docker image with latest code
+-2. ✅ Push updated image to registry
+-3. ✅ Test colormap functionality locally
+-4. ✅ Upgrade Helm deployment
+-
+-### For DevOps
+-1. ✅ Review UPGRADE_GUIDE.md
+-2. ✅ Plan maintenance window (if needed)
+-3. ✅ Execute helm upgrade
+-4. ✅ Verify deployment health
+-5. ✅ Test colormap features
+-
+-### For Documentation
+-1. ✅ All Helm documentation updated
+-2. ✅ CHANGELOG maintained
+-3. ✅ Release notes published
+-4. ✅ Upgrade guide available
+-
+----
+-
+-## 📞 Support
+-
+-For questions or issues:
+-- **Documentation**: See [UPGRADE_GUIDE.md](UPGRADE_GUIDE.md)
+-- **Release Notes**: See [RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md)
+-- **Issues**: GitHub Issues
+-- **Contact**: dave.wright@hpe.com
+-
+----
+-
+-## ✨ Summary
+-
+-Successfully updated the Helm charts from v1.1.0 to v1.2.0, incorporating:
+-- Enhanced colormap support with 23+ built-in options
+-- Comprehensive documentation updates
+-- Backward-compatible changes
+-- Validated and tested chart package
+-
+-**Status**: ✅ **COMPLETE AND READY FOR DEPLOYMENT**
+-
+diff --git a/helm/old/UPGRADE_GUIDE.md b/helm/old/UPGRADE_GUIDE.md
+deleted file mode 100644
+index 60639dd..0000000
+--- a/helm/old/UPGRADE_GUIDE.md
++++ /dev/null
+@@ -1,166 +0,0 @@
+-# Helm Chart Upgrade Guide
+-
+-## Upgrading from v1.1.0 to v1.2.0
+-
+-### Overview
+-
+-Version 1.2.0 introduces enhanced colormap support for better medical imaging visualization. This is a backward-compatible release that requires no configuration changes.
+-
+-### What's New
+-
+-#### Enhanced Colormap Support
+-- **23+ Built-in NiiVue Colormaps**: The frontend now includes native support for 23 built-in colormaps including:
+-  - Standard scientific: gray, jet, hot, cool, warm, viridis, plasma, magma, inferno
+-  - Medical-specific: Enhanced CT, MRI, and anatomical visualization options
+-  - Color schemes: spring, summer, autumn, winter, rainbow, hsv, bone, copper, cubehelix
+-  
+-#### Performance Improvements
+-- Optimized colormap loading with intelligent caching
+-- Reduced initial load time for colormap selection
+-- Better memory management for colormap data
+-
+-#### UI Enhancements
+-- Improved colormap selector organization
+-- Medical imaging colormaps prioritized in the UI
+-- Better visual preview of colormaps
+-
+-### Upgrade Process
+-
+-#### 1. Pull the Latest Chart
+-
+-```bash
+-cd HPE-Nvidia-Vista-3D
+-git pull origin main
+-cd helm/vista3d
+-```
+-
+-#### 2. Review Changes
+-
+-```bash
+-# View what will change
+-helm diff upgrade vista3d . --namespace vista3d
+-```
+-
+-#### 3. Upgrade the Release
+-
+-```bash
+-# Standard upgrade
+-helm upgrade vista3d . --namespace vista3d
+-
+-# With custom values
+-helm upgrade vista3d . \
+-  --namespace vista3d \
+-  --values values-production.yaml
+-```
+-
+-#### 4. Verify Deployment
+-
+-```bash
+-# Check pod status
+-kubectl get pods -n vista3d
+-
+-# Verify frontend pods are running
+-kubectl get pods -l app.kubernetes.io/component=frontend -n vista3d
+-
+-# Check the new version
+-kubectl get deployment vista3d-frontend -n vista3d -o jsonpath='{.spec.template.spec.containers[0].image}'
+-```
+-
+-### Breaking Changes
+-
+-**None** - This is a fully backward-compatible release.
+-
+-### Configuration Changes
+-
+-No configuration changes are required. All existing configurations will continue to work.
+-
+-### Rollback Instructions
+-
+-If you need to rollback to version 1.1.0:
+-
+-```bash
+-# View revision history
+-helm history vista3d --namespace vista3d
+-
+-# Rollback to previous version
+-helm rollback vista3d --namespace vista3d
+-```
+-
+-### Testing the Upgrade
+-
+-After upgrading, verify the new colormap functionality:
+-
+-1. Access the Vista3D web interface
+-2. Navigate to the NiiVue Viewer
+-3. Open the colormap selector
+-4. Verify built-in colormaps are available:
+-   - gray, jet, viridis, plasma, magma, inferno, etc.
+-5. Test switching between colormaps
+-6. Verify medical imaging colormaps work correctly
+-
+-### Troubleshooting
+-
+-#### Frontend Pods Not Starting
+-
+-If frontend pods fail to start after upgrade:
+-
+-```bash
+-# Check pod logs
+-kubectl logs -l app.kubernetes.io/component=frontend -n vista3d
+-
+-# Check events
+-kubectl get events -n vista3d --sort-by='.lastTimestamp'
+-
+-# If needed, restart deployment
+-kubectl rollout restart deployment/vista3d-frontend -n vista3d
+-```
+-
+-#### Colormap Loading Issues
+-
+-If colormaps don't load properly:
+-
+-1. Verify the frontend image was updated:
+-   ```bash
+-   kubectl describe pod -l app.kubernetes.io/component=frontend -n vista3d | grep Image:
+-   ```
+-
+-2. Check for any error messages in the frontend logs:
+-   ```bash
+-   kubectl logs -l app.kubernetes.io/component=frontend -n vista3d | grep -i colormap
+-   ```
+-
+-3. Clear browser cache and reload the web interface
+-
+-### Docker Image Requirements
+-
+-Ensure you're using the latest frontend image that includes the colormap changes:
+-
+-- **Frontend**: `dwtwp/vista3d-frontend:latest` (must be rebuilt after pulling the latest code)
+-- **Backend**: `nvcr.io/nim/nvidia/vista3d:1.0.0` (no changes)
+-- **Image Server**: `dwtwp/vista3d-image-server:latest` (no changes)
+-
+-### Rebuilding Docker Images
+-
+-If you're using custom-built images, rebuild the frontend:
+-
+-```bash
+-cd frontend
+-docker build -t dwtwp/vista3d-frontend:latest .
+-docker push dwtwp/vista3d-frontend:latest
+-```
+-
+-Then upgrade the Helm release to pick up the new image.
+-
+-### Support
+-
+-For issues or questions:
+-- GitHub Issues: https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/issues
+-- Documentation: See the main README.md
+-- Email: dave.wright@hpe.com
+-
+-### See Also
+-
+-- [CHANGELOG.md](vista3d/CHANGELOG.md) - Detailed list of changes
+-- [README.md](vista3d/README.md) - Chart documentation
+-- [values.yaml](vista3d/values.yaml) - Configuration options
+-
+diff --git a/helm/old/deploy-greenlake.sh b/helm/old/deploy-greenlake.sh
+deleted file mode 100755
+index 058df7e..0000000
+--- a/helm/old/deploy-greenlake.sh
++++ /dev/null
+@@ -1,190 +0,0 @@
+-#!/bin/bash
+-# ============================================================================
+-# Vista3D Deployment Script for HPE GreenLake for Containers
+-# ============================================================================
+-
+-set -e
+-
+-# Colors for output
+-RED='\033[0;31m'
+-GREEN='\033[0;32m'
+-YELLOW='\033[1;33m'
+-BLUE='\033[0;34m'
+-NC='\033[0m' # No Color
+-
+-echo -e "${GREEN}================================================================${NC}"
+-echo -e "${GREEN}       Vista3D Deployment on HPE GreenLake for Containers      ${NC}"
+-echo -e "${GREEN}================================================================${NC}"
+-
+-# Check prerequisites
+-echo -e "\n${YELLOW}[1/8] Checking prerequisites...${NC}"
+-
+-# Check kubectl
+-if ! command -v kubectl &> /dev/null; then
+-    echo -e "${RED}✗ kubectl not found. Please install kubectl.${NC}"
+-    exit 1
+-fi
+-echo -e "${GREEN}✓ kubectl found${NC}"
+-
+-# Check helm
+-if ! command -v helm &> /dev/null; then
+-    echo -e "${RED}✗ helm not found. Please install Helm 3.${NC}"
+-    exit 1
+-fi
+-echo -e "${GREEN}✓ helm found${NC}"
+-
+-# Check cluster connectivity
+-if ! kubectl cluster-info &> /dev/null; then
+-    echo -e "${RED}✗ Cannot connect to Kubernetes cluster.${NC}"
+-    echo -e "${YELLOW}Please ensure your kubeconfig is set up correctly.${NC}"
+-    exit 1
+-fi
+-echo -e "${GREEN}✓ Connected to Kubernetes cluster${NC}"
+-
+-# Display cluster info
+-CLUSTER_NAME=$(kubectl config current-context)
+-echo -e "${BLUE}Current cluster: ${CLUSTER_NAME}${NC}"
+-
+-# Get NGC API Key
+-echo -e "\n${YELLOW}[2/8] NGC API Key Configuration${NC}"
+-echo -e "${BLUE}Enter your NVIDIA NGC API Key (starts with 'nvapi-'):${NC}"
+-read -s NGC_API_KEY
+-echo ""
+-
+-if [ -z "$NGC_API_KEY" ]; then
+-    echo -e "${RED}✗ NGC API Key is required.${NC}"
+-    exit 1
+-fi
+-
+-if [[ ! "$NGC_API_KEY" =~ ^nvapi- ]]; then
+-    echo -e "${YELLOW}⚠ Warning: NGC API key should start with 'nvapi-'${NC}"
+-    echo -e "${YELLOW}Continue anyway? (y/N)${NC}"
+-    read -r CONTINUE
+-    if [[ ! "$CONTINUE" =~ ^[Yy]$ ]]; then
+-        exit 1
+-    fi
+-fi
+-echo -e "${GREEN}✓ NGC API Key configured${NC}"
+-
+-# Get domain name
+-echo -e "\n${YELLOW}[3/8] Domain Configuration${NC}"
+-echo -e "${BLUE}Enter your domain name (e.g., vista3d.greenlake.yourdomain.com):${NC}"
+-echo -e "${BLUE}Press Enter for default: vista3d.greenlake.local${NC}"
+-read DOMAIN_NAME
+-
+-if [ -z "$DOMAIN_NAME" ]; then
+-    DOMAIN_NAME="vista3d.greenlake.local"
+-fi
+-echo -e "${GREEN}✓ Using domain: ${DOMAIN_NAME}${NC}"
+-
+-# Get storage class
+-echo -e "\n${YELLOW}[4/8] Storage Configuration${NC}"
+-echo -e "${BLUE}Available storage classes:${NC}"
+-kubectl get storageclass -o name 2>/dev/null || echo "None found"
+-echo -e "${BLUE}Enter HPE storage class name (press Enter for 'hpe-standard'):${NC}"
+-read STORAGE_CLASS
+-
+-if [ -z "$STORAGE_CLASS" ]; then
+-    STORAGE_CLASS="hpe-standard"
+-fi
+-echo -e "${GREEN}✓ Using storage class: ${STORAGE_CLASS}${NC}"
+-
+-# Create namespace
+-echo -e "\n${YELLOW}[5/8] Creating namespace...${NC}"
+-kubectl create namespace vista3d --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
+-
+-# Label namespace
+-kubectl label namespace vista3d \
+-  hpe.com/project=medical-ai \
+-  hpe.com/team=healthcare \
+-  hpe.com/platform=greenlake \
+-  --overwrite 2>/dev/null
+-
+-echo -e "${GREEN}✓ Namespace 'vista3d' created and labeled${NC}"
+-
+-# Create secret
+-echo -e "\n${YELLOW}[6/8] Creating NGC secret...${NC}"
+-kubectl create secret generic vista3d-secrets \
+-  --from-literal=ngc-api-key="$NGC_API_KEY" \
+-  --namespace vista3d \
+-  --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
+-
+-echo -e "${GREEN}✓ Secret 'vista3d-secrets' created${NC}"
+-
+-# Apply storage classes (if file exists)
+-if [ -f "hpe-storage.yaml" ]; then
+-    echo -e "\n${YELLOW}[7/8] Creating Vista3D storage classes...${NC}"
+-    kubectl apply -f hpe-storage.yaml 2>/dev/null || echo -e "${YELLOW}⚠ Could not create storage classes (may already exist)${NC}"
+-    echo -e "${GREEN}✓ Storage classes configured${NC}"
+-else
+-    echo -e "${YELLOW}⚠ hpe-storage.yaml not found, skipping storage class creation${NC}"
+-fi
+-
+-# Deploy with Helm
+-echo -e "\n${YELLOW}[8/8] Deploying Vista3D with Helm...${NC}"
+-echo -e "${BLUE}This may take several minutes...${NC}"
+-
+-cd "$(dirname "$0")"
+-
+-helm upgrade --install vista3d . \
+-  --namespace vista3d \
+-  --values values-hpe-greenlake.yaml \
+-  --set ingress.hosts[0].host="$DOMAIN_NAME" \
+-  --set ingress.tls[0].hosts[0]="$DOMAIN_NAME" \
+-  --set persistence.storageClass="$STORAGE_CLASS" \
+-  --set persistence.output.storageClass="$STORAGE_CLASS" \
+-  --set persistence.dicom.storageClass="$STORAGE_CLASS" \
+-  --wait \
+-  --timeout 10m
+-
+-echo -e "${GREEN}✓ Vista3D deployed successfully${NC}"
+-
+-# Wait for pods
+-echo -e "\n${YELLOW}Waiting for pods to be ready...${NC}"
+-kubectl wait --for=condition=ready pod \
+-  -l app.kubernetes.io/name=vista3d \
+-  -n vista3d \
+-  --timeout=300s 2>/dev/null || echo -e "${YELLOW}⚠ Some pods may still be starting${NC}"
+-
+-# Display status
+-echo -e "\n${GREEN}================================================================${NC}"
+-echo -e "${GREEN}                    Deployment Complete!                        ${NC}"
+-echo -e "${GREEN}================================================================${NC}"
+-
+-echo -e "\n${YELLOW}📊 Deployment Status:${NC}"
+-kubectl get pods -n vista3d
+-
+-echo -e "\n${YELLOW}🌐 Access Information:${NC}"
+-echo -e "Primary URL: ${GREEN}https://$DOMAIN_NAME${NC}"
+-echo -e "Namespace:   ${GREEN}vista3d${NC}"
+-
+-echo -e "\n${YELLOW}📋 Useful Commands:${NC}"
+-echo -e "${BLUE}Check all resources:${NC}"
+-echo -e "  kubectl get all -n vista3d"
+-
+-echo -e "\n${BLUE}View logs:${NC}"
+-echo -e "  kubectl logs -n vista3d -l app.kubernetes.io/name=vista3d --tail=100 -f"
+-
+-echo -e "\n${BLUE}Check backend (GPU) pod:${NC}"
+-echo -e "  kubectl logs -n vista3d -l app.kubernetes.io/component=backend --tail=50"
+-
+-echo -e "\n${BLUE}Port-forward (if ingress not ready):${NC}"
+-echo -e "  kubectl port-forward -n vista3d svc/vista3d-frontend 8501:8501"
+-echo -e "  Then visit: ${GREEN}http://localhost:8501${NC}"
+-
+-echo -e "\n${BLUE}Check ingress:${NC}"
+-echo -e "  kubectl get ingress -n vista3d"
+-
+-echo -e "\n${BLUE}Scale frontend:${NC}"
+-echo -e "  kubectl scale deployment vista3d-frontend --replicas=5 -n vista3d"
+-
+-echo -e "\n${BLUE}Uninstall:${NC}"
+-echo -e "  helm uninstall vista3d -n vista3d"
+-
+-echo -e "\n${YELLOW}📚 Documentation:${NC}"
+-echo -e "See GREENLAKE_DEPLOYMENT.md for detailed information"
+-
+-echo -e "\n${GREEN}================================================================${NC}"
+-echo -e "${GREEN}✓ Setup complete! Your Vista3D platform is ready.${NC}"
+-echo -e "${GREEN}================================================================${NC}"
+-
+diff --git a/helm/vista3d/.helmignore b/helm/vista3d/.helmignore
+new file mode 100644
+index 0000000..1ee0d83
+--- /dev/null
++++ b/helm/vista3d/.helmignore
+@@ -0,0 +1,3 @@
++# Exclude packaged Helm charts
++*.tgz
++*.tar.gz
+\ No newline at end of file
+diff --git a/helm/vista3d/templates/backend-deployment.yaml b/helm/vista3d/templates/backend-deployment.yaml
+index 166233a..29a203b 100644
+--- a/helm/vista3d/templates/backend-deployment.yaml
++++ b/helm/vista3d/templates/backend-deployment.yaml
+@@ -24,7 +24,8 @@ spec:
+         app.kubernetes.io/component: backend
+         app.kubernetes.io/part-of: vista3d
+         app.kubernetes.io/managed-by: {{ .Release.Service }}
+-      annotations: {}
++      annotations:
++        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+     spec:
+       {{- with .Values.global.imagePullSecrets }}
+       imagePullSecrets:
+@@ -103,16 +104,16 @@ spec:
+             httpGet:
+               path: /health
+               port: http
+-            initialDelaySeconds: 60
+-            periodSeconds: 30
++            initialDelaySeconds: 180
++            periodSeconds: 60
+             timeoutSeconds: 10
+             failureThreshold: 3
+           readinessProbe:
+             httpGet:
+               path: /health
+               port: http
+-            initialDelaySeconds: 30
+-            periodSeconds: 10
++            initialDelaySeconds: 180
++            periodSeconds: 60
+             timeoutSeconds: 5
+             failureThreshold: 3
+           resources:
+diff --git a/helm/vista3d/templates/configmap.yaml b/helm/vista3d/templates/configmap.yaml
+new file mode 100644
+index 0000000..747141c
+--- /dev/null
++++ b/helm/vista3d/templates/configmap.yaml
+@@ -0,0 +1,15 @@
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: {{ include "vista3d.fullname" . }}
++  labels:
++    {{- include "vista3d.labels" . | nindent 4 }}
++data:
++  IMAGE_SERVER: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
++  EXTERNAL_IMAGE_SERVER: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
++  VISTA3D_IMAGE_SERVER_URL: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
++  OUTPUT_FOLDER: "/app/output"
++  DICOM_FOLDER: "/app/dicom"
++  DOCKER_CONTAINER: "true"
++  STREAMLIT_SERVER_RUN_ON_SAVE: "true"
++  STREAMLIT_SERVER_FILE_WATCHER_TYPE: "auto"
+\ No newline at end of file
+diff --git a/helm/vista3d/templates/frontend-deployment.yaml b/helm/vista3d/templates/frontend-deployment.yaml
+index 49a8c6c..1f78ecd 100644
+--- a/helm/vista3d/templates/frontend-deployment.yaml
++++ b/helm/vista3d/templates/frontend-deployment.yaml
+@@ -2,92 +2,47 @@
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+-  name: {{ include "vista3d.frontend.deploymentName" . }}
++  name: {{ include "vista3d.fullname" . }}-frontend
+   labels:
+-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-    app.kubernetes.io/instance: {{ .Release.Name }}
++    {{- include "vista3d.labels" . | nindent 4 }}
+     app.kubernetes.io/component: frontend
+-    app.kubernetes.io/part-of: vista3d
+-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+ spec:
+   replicas: {{ .Values.frontend.replicaCount }}
+   selector:
+     matchLabels:
+-      app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-      app.kubernetes.io/instance: {{ .Release.Name }}
++      {{- include "vista3d.selectorLabels" . | nindent 6 }}
+       app.kubernetes.io/component: frontend
+   template:
+     metadata:
+       labels:
+-        app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-        app.kubernetes.io/instance: {{ .Release.Name }}
++        {{- include "vista3d.selectorLabels" . | nindent 8 }}
+         app.kubernetes.io/component: frontend
+-        app.kubernetes.io/part-of: vista3d
+-        app.kubernetes.io/managed-by: {{ .Release.Service }}
+-      annotations: {}
+     spec:
+-      {{- with .Values.global.imagePullSecrets }}
+-      imagePullSecrets:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-      serviceAccountName: {{ include "vista3d.serviceAccountName" . }}
+-      securityContext:
+-        {{- if .Values.frontend.podSecurityContext }}
+-        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
+-        {{- else }}
+-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+-        {{- end }}
+       containers:
+-        - name: vista3d-frontend
+-          image: "{{ .Values.global.imageRegistry }}{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
++        - name: {{ .Values.frontend.name }}
++          image: "{{ .Values.global.imageRegistry }}{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+-          securityContext:
+-            {{- if .Values.frontend.securityContext }}
+-            {{- toYaml .Values.frontend.securityContext | nindent 12 }}
+-            {{- else }}
+-            {{- toYaml .Values.securityContext | nindent 12 }}
+-            {{- end }}
+           ports:
+             - name: http
+-              containerPort: 8501
++              containerPort: {{ .Values.frontend.service.port }}
+               protocol: TCP
+           env:
+             - name: IMAGE_SERVER
+-              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
++              value: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
+             - name: EXTERNAL_IMAGE_SERVER
+-              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
++              value: "http://localhost:8888"
+             - name: VISTA3D_IMAGE_SERVER_URL
+-              value: "http://{{ include "vista3d.imageServer.serviceName" . }}:8888"
++              value: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
+             - name: OUTPUT_FOLDER
+-              value: "/app/output"
++              value: {{ .Values.frontend.env.OUTPUT_FOLDER | quote }}
+             - name: DICOM_FOLDER
+-              value: "/app/dicom"
+-            - name: VISTA3D_SERVER
+-              value: "http://vista3d-backend:8000"
++              value: {{ .Values.frontend.env.DICOM_FOLDER | quote }}
+             - name: DOCKER_CONTAINER
+-              value: "false"
++              value: {{ .Values.frontend.env.DOCKER_CONTAINER | quote }}
+             - name: STREAMLIT_SERVER_RUN_ON_SAVE
+-              value: "true"
++              value: {{ .Values.frontend.env.STREAMLIT_SERVER_RUN_ON_SAVE | quote }}
+             - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
+-              value: "auto"
+-          livenessProbe:
+-            httpGet:
+-              path: /
+-              port: http
+-            initialDelaySeconds: 30
+-            periodSeconds: 30
+-            timeoutSeconds: 10
+-            failureThreshold: 3
+-          readinessProbe:
+-            httpGet:
+-              path: /
+-              port: http
+-            initialDelaySeconds: 10
+-            periodSeconds: 10
+-            timeoutSeconds: 5
+-            failureThreshold: 3
+-          resources:
+-            {{- toYaml .Values.frontend.resources | nindent 12 }}
++              value: {{ .Values.frontend.env.STREAMLIT_SERVER_FILE_WATCHER_TYPE | quote }}
+           volumeMounts:
+             {{- toYaml .Values.frontend.volumeMounts | nindent 12 }}
+       volumes:
+@@ -97,16 +52,4 @@ spec:
+         - name: dicom-data
+           persistentVolumeClaim:
+             claimName: {{ include "vista3d.fullname" . }}-dicom-pvc
+-      {{- with .Values.frontend.nodeSelector }}
+-      nodeSelector:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-      {{- with .Values.frontend.affinity }}
+-      affinity:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-      {{- with .Values.frontend.tolerations }}
+-      tolerations:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-{{- end }}
++{{- end }}
+\ No newline at end of file
+diff --git a/helm/vista3d/templates/frontend-service.yaml b/helm/vista3d/templates/frontend-service.yaml
+index d59b3a5..bc80218 100644
+--- a/helm/vista3d/templates/frontend-service.yaml
++++ b/helm/vista3d/templates/frontend-service.yaml
+@@ -2,13 +2,10 @@
+ apiVersion: v1
+ kind: Service
+ metadata:
+-  name: {{ include "vista3d.frontend.serviceName" . }}
++  name: {{ include "vista3d.fullname" . }}-frontend
+   labels:
+-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-    app.kubernetes.io/instance: {{ .Release.Name }}
++    {{- include "vista3d.labels" . | nindent 4 }}
+     app.kubernetes.io/component: frontend
+-    app.kubernetes.io/part-of: vista3d
+-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+ spec:
+   type: {{ .Values.frontend.service.type }}
+   ports:
+@@ -17,7 +14,6 @@ spec:
+       protocol: TCP
+       name: http
+   selector:
+-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-    app.kubernetes.io/instance: {{ .Release.Name }}
++    {{- include "vista3d.selectorLabels" . | nindent 4 }}
+     app.kubernetes.io/component: frontend
+-{{- end }}
++{{- end }}
+\ No newline at end of file
+diff --git a/helm/vista3d/templates/image-server-deployment.yaml b/helm/vista3d/templates/image-server-deployment.yaml
+index e86e60a..7f84ef4 100644
+--- a/helm/vista3d/templates/image-server-deployment.yaml
++++ b/helm/vista3d/templates/image-server-deployment.yaml
+@@ -2,75 +2,41 @@
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+-  name: {{ include "vista3d.imageServer.deploymentName" . }}
++  name: {{ include "vista3d.fullname" . }}-image-server
+   labels:
+-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-    app.kubernetes.io/instance: {{ .Release.Name }}
++    {{- include "vista3d.labels" . | nindent 4 }}
+     app.kubernetes.io/component: image-server
+-    app.kubernetes.io/part-of: vista3d
+-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+ spec:
+   replicas: {{ .Values.imageServer.replicaCount }}
+   selector:
+     matchLabels:
+-      app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-      app.kubernetes.io/instance: {{ .Release.Name }}
++      {{- include "vista3d.selectorLabels" . | nindent 6 }}
+       app.kubernetes.io/component: image-server
+   template:
+     metadata:
+       labels:
+-        app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-        app.kubernetes.io/instance: {{ .Release.Name }}
++        {{- include "vista3d.selectorLabels" . | nindent 8 }}
+         app.kubernetes.io/component: image-server
+-        app.kubernetes.io/part-of: vista3d
+-        app.kubernetes.io/managed-by: {{ .Release.Service }}
+-      annotations: {}
+     spec:
+-      {{- with .Values.global.imagePullSecrets }}
+-      imagePullSecrets:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-      serviceAccountName: {{ include "vista3d.serviceAccountName" . }}
+-      securityContext:
+-        {{- if .Values.imageServer.podSecurityContext }}
+-        {{- toYaml .Values.imageServer.podSecurityContext | nindent 8 }}
+-        {{- else }}
+-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+-        {{- end }}
+       containers:
+-        - name: vista3d-image-server
+-          image: "{{ .Values.global.imageRegistry }}{{ .Values.imageServer.image.repository }}:{{ .Values.imageServer.image.tag | default .Chart.AppVersion }}"
++        - name: {{ .Values.imageServer.name }}
++          image: "{{ .Values.global.imageRegistry }}{{ .Values.imageServer.image.repository }}:{{ .Values.imageServer.image.tag }}"
+           imagePullPolicy: {{ .Values.imageServer.image.pullPolicy }}
+-          securityContext:
+-            {{- if .Values.imageServer.securityContext }}
+-            {{- toYaml .Values.imageServer.securityContext | nindent 12 }}
+-            {{- else }}
+-            {{- toYaml .Values.securityContext | nindent 12 }}
+-            {{- end }}
+           ports:
+             - name: http
+-              containerPort: 8888
++              containerPort: {{ .Values.imageServer.service.port }}
+               protocol: TCP
+           env:
+-            {{- toYaml .Values.imageServer.env | nindent 12 }}
+-          livenessProbe:
+-            httpGet:
+-              path: /health
+-              port: http
+-            initialDelaySeconds: 30
+-            periodSeconds: 30
+-            timeoutSeconds: 10
+-            failureThreshold: 3
+-          readinessProbe:
+-            httpGet:
+-              path: /health
+-              port: http
+-            initialDelaySeconds: 10
+-            periodSeconds: 10
+-            timeoutSeconds: 5
+-            failureThreshold: 3
+-          resources:
+-            {{- toYaml .Values.imageServer.resources | nindent 12 }}
++            - name: OUTPUT_FOLDER
++              value: {{ .Values.imageServer.env.OUTPUT_FOLDER | quote }}
++            - name: DICOM_FOLDER
++              value: {{ .Values.imageServer.env.DICOM_FOLDER | quote }}
++            - name: IMAGE_SERVER
++              value: {{ .Values.imageServer.env.IMAGE_SERVER | quote }}
++            - name: PYTHONUNBUFFERED
++              value: {{ .Values.imageServer.env.PYTHONUNBUFFERED | quote }}
++            - name: PYTHONDONTWRITEBYTECODE
++              value: {{ .Values.imageServer.env.PYTHONDONTWRITEBYTECODE | quote }}
+           volumeMounts:
+             {{- toYaml .Values.imageServer.volumeMounts | nindent 12 }}
+       volumes:
+@@ -80,16 +46,4 @@ spec:
+         - name: dicom-data
+           persistentVolumeClaim:
+             claimName: {{ include "vista3d.fullname" . }}-dicom-pvc
+-      {{- with .Values.imageServer.nodeSelector }}
+-      nodeSelector:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-      {{- with .Values.imageServer.affinity }}
+-      affinity:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-      {{- with .Values.imageServer.tolerations }}
+-      tolerations:
+-        {{- toYaml . | nindent 8 }}
+-      {{- end }}
+-{{- end }}
++{{- end }}
+\ No newline at end of file
+diff --git a/helm/vista3d/templates/image-server-service.yaml b/helm/vista3d/templates/image-server-service.yaml
+index 6c20b3d..4c5e0f9 100644
+--- a/helm/vista3d/templates/image-server-service.yaml
++++ b/helm/vista3d/templates/image-server-service.yaml
+@@ -2,13 +2,10 @@
+ apiVersion: v1
+ kind: Service
+ metadata:
+-  name: {{ include "vista3d.imageServer.serviceName" . }}
++  name: {{ include "vista3d.fullname" . }}-image-server
+   labels:
+-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-    app.kubernetes.io/instance: {{ .Release.Name }}
++    {{- include "vista3d.labels" . | nindent 4 }}
+     app.kubernetes.io/component: image-server
+-    app.kubernetes.io/part-of: vista3d
+-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+ spec:
+   type: {{ .Values.imageServer.service.type }}
+   ports:
+@@ -17,7 +14,6 @@ spec:
+       protocol: TCP
+       name: http
+   selector:
+-    app.kubernetes.io/name: {{ include "vista3d.name" . }}
+-    app.kubernetes.io/instance: {{ .Release.Name }}
++    {{- include "vista3d.selectorLabels" . | nindent 4 }}
+     app.kubernetes.io/component: image-server
+-{{- end }}
++{{- end }}
+\ No newline at end of file
+diff --git a/helm/vista3d/templates/secret.yaml b/helm/vista3d/templates/secret.yaml
+index d82302c..e53bbf2 100644
+--- a/helm/vista3d/templates/secret.yaml
++++ b/helm/vista3d/templates/secret.yaml
+@@ -7,11 +7,7 @@ metadata:
+     {{- include "vista3d.labels" . | nindent 4 }}
+ type: Opaque
+ data:
+-  {{- if .Values.secrets.ngcApiKey }}
+   ngc-api-key: {{ .Values.secrets.ngcApiKey | b64enc | quote }}
+-  {{- else }}
+-  ngc-api-key: {{ "your-ngc-api-key-here" | b64enc | quote }}
+-  {{- end }}
+ {{- else if .Values.secrets.existingSecret }}
+ apiVersion: v1
+ kind: Secret
+diff --git a/helm/vista3d/values.yaml b/helm/vista3d/values.yaml
+index 27b8e43..8bf73ba 100644
+--- a/helm/vista3d/values.yaml
++++ b/helm/vista3d/values.yaml
+@@ -2,217 +2,107 @@
+ # This is a YAML-formatted file.
+ # Declare variables to be passed into your templates.
+ 
+-replicaCount: 1
+-namespace: "vista3d"
+-
+-# Global configuration
+ global:
+   imageRegistry: ""
+   imagePullSecrets: []
+-  storageClass: ""
+ 
+-# Backend (Vista3D Server) configuration
+ backend:
+-  enabled: true
++  enabled: false
+   name: vista3d-backend
+   replicaCount: 1
+-  
+   image:
+     repository: nvcr.io/nim/nvidia/vista3d
+     tag: "1.0.0"
+     pullPolicy: IfNotPresent
+-  
+   service:
+     type: ClusterIP
+     port: 8000
+     targetPort: 8000
+-    protocol: TCP
+-    name: backend-service
+-  
+-  resources:
+-    limits:
+-      nvidia.com/gpu: 1
+-      memory: "16Gi"
+-      cpu: "4"
+-    requests:
+-      nvidia.com/gpu: 1
+-      memory: "8Gi"
+-      cpu: "2"
+-  
+-  nodeSelector:
+-    nvidia.com/gpu: "true"
+-  
+-  tolerations:
+-    - key: nvidia.com/gpu
+-      operator: Exists
+-      effect: NoSchedule
+ 
+-# Frontend (Streamlit App) configuration
+ frontend:
+   enabled: true
+   name: vista3d-frontend
+   replicaCount: 1
+-  
+   image:
+     repository: dwtwp/vista3d-frontend
+     tag: latest
+     pullPolicy: IfNotPresent
+-  
+   service:
+     type: ClusterIP
+     port: 8501
+     targetPort: 8501
+-    protocol: TCP
+-    name: frontend-service
+-  
+-  resources:
+-    limits:
+-      memory: "4Gi"
+-      cpu: "2"
+-    requests:
+-      memory: "2Gi"
+-      cpu: "1"
++  env:
++    IMAGE_SERVER: "http://vista3d-image-server:8888"
++    EXTERNAL_IMAGE_SERVER: "http://vista3d-image-server:8888"
++    VISTA3D_IMAGE_SERVER_URL: "http://vista3d-image-server:8888"
++    OUTPUT_FOLDER: "/app/output"
++    DICOM_FOLDER: "/app/dicom"
++    DOCKER_CONTAINER: "true"
++    STREAMLIT_SERVER_RUN_ON_SAVE: "true"
++    STREAMLIT_SERVER_FILE_WATCHER_TYPE: "auto"
++  volumeMounts:
++    - name: output-data
++      mountPath: /app/output
++    - name: dicom-data
++      mountPath: /app/dicom
+ 
+-# Image Server configuration
+ imageServer:
+   enabled: true
+   name: vista3d-image-server
+   replicaCount: 1
+-  
+   image:
+     repository: dwtwp/vista3d-image-server
+     tag: latest
+     pullPolicy: IfNotPresent
+-  
+   service:
+     type: ClusterIP
+     port: 8888
+     targetPort: 8888
+-    protocol: TCP
+-    name: image-server-service
+-  
+-  resources:
+-    limits:
+-      memory: "2Gi"
+-      cpu: "1"
+-    requests:
+-      memory: "1Gi"
+-      cpu: "0.5"
+-
+-# Ingress configuration
+-ingress:
+-  enabled: false
+-  className: "nginx"
+-  annotations:
+-    nginx.ingress.kubernetes.io/rewrite-target: /
+-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+-    nginx.ingress.kubernetes.io/use-regex: "true"
+-    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+-    nginx.ingress.kubernetes.io/client-max-body-size: "500m"
+-    nginx.ingress.kubernetes.io/enable-cors: "true"
+-    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+-    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+-    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+-  hosts:
+-    - host: vista3d.local
+-      paths:
+-        - path: /
+-          pathType: Prefix
+-          service: vista3d-frontend
+-        - path: /api/vista3d
+-          pathType: Prefix
+-          service: vista3d-backend
+-        - path: /images
+-          pathType: Prefix
+-          service: vista3d-image-server
+-        - path: /health
+-          pathType: Prefix
+-          service: vista3d-image-server
+-  tls: []
++  env:
++    OUTPUT_FOLDER: "/data/output"
++    DICOM_FOLDER: "/data/dicom"
++    IMAGE_SERVER: "http://localhost:8888" # This is for the image server itself, not the frontend
++    PYTHONUNBUFFERED: "1"
++    PYTHONDONTWRITEBYTECODE: "1"
++  volumeMounts:
++    - name: output-data
++      mountPath: /data/output
++      readOnly: true
++    - name: dicom-data
++      mountPath: /data/dicom
++      readOnly: true
+ 
+-# Persistent Volume configuration
+ persistence:
+   enabled: true
+-  existingClaim: ""
+-  mountPath: "/data"
+-  subPath: ""
+-  
+   output:
+     enabled: true
+-    existingClaim: ""
+-    mountPath: "/workspace/output"
+-    subPath: ""
+-    storageClass: ""
+     accessMode: ReadWriteOnce
+     size: 100Gi
+-  
+   dicom:
+     enabled: true
+-    existingClaim: ""
+-    mountPath: "/workspace/dicom"
+-    subPath: ""
+-    storageClass: ""
+     accessMode: ReadOnlyMany
+     size: 50Gi
+ 
+-# Secrets configuration
+-secrets:
+-  create: true
+-  ngcApiKey: ""
+-  # You can also provide existing secret name
+-  # existingSecret: ""
++sampleData:
++  enabled: true
++  url: "https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/releases/download/v1.0.0/sample_data.tgz"
+ 
+-# Service Account configuration
+ serviceAccount:
+   create: true
+   annotations: {}
+   name: ""
+ 
+-# Global environment variables
+-env:
+-  PYTHONUNBUFFERED: "1"
+-  HTTP_PROXY: ""
+-  HTTPS_PROXY: ""
+-  NO_PROXY: "localhost,127.0.0.1,0.0.0.0,::1,frontend-service,backend-service,image-server-service"
+-  REQUESTS_CA_BUNDLE: ""
+-  CURL_CA_BUNDLE: ""
+-
+-# API Key configuration
+-apiKey:
+-  value: "vista3d-api-key"
+-
+-# Pod Security Context
+-podSecurityContext:
+-  fsGroup: 1000
+-  runAsUser: 1000
+-  runAsNonRoot: true
+-
+-# Security Context
+-securityContext:
+-  allowPrivilegeEscalation: false
+-  capabilities:
+-    drop:
+-    - ALL
+-  readOnlyRootFilesystem: false
+-  runAsNonRoot: true
+-  runAsUser: 1000
+-
+-# Node selection
+-nodeSelector: {}
+-
+-# Tolerations
+-tolerations: []
+-
+-# Affinity
+-affinity: {}
++secrets:
++  create: true
++  ngcApiKey: "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" # User must provide their NGC API Key here or via --set
+ 
+-# EZUA configuration
+-ezua:
+-  enabled: true
+-  virtualService:
+-    endpoint: "vista3d.${DOMAIN_NAME}"
+-    backendEndpoint: "vista3d-backend.${DOMAIN_NAME}"
+-    istioGateway: "istio-system/ezaf-gateway"
+\ No newline at end of file
++ingress:
++  enabled: false
++  className: "nginx"
++  annotations: {}
++  hosts:
++    - host: vista3d.local
++      paths:
++        - path: /
++          pathType: Prefix
++  tls: []
+\ No newline at end of file
+diff --git a/helm/vista3d/vista3d-1.2.0.tgz b/helm/vista3d/vista3d-1.2.0.tgz
+new file mode 100644
+index 0000000..a5664ea
+Binary files /dev/null and b/helm/vista3d/vista3d-1.2.0.tgz differ
+diff --git a/image_server/Dockerfile b/image_server/Dockerfile
+index 12fc259..f50f5a0 100644
+--- a/image_server/Dockerfile
++++ b/image_server/Dockerfile
+@@ -1,4 +1,4 @@
+-FROM --platform=linux/arm64 python:3.11-slim
++FROM python:3.11-slim
+ 
+ WORKDIR /srv
+ 
+@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
+     curl \
+   && rm -rf /var/lib/apt/lists/*
+ 
+-# Install uv for fast dependency management
+-RUN pip install --no-cache-dir uv
++# uv is causing an 'exec format error', so we are removing it and using pip directly.
+ 
+ # Create unprivileged user early
+ RUN useradd -m appuser && chown -R appuser:appuser /srv
+@@ -21,7 +20,7 @@ USER appuser
+ 
+ # Copy minimal project metadata and install deps
+ COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
+-RUN uv sync --frozen
++RUN pip install .
+ 
+ # Copy server code (will be overridden by volume mount in development)
+ COPY --chown=appuser:appuser main.py ./main.py
+@@ -33,4 +32,4 @@ EXPOSE 8888
+ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+   CMD curl -f http://localhost:8888/health || exit 1
+ 
+-CMD ["uv", "run", "python", "server.py"]
++CMD ["python", "server.py"]
+diff --git a/image_server/image-server.tar b/image_server/image-server.tar
+new file mode 100644
+index 0000000..9f968ed
+Binary files /dev/null and b/image_server/image-server.tar differ
+diff --git a/kube/README.md b/kube/README.md
+new file mode 100644
+index 0000000..a5c294a
+--- /dev/null
++++ b/kube/README.md
+@@ -0,0 +1,41 @@
++# Kubernetes Deployment
++
++This folder contains scripts and configurations related to deploying the HPE-Nvidia-Vista-3D application to Kubernetes, specifically MicroK8s.
++
++## Scripts
++
++- `build_and_push_docker.sh`: Builds and pushes the Docker images for the `frontend` and `image-server` to Docker Hub.
++- `deploy_frontend.sh`: Automates the deployment process for the `frontend` and `image-server` to a Kubernetes cluster. This script:
++    1. Builds and pushes the Docker images using `build_and_push_docker.sh`.
++    2. Upgrades the Helm release for `vista3d`.
++    3. Deletes the existing `frontend` pod to force Kubernetes to pull the new image.
++    4. Watches for the new `frontend` pod to become ready.
++
++## Usage
++
++To deploy the `frontend` and `image-server` with the latest changes, run the `deploy_frontend.sh` script:
++
++```bash
++./kube/deploy_frontend.sh
++```
++
++## MicroK8s Configuration
++
++If you are using MicroK8s, ensure your `kubectl` is configured correctly. You can export the MicroK8s configuration and set the `KUBECONFIG` environment variable:
++
++```bash
++microk8s config > ~/.kube/config
++export KUBECONFIG=~/.kube/config
++```
++
++To make the `KUBECONFIG` environment variable persistent, add the `export` command to your shell's configuration file (e.g., `~/.bashrc` or `~/.zshrc`).
++
++## Accessing the Frontend
++
++Once the `frontend` pod is running, you can access the web interface by port-forwarding:
++
++```bash
++microk8s kubectl port-forward service/vista3d-frontend 8501:8501
++```
++
++Then, open your browser to `http://localhost:8501`.
+\ No newline at end of file
+diff --git a/kube/build_and_push_docker.sh b/kube/build_and_push_docker.sh
+new file mode 100755
+index 0000000..4dd5c30
+--- /dev/null
++++ b/kube/build_and_push_docker.sh
+@@ -0,0 +1,37 @@
++#!/bin/bash
++
++# Docker Build and Push Script for Vista3D
++# This script builds and pushes both the image_server and frontend Docker images
++
++set -e  # Exit on error
++
++# Configuration
++DOCKER_USERNAME="dwtwp"
++VERSION="${1:-$(date +%Y%m%d%H%M%S)}"  # Default to timestamp if no version specified
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++
++# Function to build and push an image
++build_and_push() {
++    local service_name=$1
++    local service_path=$2
++    local image_name="${DOCKER_USERNAME}/vista3d-${service_name}"
++    
++    cd "${PROJECT_ROOT}/${service_path}"
++    
++    docker build --no-cache -t "${image_name}:${VERSION}" .
++    
++    docker tag "${image_name}:${VERSION}" "${image_name}:latest"
++    
++    docker push "${image_name}:${VERSION}" > /dev/null
++    
++    docker push "${image_name}:latest" > /dev/null
++}
++
++# Build and push image_server
++build_and_push "image-server" "image_server"
++
++# Build and push frontend
++build_and_push "frontend" "frontend"
++
++# Print the version for deploy_frontend.sh to capture
++echo "${VERSION}"
+diff --git a/kube/deploy_frontend.sh b/kube/deploy_frontend.sh
+new file mode 100755
+index 0000000..b57c782
+--- /dev/null
++++ b/kube/deploy_frontend.sh
+@@ -0,0 +1,31 @@
++#!/bin/bash
++
++# Script to deploy the frontend and image-server to MicroK8s
++
++set -e # Exit on error
++
++echo "=== Building and pushing Docker images ==="
++VERSION=$(kube/build_and_push_docker.sh)
++echo "Captured VERSION: ${VERSION}"
++
++if helm status vista3d &> /dev/null; then
++    echo "=== Upgrading Helm release ==="
++    helm upgrade vista3d ./helm/vista3d \
++        --set frontend.image.tag="${VERSION}" \
++        --set imageServer.image.tag="${VERSION}"
++else
++    echo "=== Installing Helm release ==="
++    helm install vista3d ./helm/vista3d \
++        --set frontend.image.tag="${VERSION}" \
++        --set imageServer.image.tag="${VERSION}"
++fi
++
++echo "=== Deleting frontend pod to force image re-pull ==="
++# This ensures the new image is pulled even if the tag is 'latest' and pullPolicy is IfNotPresent
++microk8s kubectl delete pod -l app.kubernetes.io/component=frontend
++
++echo "=== Deployment process complete ==="
++echo "Please monitor the pod status manually by running: microk8s kubectl get pods -l app.kubernetes.io/component=frontend --watch"
++
++echo "Once the pod is running, you can port-forward to access the web interface:"
++echo "microk8s kubectl port-forward service/vista3d-frontend 8501:8501"
+\ No newline at end of file
+diff --git a/kube/frontend-deployment.yaml b/kube/frontend-deployment.yaml
+new file mode 100644
+index 0000000..521bc68
+--- /dev/null
++++ b/kube/frontend-deployment.yaml
+@@ -0,0 +1,116 @@
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: vista3d-frontend
++  namespace: default
++spec:
++  progressDeadlineSeconds: 600
++  replicas: 1
++  revisionHistoryLimit: 10
++  selector:
++    matchLabels:
++      app.kubernetes.io/component: frontend
++      app.kubernetes.io/instance: vista3d
++      app.kubernetes.io/name: vista3d
++  strategy:
++    rollingUpdate:
++      maxSurge: 25%
++      maxUnavailable: 25%
++    type: RollingUpdate
++  template:
++    metadata:
++      labels:
++        app.kubernetes.io/component: frontend
++        app.kubernetes.io/instance: vista3d
++        app.kubernetes.io/managed-by: Helm
++        app.kubernetes.io/name: vista3d
++        app.kubernetes.io/part-of: vista3d
++    spec:
++      containers:
++      - env:
++        - name: IMAGE_SERVER
++          value: http://vista3d-image-server:8888
++        - name: EXTERNAL_IMAGE_SERVER
++          value: http://vista3d-image-server:8888
++        - name: VISTA3D_IMAGE_SERVER_URL
++          value: http://vista3d-image-server:8888
++        - name: OUTPUT_FOLDER
++          value: /app/output
++        - name: DICOM_FOLDER
++          value: /app/dicom
++        - name: VISTA3D_SERVER
++          value: http://vista3d-backend:8000
++        - name: DOCKER_CONTAINER
++          value: "false"
++        - name: STREAMLIT_SERVER_RUN_ON_SAVE
++          value: "true"
++        - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
++          value: auto
++        - name: UV_CACHE_DIR
++          value: /tmp/.uv_cache
++        image: localhost:32000/vista3d-frontend:latest
++        imagePullPolicy: Always
++        livenessProbe:
++          failureThreshold: 3
++          httpGet:
++            path: /
++            port: http
++            scheme: HTTP
++          initialDelaySeconds: 30
++          periodSeconds: 30
++          successThreshold: 1
++          timeoutSeconds: 10
++        name: vista3d-frontend
++        ports:
++        - containerPort: 8501
++          name: http
++          protocol: TCP
++        readinessProbe:
++          failureThreshold: 3
++          httpGet:
++            path: /
++            port: http
++            scheme: HTTP
++          initialDelaySeconds: 10
++          periodSeconds: 10
++          successThreshold: 1
++          timeoutSeconds: 5
++        resources:
++          limits:
++            cpu: "2"
++            memory: 4Gi
++          requests:
++            cpu: "1"
++            memory: 2Gi
++        securityContext:
++          allowPrivilegeEscalation: false
++          capabilities:
++            drop:
++            - ALL
++          readOnlyRootFilesystem: false
++          runAsNonRoot: true
++          runAsUser: 1000
++        terminationMessagePath: /dev/termination-log
++        terminationMessagePolicy: File
++        volumeMounts:
++        - mountPath: /app/output
++          name: output-data
++        - mountPath: /app/dicom
++          name: dicom-data
++      dnsPolicy: ClusterFirst
++      restartPolicy: Always
++      schedulerName: default-scheduler
++      securityContext:
++        fsGroup: 1000
++        runAsNonRoot: true
++        runAsUser: 1000
++      serviceAccount: vista3d
++      serviceAccountName: vista3d
++      terminationGracePeriodSeconds: 30
++      volumes:
++      - name: output-data
++        persistentVolumeClaim:
++          claimName: vista3d-output-pvc
++      - name: dicom-data
++        persistentVolumeClaim:
++          claimName: vista3d-dicom-pvc
+diff --git a/kube/image-server-deployment.yaml b/kube/image-server-deployment.yaml
+new file mode 100644
+index 0000000..78aae01
+--- /dev/null
++++ b/kube/image-server-deployment.yaml
+@@ -0,0 +1,108 @@
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: vista3d-image-server
++  namespace: default
++spec:
++  progressDeadlineSeconds: 600
++  replicas: 1
++  revisionHistoryLimit: 10
++  selector:
++    matchLabels:
++      app.kubernetes.io/component: image-server
++      app.kubernetes.io/instance: vista3d
++      app.kubernetes.io/name: vista3d
++  strategy:
++    rollingUpdate:
++      maxSurge: 25%
++      maxUnavailable: 25%
++    type: RollingUpdate
++  template:
++    metadata:
++      labels:
++        app.kubernetes.io/component: image-server
++        app.kubernetes.io/instance: vista3d
++        app.kubernetes.io/managed-by: Helm
++        app.kubernetes.io/name: vista3d
++        app.kubernetes.io/part-of: vista3d
++    spec:
++      containers:
++      - env:
++        - name: OUTPUT_FOLDER
++          value: /data/output
++        - name: DICOM_FOLDER
++          value: /data/dicom
++        - name: IMAGE_SERVER
++          value: http://localhost:8888
++        - name: PYTHONUNBUFFERED
++          value: "1"
++        - name: PYTHONDONTWRITEBYTECODE
++          value: "1"
++        image: localhost:32000/vista3d-image-server:latest
++        imagePullPolicy: Always
++        livenessProbe:
++          failureThreshold: 3
++          httpGet:
++            path: /health
++            port: http
++            scheme: HTTP
++          initialDelaySeconds: 30
++          periodSeconds: 30
++          successThreshold: 1
++          timeoutSeconds: 10
++        name: vista3d-image-server
++        ports:
++        - containerPort: 8888
++          name: http
++          protocol: TCP
++        readinessProbe:
++          failureThreshold: 3
++          httpGet:
++            path: /health
++            port: http
++            scheme: HTTP
++          initialDelaySeconds: 10
++          periodSeconds: 10
++          successThreshold: 1
++          timeoutSeconds: 5
++        resources:
++          limits:
++            cpu: "1"
++            memory: 2Gi
++          requests:
++            cpu: 500m
++            memory: 1Gi
++        securityContext:
++          allowPrivilegeEscalation: false
++          capabilities:
++            drop:
++            - ALL
++          readOnlyRootFilesystem: false
++          runAsNonRoot: true
++          runAsUser: 1000
++        terminationMessagePath: /dev/termination-log
++        terminationMessagePolicy: File
++        volumeMounts:
++        - mountPath: /data/output
++          name: output-data
++          readOnly: true
++        - mountPath: /data/dicom
++          name: dicom-data
++          readOnly: true
++      dnsPolicy: ClusterFirst
++      restartPolicy: Always
++      schedulerName: default-scheduler
++      securityContext:
++        fsGroup: 1000
++        runAsNonRoot: true
++        runAsUser: 1000
++      serviceAccount: vista3d
++      serviceAccountName: vista3d
++      terminationGracePeriodSeconds: 30
++      volumes:
++      - name: output-data
++        persistentVolumeClaim:
++          claimName: vista3d-output-pvc
++      - name: dicom-data
++        persistentVolumeClaim:
++          claimName: vista3d-dicom-pvc
+diff --git a/kube/microk8s.kubeconfig b/kube/microk8s.kubeconfig
+new file mode 100644
+index 0000000..f9d6940
+--- /dev/null
++++ b/kube/microk8s.kubeconfig
+@@ -0,0 +1,19 @@
++apiVersion: v1
++clusters:
++- cluster:
++    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUREekNDQWZlZ0F3SUJBZ0lVWGdQNU5Va1NHWG11eDZYRHE1dFk1RTFvWkJrd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0Z6RVZNQk1HQTFVRUF3d01NVEF1TVRVeUxqRTRNeTR4TUI0WERUSTFNVEF5TVRJeE5UWTBOVm9YRFRNMQpNVEF4T1RJeE5UWTBOVm93RnpFVk1CTUdBMVVFQXd3TU1UQXVNVFV5TGpFNE15NHhNSUlCSWpBTkJna3Foa2lHCjl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUFzRDJ4WDFndVYvelFZV2o2aERURmxxemI1VkNFY2hnOFFacEoKR2g0VmthYXY4ZG9wVndaRVpCVFVBZ3M0TEl3eVd5cWIvcnFhS0p6NzN0MHNucXAwWVluQUMwOFRCRXRYeDRMaApWY0ppcld2QlVhbTRqTnI5WHd2S2Nua2YrcmtOc2czYVZjdUNDQ1I0MDJHRnMvRUhUYXp2bHpqR1FKK2NQQVFhClhvQUFtQjczT2tqeW9DVC95TW5BWEMyclh2NTdISmhoL3ZIZElmS3Noc3FYZlo2aUtIQ3BvS3dsTE1pdGdmNEEKNkJXQjFJTFQ1cFE3NFhicGRMMHI5MUdnTHhjY2owT2hhQzZrb0l2b2RWOTJuN3ZkVjgreUdldzBqS2FxbmhJdgpVd3RqVTFQSCtqdlgvanlXNTJaNjNOZ3pVQXRvNUJYbDVLTEhOUzgxM2psTXR2YmlGd0lEQVFBQm8xTXdVVEFkCkJnTlZIUTRFRmdRVVcxSVJCU2Y2TXlDNGJmcG4zTU1wT0pJVVFKWXdId1lEVlIwakJCZ3dGb0FVVzFJUkJTZjYKTXlDNGJmcG4zTU1wT0pJVVFKWXdEd1lEVlIwVEFRSC9CQVV3QXdFQi96QU5CZ2txaGtpRzl3MEJBUXNGQUFPQwpBUUVBUlNtY0gzaEVsd1E4YVMwZWRrWUNFb1VjVXNvY0oyM0VrNkFjcGhXYWx0TU8ydk5XajhqdVJSWERnTFF3CkpWWHhZSWdBZHI0Nm5mTW8vN3N2bGVIRnZ5b1NndTEydVpnbXB5ZFk0bHFFVnUvNjZDdzVFUUxHcEJrR1dJSDkKNkNiWGl6aUJWVWxTMjZwcUhhSWdCd2ViaXozUGI5S2pJTWZ2V0xWZHNhQjZNa2xtNWlXZ2JKOXJPaGNuZ01YUgpKTHJCazZEZFNiRVBUSzZjUU1kbituSXllcXFEclcrYTBLWkIrZm5CMTIwd2U1a3ZrM09FYjY0djErdTFDa2ZHCnFTa2Qra0l1UnpRR1kzRUlmS0hSR0tiVWUrR2J1bWNMM1lqVmxyYlZsczFWbDdqY2dkaElVZXlPWXRhdnFCOGMKeTFDNjRKeXY0RUhFK3ErOFdNd2FFMjJ4dGc9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
++    server: https://127.0.0.1:16443
++  name: microk8s-cluster
++contexts:
++- context:
++    cluster: microk8s-cluster
++    user: admin
++  name: microk8s
++current-context: microk8s
++kind: Config
++preferences: {}
++users:
++- name: admin
++  user:
++    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN6RENDQWJTZ0F3SUJBZ0lVY01EdVBVVVdLSFhmZmhETStyS3dSWURXUllnd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0Z6RVZNQk1HQTFVRUF3d01NVEF1TVRVeUxqRTRNeTR4TUI0WERUSTFNVEF5TVRJeE5UWTBObG9YRFRNMQpNVEF4T1RJeE5UWTBObG93S1RFT01Bd0dBMVVFQXd3RllXUnRhVzR4RnpBVkJnTlZCQW9NRG5ONWMzUmxiVHB0CllYTjBaWEp6TUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUEyQjJ6T1Nhc2FUaEIKTWJBNXd5OFJPY25YcWR0ajJ4L3pyelNoSndkTDJsOUovYUJ3dTRMenBzeW84RDJTTm1YTE1BT2RKM2xhZHd0RAp6Z1BvMjhuRnNWcDJHa2x4VGlqdjFZMzVVV1k4c3lac1JNWHFLbDhvT292elhsS2xGczhmZzlHOXdTUWgrRCtDCjZjakdKVlpSaU1iTGlPS2dEZEhnc0V6ejR5b09jaDZKNFNtckpOOHh2U2c3Yzl4Y0VFZUR4ai9MeVA3U0JiNkEKbldxVXRxVFJlWlFiMUlrcXBRVzFhNU42bmhKRGhZZHJHcnJZNlI2OW9vSlBEci93L3I5dlJnN3N1cjE5ZUdkSApCeTFBUlluaDJ4b3ZzcHVZRzZPd3hWSFlWbnNBQlhwdHBVK1kwdWhPU2RrUHpGTE1yNG5jZ2JGMXg0VXhlcG9hClovcVpBWHYxbHdJREFRQUJNQTBHQ1NxR1NJYjNEUUVCQ3dVQUE0SUJBUUExTU84V0FLdWtyelN3U2x4RXYyTksKb1RRZGhIa1F2L0lsbkMxR045empuaVJveHp3dFhROUdZTi9ZSnVUNVlCMTE5M2tTN3QwU0JkMG1xaC9CQ2dlYQoyTjVuRjI1dExQTE9ldmdWREdGZnhhUVZ4bU5nUEEzUW9VY3htK1Q2d0lxU2pKazc2NERiakJMZHpNMXlWVmc4CmRVd093YnpjWmsrUzQ4VUVHajI2R1pOZDk1R0lMcy9kSE5PaWxHVmY2VWNTWmczQlZsdVBXNFppR3JDWlA3ODgKNkxUZ0xReFJxVVlKanhLS0VRZDhDMVB4QXZIRGJ4Qnk3cXJodGwxTTBxdCtEOEZubzZBUVNTRjRFUVp2N3hwaQpLYkFJeWN6VEZ5UEkxcktIeS83eVdLK3BMSndRQmp3WHpIdWFTQ1NQSG5LYlNHbFdTb0xETkNxME1va21GeXdICi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
++    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcFFJQkFBS0NBUUVBMkIyek9TYXNhVGhCTWJBNXd5OFJPY25YcWR0ajJ4L3pyelNoSndkTDJsOUovYUJ3CnU0THpwc3lvOEQyU05tWExNQU9kSjNsYWR3dER6Z1BvMjhuRnNWcDJHa2x4VGlqdjFZMzVVV1k4c3lac1JNWHEKS2w4b09vdnpYbEtsRnM4Zmc5Rzl3U1FoK0QrQzZjakdKVlpSaU1iTGlPS2dEZEhnc0V6ejR5b09jaDZKNFNtcgpKTjh4dlNnN2M5eGNFRWVEeGovTHlQN1NCYjZBbldxVXRxVFJlWlFiMUlrcXBRVzFhNU42bmhKRGhZZHJHcnJZCjZSNjlvb0pQRHIvdy9yOXZSZzdzdXIxOWVHZEhCeTFBUlluaDJ4b3ZzcHVZRzZPd3hWSFlWbnNBQlhwdHBVK1kKMHVoT1Nka1B6RkxNcjRuY2diRjF4NFV4ZXBvYVovcVpBWHYxbHdJREFRQUJBb0lCQVFEQk0ydnhmNTFLUXp3bApDNEhYOTgvU2Rac1RBa3AycmszUEo2R1pubkExUEZLTkprMGhsS1AxVGFrSmZFR2wxOEtabmVGMFZJeUhOODdaCjhhek9MOGRJRWJMYk5TVFIxczd4ZndhUHVuSXhSZndzVHpKVHh0WFQ0U0VrQllZSXFnbG1jcTdNWjF6bTdRQS8KdDNsTUQ2cThOOXZrOTVSV1JuWXpwZGV5RVByeEVLOHZVT0dzanh6Umc4d0NzQUpxT3JLOXc5bDVSY0RoNWVoNApxUE5obGwzY09Ba2JvZDZZUHJOWG4yWWRWQXRFQ3k2eEZBN2hKK1gwaEwvdHJ2V0J1ZGVlU2Q3LzNQejBHcW1JClNJV0hLLzJtRktRSEZMaURtY0JsL1cxdWRnai9pcEFUNGZpTXMzZ1dSR1QrdFdWT0pYdFBhdU9YV2hMSXdIdGQKWFJjem5NbEJBb0dCQVBORjIxaVY4SWk2TncyblpTVVVKZ1V0dXhaSGRNaVpOY3gzMGF2ZzloL0JNTWd0d2JlVwpFODdmQ2NZc3ZiTkpzcDR1VzFDdWt0SjVSQXlHK1EwTzNpMHY0bDRIYXYyWk9WRS9wM3VQbmpqU3N3a3RONURpClczQXhHdlNHL1VTNTF4c0poZm90UXM0eEJDOFVMenBnT0ZrTnI4WmEyOWNEZE9WamtHaldWREhwQW9HQkFPTnMKSWZFSzJRUTFkK0FDeFFvWGRpZFRnUVpFVVRUYnQzdGQvaGJneW04bkhzVzIySWgrbjZJdXRFR1RBRDg5aUl5dwp5OU51WDhYcDZKMm1ZcjY5cXlQME9hMkJyMUpOU3VFRktJem5ud3o2K0VkR3FMTnpUSnF5VWl6d1dpR2ZSYVJ5CmZ1SEpLV0xDNkY1MXRsRU1qczFxZ2FWWTYrOW1nbThrRlRtbjhydC9Bb0dBWEJ6MFhBdVNJME5YT3kxS0NBc2sKQmt2MWpnOEtjalpJLzUzUzMyRHo4THdtNjNVZjU1TEU5MHpPbDZJelJpSytwbFJwTVJpWThXY0hWREw3TkcyUAp4TTVmeVRqSDB6UmtWcFppcFUrUkduVDFZNkVpYkJLNWlyYWRQVCtyd0kwWm5Od3pSYkpEbkcxRTUwcWVRMTFSCm1LNnRBczgrZEtDVGI1UU9oeE80bDVrQ2dZRUEybmd0SHU1cHpZWkRzeGxXQ2J6Q0QwTkRoaTZveUJ0dDVvQkQKcjl5Zit5bGNnVmlHS0pGamJweHBJemxCR245VkpycE1BNzliRjdmOWN6eThUVG5OSnd2ZFFKVjlRNVhtb2NXZgp6OFJONFYxU2xyNEZIK1phSjUyNEhWMkRhQnNsL3JUU3VMblRIUUhaMGF4SXlSRkVPWWJnSm1RR3VvTUNPQncwCm01K0FLYWNDZ1lFQXhXK1I3Rm5kcG5kdXV5b1prM0ZVamtieGMzazd2VG9KSER2OEREUGtKL24vaDJ2QktSb2UKWk92M3R1a0t0T2luVW5rejJxOWNkRW43QVd4cXluaExQZU1EL0NpaldxZUszSDc1Uy9aeWx4dFVjS0RjSldSOApONDVvbjk5U2JLdDZ2Ny83NDA2V3Y3QzFuOUR0d042TTJLMmh5anE0RytKZGg0dHp6Y0ZFRUdFPQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+diff --git a/kube/my-local-values.yaml b/kube/my-local-values.yaml
+new file mode 100644
+index 0000000..6d50071
+--- /dev/null
++++ b/kube/my-local-values.yaml
+@@ -0,0 +1,4 @@
++frontend:
++  externalImageServerUrl: "http://localhost:8888"
++  image:
++    tag: "v1.0.0-final-fix"
+\ No newline at end of file
+diff --git a/kube/notes.md b/kube/notes.md
+new file mode 100644
+index 0000000..5c22733
+--- /dev/null
++++ b/kube/notes.md
+@@ -0,0 +1,46 @@
++# get current status 
++microk8s status
++
++# start if it is not already
++microk8s start
++
++# set for current sesstion
++export KUBECONFIG=/home/hpadmin/HPE-Nvidia-Vista-3D/kube/microk8s.kubeconfig
++
++# deploy helm chart for frontend and image-server
++#helm upgrade --install vista3d helm/vista3d -f helm/vista3d/values-frontend-imageserver.yaml
++helm install vista3d helm/vista3d -f helm/vista3d/values.yaml
++
++# see what is running
++microk8s kubectl get pods
++microk8s kubectl get deployments
++
++# portforward from pod to host
++export KUBECONFIG=/home/hpadmin/HPE-Nvidia-Vista-3D/kube/microk8s.kubeconfig 
++microk8s.kubectl port-forward service/vista3d-frontend 8501:8501 -n vista3d &
++microk8s.kubectl port-forward service/vista3d-image-server 8888:8888 -n vista3d &
++
++# portforward from server to localhost
++ssh ssh.axisapps.io  -l a55edd84cf804eed8d07957c24146fe6 -L 8501:localhost:8501 -L 8888:localhost:8888
++
++
++# delete a pod
++microk8s kubectl delete deployment vista3d-backend
++
++
++# helm commands
++helm list
++helm uninstall vista3d
++cd helm/vista3d
++helm install vista3d . --namespace vista3d --create-namespace
++cd helm
++helm package vista3d
++microk8s helm list
++microk8s kubectl get pods -n default
++microk8s kubectl get pods -n vista3d
++# see ports assigned
++microk8s kubectl get svc -n vista3d
++
++# list secrets
++microk8s kubectl get secrets -n vista3d | grep 'helm.sh/release.v1'
++microk8s kubectl delete secret sh.helm.release.v1.vista3d.v1  -n vista3d
+diff --git a/kube/port-forward.sh b/kube/port-forward.sh
+new file mode 100755
+index 0000000..8f601c7
+--- /dev/null
++++ b/kube/port-forward.sh
+@@ -0,0 +1,19 @@
++#!/bin/bash
++#
++
++echo "Starting port-forward for Frontend (8501)..."
++KUBECONFIG=microk8s.kubeconfig microk8s.kubectl port-forward service/vista3d-frontend 8501:8501 -n vista3d &
++FRONTEND_PID=$!
++echo "Frontend port-forward PID: $FRONTEND_PID"
++
++echo "Starting port-forward for Image Server (8888)..."
++KUBECONFIG=microk8s.kubeconfig microk8s.kubectl port-forward service/vista3d-image-server 8888:8888 -n vista3d &
++IMAGE_SERVER_PID=$!
++echo "Image Server port-forward PID: $IMAGE_SERVER_PID"
++
++echo "All port-forwards started in the background."
++echo "To stop them, use 'kill $FRONTEND_PID $BACKEND_PID $IMAGE_SERVER_PID' or 'killall kubectl'."
++echo "Keeping script alive. Press Ctrl+C to exit this script (this will NOT stop the port-forwards)."
++
++# Keep the script alive so the background processes don't get killed immediately
++sleep 10

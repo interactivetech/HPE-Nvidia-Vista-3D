@@ -75,12 +75,15 @@ class Navigation:
                             is_image=item_config.get('is_image', False)
                         )
                         self.items.append(nav_item)
-            else:
+            
+            # If no items were loaded from config, load defaults
+            if not self.items:
                 self._load_default_items()
                 
         except Exception as e:
             st.warning(f"Error loading navigation config: {e}. Using default navigation.")
-            self._load_default_items()
+            if not self.items:
+                self._load_default_items()
     
     def _load_default_items(self) -> None:
         """Load default navigation items when config file is not available."""

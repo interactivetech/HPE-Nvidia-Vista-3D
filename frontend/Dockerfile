@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 python:3.11-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -19,32 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
 
-# Install uv for dependency management
-RUN pip install --no-cache-dir uv
+# uv is causing an 'exec format error', so we are removing it and using pip directly.
 
 # Install only frontend deps
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen
-
-# Runtime env
-ENV DOCKER_CONTAINER=true
-
-# Copy minimal app code into image to avoid bind mounts in production
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py ./app.py
-COPY Tools.py ./Tools.py
-COPY NiiVue_Viewer.py ./NiiVue_Viewer.py
-COPY Image_Data.py ./Image_Data.py
-COPY assets ./assets
-COPY utils ./utils
-COPY conf ./conf
-COPY .streamlit ./.streamlit
-
-# Expose UI port
-EXPOSE 8501
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8501/_stcore/health || exit 1
-
-CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["/usr/local/bin/streamlit", "run", "/app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
 

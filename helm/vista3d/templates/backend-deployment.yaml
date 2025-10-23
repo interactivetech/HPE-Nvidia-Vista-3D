@@ -24,7 +24,8 @@ spec:
         app.kubernetes.io/component: backend
         app.kubernetes.io/part-of: vista3d
         app.kubernetes.io/managed-by: {{ .Release.Service }}
-      annotations: {}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
@@ -103,16 +104,16 @@ spec:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 60
-            periodSeconds: 30
+            initialDelaySeconds: 180
+            periodSeconds: 60
             timeoutSeconds: 10
             failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 180
+            periodSeconds: 60
             timeoutSeconds: 5
             failureThreshold: 3
           resources:
