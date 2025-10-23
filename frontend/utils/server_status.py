@@ -77,10 +77,10 @@ def render_server_status_sidebar():
         # Prioritize EXTERNAL_IMAGE_SERVER for display if available, otherwise use IMAGE_SERVER
         display_image_server_url = os.getenv("EXTERNAL_IMAGE_SERVER", os.getenv("IMAGE_SERVER", "http://localhost:8888"))
 
-        st.sidebar.info(f"""🖥️ **Image Server**  
+        st.sidebar.info(f"""📥 **Image Server**  
 ✅ Online • {display_image_server_url}""")
     else:
-        st.sidebar.error(f"""🖥️ **Image Server**  
+        st.sidebar.error(f"""📥 **Image Server**  
 ❌ Offline  
 Start with: `python utils/image_server.py`""")
 

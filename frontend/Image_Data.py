@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Image Data Page - Embeds the image server interface in an iframe.
+Image Data Page - Opens the image server URL directly.
 """
 
 import streamlit as st
 import streamlit.components.v1 as components
-import requests
 import os
 
 # Load environment variables from .env file
@@ -18,8 +17,6 @@ except ImportError:
 
 from assets.vista3d_badge import render_nvidia_vista_card as _render_nvidia_vista_card
 from assets.hpe_badge import render_hpe_badge as _render_hpe_badge
-
-from utils.server_status import check_image_server_status, render_server_status_sidebar
 
 def render_nvidia_vista_card():
     """Delegate rendering to assets.vista3d_badge module."""
@@ -36,24 +33,15 @@ def main():
     # Render HPE AI badge in sidebar
     _render_hpe_badge()
     
-    # Render server status widgets in sidebar
-    render_server_status_sidebar()
+    # Get image server URL from environment variable
+    image_server_url = os.getenv("IMAGE_SERVER", "http://localhost:8888")
     
-    # Get image server URLs
-    # For browser access (iframe), we need the external URL that the browser can reach
-    # For server-side checks, we use the internal URL (works within Docker network)
-    external_image_server_url = os.getenv("EXTERNAL_IMAGE_SERVER", "http://localhost:8888")
-    
-    # Check if image server is running
-    if check_image_server_status():
-        # Embed the image server in an iframe using the external URL (accessible from browser)
-        components.iframe(external_image_server_url, height=800, scrolling=True)
-    else:
-        st.error(f"❌ **Image Server is Offline**")
-        st.write(f"The image server at `{external_image_server_url}` is not responding.")
-        st.write("Please start the image server using:")
-        st.code("python image_server/server.py", language="bash")
-        st.write("Or check your `.env` file to ensure `IMAGE_SERVER` is set correctly.")
+    # Open the URL in a new tab using components.html (more reliable than st.markdown)
+    components.html(f"""
+    <script>
+        window.open('{image_server_url}', '_blank');
+    </script>
+    """, height=0)
 
 if __name__ == "__main__":
     main()

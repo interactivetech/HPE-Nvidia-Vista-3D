@@ -5,6 +5,8 @@ dicom
 .DS_Store
 output*
 dicom*
+old*
+delme*
 .setup_state*
 ,genkit
 .gemini

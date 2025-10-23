@@ -468,7 +468,7 @@ def generate_restricted_root_listing() -> HTMLResponse:
     </head>
     <body>
         <div class="header">
-            <h1>🩻 {title}</h1>
+            <h1>📥 {title}</h1>
             <p>{description}</p>
             <p>Accessible folders: {folder_list}</p>
         </div>
@@ -476,7 +476,7 @@ def generate_restricted_root_listing() -> HTMLResponse:
             {items_html}
         </ul>
         <div class="footer">
-            <p>🩻 {title} | FastAPI + Uvicorn</p>
+            <p>📥 {title} | FastAPI + Uvicorn</p>
         </div>
     </body>
     </html>
