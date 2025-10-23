@@ -62,13 +62,6 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Create the name of the backend service
-*/}}
-{{- define "vista3d.backend.serviceName" -}}
-{{- printf "%s-backend" (include "vista3d.fullname" .) }}
-{{- end }}
-
-{{/*
 Create the name of the frontend service
 */}}
 {{- define "vista3d.frontend.serviceName" -}}
@@ -80,13 +73,6 @@ Create the name of the image server service
 */}}
 {{- define "vista3d.imageServer.serviceName" -}}
 {{- printf "%s-image-server" (include "vista3d.fullname" .) }}
-{{- end }}
-
-{{/*
-Create the name of the backend deployment
-*/}}
-{{- define "vista3d.backend.deploymentName" -}}
-{{- printf "%s-backend" (include "vista3d.fullname" .) }}
 {{- end }}
 
 {{/*

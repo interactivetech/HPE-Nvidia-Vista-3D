@@ -1,9 +1,9 @@
 apiVersion: v2
 name: vista3d
-description: HPE NVIDIA Vista3D Medical AI Platform - AI-powered medical image segmentation with 3D visualization
+description: HPE NVIDIA Vista3D Medical AI Platform - Frontend and Image Server for microk8s deployment
 type: application
-version: 1.2.0
-appVersion: "1.2.0"
+version: 1.3.0
+appVersion: "1.3.0"
 home: https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D
 sources:
   - https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D

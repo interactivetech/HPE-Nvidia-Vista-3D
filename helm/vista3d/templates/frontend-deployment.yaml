@@ -28,11 +28,11 @@ spec:
               protocol: TCP
           env:
             - name: IMAGE_SERVER
-              value: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
+              value: "http://{{ include "vista3d.fullname" . }}-image-server:{{ .Values.imageServer.service.port }}"
             - name: EXTERNAL_IMAGE_SERVER
-              value: "http://localhost:8888"
+              value: "http://{{ include "vista3d.fullname" . }}-image-server:{{ .Values.imageServer.service.port }}"
             - name: VISTA3D_IMAGE_SERVER_URL
-              value: "http://{{ .Values.imageServer.name }}:{{ .Values.imageServer.service.port }}"
+              value: "http://{{ include "vista3d.fullname" . }}-image-server:{{ .Values.imageServer.service.port }}"
             - name: OUTPUT_FOLDER
               value: {{ .Values.frontend.env.OUTPUT_FOLDER | quote }}
             - name: DICOM_FOLDER

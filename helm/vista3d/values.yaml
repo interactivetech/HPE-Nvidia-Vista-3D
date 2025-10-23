@@ -6,18 +6,7 @@ global:
   imageRegistry: ""
   imagePullSecrets: []
 
-backend:
-  enabled: false
-  name: vista3d-backend
-  replicaCount: 1
-  image:
-    repository: nvcr.io/nim/nvidia/vista3d
-    tag: "1.0.0"
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 8000
-    targetPort: 8000
+# Backend is disabled - only frontend and image server are deployed
 
 frontend:
   enabled: true
@@ -61,7 +50,7 @@ imageServer:
   env:
     OUTPUT_FOLDER: "/data/output"
     DICOM_FOLDER: "/data/dicom"
-    IMAGE_SERVER: "http://localhost:8888" # This is for the image server itself, not the frontend
+    IMAGE_SERVER: "http://localhost:8888"
     PYTHONUNBUFFERED: "1"
     PYTHONDONTWRITEBYTECODE: "1"
   volumeMounts:
@@ -86,15 +75,15 @@ persistence:
 sampleData:
   enabled: true
   url: "https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/releases/download/v1.0.0/sample_data.tgz"
+  extractToDicom: true
+  extractToOutput: true
 
 serviceAccount:
   create: true
   annotations: {}
   name: ""
 
-secrets:
-  create: true
-  ngcApiKey: "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" # User must provide their NGC API Key here or via --set
+# Secrets not needed for frontend/image server only deployment
 
 ingress:
   enabled: false
