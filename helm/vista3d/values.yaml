@@ -13,7 +13,7 @@ frontend:
   name: vista3d-frontend
   replicaCount: 1
   image:
-    repository: dwtwp/vista3d-frontend
+    repository: mendeza/vista3d-frontend
     tag: latest
     pullPolicy: Always
   service:
