@@ -1,0 +1,32 @@
+{{- if .Values.ezua.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  # Use the full release name plus "-vs" for a unique, descriptive name
+  name: {{ include "vista3d.fullname" . }}-vs
+  # Always use the release namespace to ensure it's deployed correctly
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "vista3d.labels" . | nindent 4 }}
+spec:
+  gateways:
+  # Pull the gateway name directly from your values.yaml
+  - {{ .Values.ezua.virtualService.istioGateway }}
+  hosts:
+  # Pull the external hostname directly from your values.yaml
+  - {{ .Values.ezua.virtualService.endpoint }}
+  http:
+  - match:
+    - uri:
+        prefix: /
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        # Dynamically build the correct Kubernetes service FQDN
+        # This makes it robust even if you change namespaces or release names
+        host: {{ include "vista3d.frontend.serviceName" . }}.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          # Pull the port number from the frontend service configuration in values.yaml
+          number: {{ .Values.frontend.service.port }}
+{{- end }}

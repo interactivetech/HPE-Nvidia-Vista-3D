@@ -14,7 +14,7 @@ frontend:
   replicaCount: 1
   image:
     repository: mendeza/vista3d-frontend
-    tag: v1.0.0
+    tag: v1.0.5
     pullPolicy: Always
   service:
     type: ClusterIP
@@ -95,3 +95,13 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+ezua:
+  enabled: true
+  virtualService:
+    # The external hostname for the service.
+    # IMPORTANT: Update this to match your PCAI environment's ingress domain.
+    # This is a placeholder you need to replace.
+    endpoint: "vision-app.${DOMAIN_NAME}"
+
+    # The Istio gateway to bind to. This is the standard gateway for PCAI.
+    istioGateway: "istio-system/ezaf-gateway"

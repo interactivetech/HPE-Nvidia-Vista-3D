@@ -14,7 +14,7 @@ def check_image_server_status():
 
     try:
         # Use the URL for the health check
-        response = requests.head(f"{image_server_url.rstrip('/')}/health", timeout=2)
+        response = requests.get(f"{image_server_url.rstrip('/')}/health", timeout=2)
         return response.status_code == 200
     except (requests.exceptions.RequestException, requests.exceptions.Timeout):
         return False
