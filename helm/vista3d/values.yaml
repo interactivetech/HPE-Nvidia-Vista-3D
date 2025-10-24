@@ -101,7 +101,7 @@ ezua:
     # The external hostname for the service.
     # IMPORTANT: Update this to match your PCAI environment's ingress domain.
     # This is a placeholder you need to replace.
-    endpoint: "vision-app.${DOMAIN_NAME}"
+    endpoint: "vista3d-frontend.${DOMAIN_NAME}"
 
     # The Istio gateway to bind to. This is the standard gateway for PCAI.
     istioGateway: "istio-system/ezaf-gateway"
