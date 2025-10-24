@@ -37,7 +37,7 @@ microk8s status --wait-ready
 microk8s config > ~/microk8s.kubeconfig
 
 # Set KUBECONFIG environment variable
-export KUBECONFIG=~/microk8s.kubeconfig
+export KUBECONFIG=/home/hpadmin/HPE-Nvidia-Vista-3D/kube/microk8s.kubeconfig
 
 # Verify cluster is working
 microk8s kubectl get nodes
