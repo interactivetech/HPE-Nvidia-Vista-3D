@@ -14,7 +14,7 @@ frontend:
   replicaCount: 1
   image:
     repository: mendeza/vista3d-frontend
-    tag: latest
+    tag: v1.0.0
     pullPolicy: Always
   service:
     type: ClusterIP
