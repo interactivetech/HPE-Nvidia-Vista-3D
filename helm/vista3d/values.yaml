@@ -15,7 +15,7 @@ frontend:
   image:
     repository: dwtwp/vista3d-frontend
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   service:
     type: ClusterIP
     port: 8501
@@ -42,7 +42,7 @@ imageServer:
   image:
     repository: dwtwp/vista3d-image-server
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
   service:
     type: ClusterIP
     port: 8888
@@ -73,7 +73,7 @@ persistence:
     size: 50Gi
 
 sampleData:
-  enabled: true
+  enabled: false
   url: "https://github.com/dw-flyingw/HPE-Nvidia-Vista-3D/releases/download/v1.0.0/sample_data.tgz"
   extractToDicom: true
   extractToOutput: true
