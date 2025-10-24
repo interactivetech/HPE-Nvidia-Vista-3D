@@ -61,6 +61,27 @@ imageServer:
       mountPath: /data/dicom
       readOnly: true
 
+backend:
+  enabled: true
+  name: vista3d-backend
+  # WARNING: For development/testing only. Do not commit this file with the key to a public repository.
+  ngcApiKey: "nvapi-YOUR_NGC_API_KEY_HERE" # <-- PASTE YOUR KEY HERE
+  image:
+    repository: nvcr.io/nim/nvidia/vista3d
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  nodeSelector:
+    nvidia.com/gpu: "true"
+  resources:
+    limits:
+      nvidia.com/gpu: 1
+  volumeMounts:
+    - name: output-data
+      mountPath: /workspace/output
+
 persistence:
   enabled: true
   output:
