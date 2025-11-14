@@ -20,36 +20,36 @@ spec:
     spec:
       containers:
         - name: {{ .Values.frontend.name }}
-          image: "{{ .Values.global.imageRegistry }}{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
           ports:
             - name: http
               containerPort: {{ .Values.frontend.service.port }}
               protocol: TCP
           env:
+            {{- /* Construct the URL for the fileserver dynamically */}}
             - name: IMAGE_SERVER
-              value: "http://{{ include "vista3d.fullname" . }}-image-server:{{ .Values.imageServer.service.port }}"
-            - name: EXTERNAL_IMAGE_SERVER
-              value: "http://{{ include "vista3d.fullname" . }}-image-server:{{ .Values.imageServer.service.port }}"
-            - name: VISTA3D_IMAGE_SERVER_URL
-              value: "http://{{ include "vista3d.fullname" . }}-image-server:{{ .Values.imageServer.service.port }}"
+              value: "http://{{ .Values.imageServer.name }}-service:{{ .Values.imageServer.service.port }}"
+            {{- /* These variables are now read from the values file */}}
             - name: OUTPUT_FOLDER
-              value: {{ .Values.frontend.env.OUTPUT_FOLDER | quote }}
+              value: {{ .Values.frontend.env.outputFolder | quote }}
             - name: DICOM_FOLDER
-              value: {{ .Values.frontend.env.DICOM_FOLDER | quote }}
+              value: {{ .Values.frontend.env.dicomFolder | quote }}
             - name: DOCKER_CONTAINER
-              value: {{ .Values.frontend.env.DOCKER_CONTAINER | quote }}
-            - name: STREAMLIT_SERVER_RUN_ON_SAVE
-              value: {{ .Values.frontend.env.STREAMLIT_SERVER_RUN_ON_SAVE | quote }}
-            - name: STREAMLIT_SERVER_FILE_WATCHER_TYPE
-              value: {{ .Values.frontend.env.STREAMLIT_SERVER_FILE_WATCHER_TYPE | quote }}
+              value: {{ .Values.frontend.env.dockerContainer | quote }}
+            {{- if .Values.backend.enabled }}
+            - name: VISTA3D_SERVER
+              value: "http://{{ .Values.backend.name }}:{{ .Values.backend.service.port }}"
+            {{- end }}
           volumeMounts:
-            {{- toYaml .Values.frontend.volumeMounts | nindent 12 }}
+            - name: shared-data
+              mountPath: {{ .Values.frontend.env.outputFolder }}
+              subPath: {{ .Values.persistence.shared.outputSubPath }}
+            - name: shared-data
+              mountPath: {{ .Values.frontend.env.dicomFolder }}
+              subPath: {{ .Values.persistence.shared.dicomSubPath }}
       volumes:
-        - name: output-data
+        - name: shared-data
           persistentVolumeClaim:
-            claimName: {{ include "vista3d.fullname" . }}-output-pvc
-        - name: dicom-data
-          persistentVolumeClaim:
-            claimName: {{ include "vista3d.fullname" . }}-dicom-pvc
+            claimName: {{ .Values.persistence.shared.existingClaim }}
 {{- end }}

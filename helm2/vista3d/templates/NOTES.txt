@@ -1,0 +1,15 @@
+Thank you for installing {{ include "vista3d.name" . }}!
+
+Namespace: {{ .Release.Namespace }}
+
+Frontend:
+  Service:  {{ include "vista3d.fullname" . }}-frontend
+  Port:     {{ .Values.frontend.port }}
+  Istio VS: {{ if .Values.ezua.enabled }}{{ .Values.ezua.virtualService.endpoint }} via {{ .Values.ezua.virtualService.istioGateway }}{{ else }}(disabled){{ end }}
+
+Fileserver:
+  Service:  {{ include "vista3d.fullname" . }}-image-server
+  Port:     {{ .Values.fileserver.port }}
+  Istio VS: {{ if and .Values.fileserver.enabled .Values.fileserver.istio.enabled }}{{ .Values.fileserver.istio.host }} via {{ .Values.fileserver.istio.gateway }}{{ else }}(disabled){{ end }}
+
+Remember to set: .Values.frontend.env.VISTA3D_API_KEY

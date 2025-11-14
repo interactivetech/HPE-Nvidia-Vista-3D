@@ -1,0 +1,471 @@
+# vista3d-full-deployment.yaml
+
+# 1. PersistentVolumeClaims to store your data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vista3d-output-pvc
+  namespace: test
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vista3d-dicom-pvc
+  namespace: test
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+---
+# 2. UPDATED Fileserver using a dedicated image with built-in CORS support
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vista3d-fileserver-deployment
+  namespace: test
+  labels:
+    app: vista3d-image-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vista3d-image-server
+  template:
+    metadata:
+      labels:
+        app: vista3d-image-server
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - name: fileserver
+          # Use a dedicated, lightweight static file server with CORS support
+          image: halverneus/static-file-server:latest
+          # Configure the server using environment variables
+          env:
+            - name: PORT
+              value: "8888" # The port the server should listen on
+            - name: FOLDER
+              value: "/app" # The root directory to serve files from
+            - name: CORS
+              value: "true" # ⬅️ CRITICAL: This enables the CORS headers
+          ports:
+            - containerPort: 8888
+          volumeMounts:
+            - name: output-data-volume
+              mountPath: /app/output
+            - name: dicom-data-volume
+              mountPath: /app/dicom
+      volumes:
+        - name: output-data-volume
+          persistentVolumeClaim:
+            claimName: vista3d-output-pvc
+        - name: dicom-data-volume
+          persistentVolumeClaim:
+            claimName: vista3d-dicom-pvc
+---
+# 3. The Service for the fileserver
+apiVersion: v1
+kind: Service
+metadata:
+  name: vista3d-image-server-service
+  namespace: test
+  labels:
+    app: vista3d-image-server
+spec:
+  selector:
+    app: vista3d-image-server
+  ports:
+    - name: http
+      port: 8888
+      targetPort: 8888
+  type: ClusterIP
+---
+# 4. The VirtualService to expose the fileserver externally
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: fileserver-vs
+  namespace: test
+spec:
+  hosts:
+    - fileserver.ingress.pcai0108.sv11.hpecolo.net
+  gateways:
+    - istio-system/ezaf-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: vista3d-image-server-service.test.svc.cluster.local
+            port:
+              number: 8888
+---
+# 5. The Frontend Pod definition
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vista3d-frontend
+  namespace: test
+  labels:
+    app: vista3d-frontend
+spec:
+  containers:
+    - name: vista3d-frontend
+      image: mendeza/vista3d-frontend:v1.0.8
+      imagePullPolicy: Always
+      ports:
+        - containerPort: 8501
+      env:
+        - name: VISTA3D_SERVER
+          value: "https://vista-predictor-andrew-mendez-fa786398.ingress.pcai0108.sv11.hpecolo.net"
+        - name: IMAGE_SERVER
+          value: "https://fileserver.ingress.pcai0108.sv11.hpecolo.net"
+        - name: VISTA3D_IMAGE_SERVER_URL
+          value: "https://fileserver.ingress.pcai0108.sv11.hpecolo.net"
+        - name: EXTERNAL_IMAGE_SERVER
+          value: "https://fileserver.ingress.pcai0108.sv11.hpecolo.net"
+        - name: VISTA3D_API_KEY
+          value: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1MzYxOTIsImlzcyI6ImFpb2xpQGhwZS5jb20iLCJzdWIiOiJlYzI1MTg5YS1mOTMyLTQ3Y2ItYjE5Yy1jNTUzMWI5ZWQ4MjEiLCJ1c2VyIjoiYWRtaW4ifQ.FY8FsrB5GcsodS3EEJTHmrvVlDDqWCu_u09H6Xh5leCb8jtcRp-Zb2Eg1pdhjnQ6hdZlimMNAghrZPldXsHnxCG6eNmIYJjy_e0Hs7RLwUDpUKfhE4Z3SdCiDIZd3sOkfkT6hw-D42hSFY9ZbOMOuKnQEy5ngvr9Tlml37qLhUn_l2dXCmZOYrQDXlNRkI5Fj8IzrP7jpP2MjTU3qv123bux2F-oxiMy7KKJEI2ieJ04d7oCZNpp9mNpXWvhHRSmk7dfCefXhlBSBsQgZglfXYFl-QfVEHdy5aY-JYriWXBx4ZWMOb5ibFGib6aj5u3ZsPKDNIx03sG5KF0xnXeabg"
+        - name: OUTPUT_FOLDER
+          value: "/app/output"
+        - name: DICOM_FOLDER
+          value: "/app/dicom"
+        - name: DOCKER_CONTAINER
+          value: "true"
+        - name: STREAMLIT_SERVER_RUN_ON_SAVE
+          value: "true"
+        - name: STREAML-IT_SERVER_FILE_WATCHER_TYPE
+          value: "auto"
+      resources:
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+        limits:
+          cpu: "2"
+          memory: "4Gi"
+      volumeMounts:
+        - name: output-data
+          mountPath: /app/output
+        - name: dicom-data
+          mountPath: /app/dicom
+  volumes:
+    - name: output-data
+      persistentVolumeClaim:
+        claimName: vista3d-output-pvc
+    - name: dicom-data
+      persistentVolumeClaim:
+        claimName: vista3d-dicom-pvc
+---
+# 6. The Frontend Service and VirtualService
+apiVersion: v1
+kind: Service
+metadata:
+  name: vista3d-frontend-service
+  namespace: test
+spec:
+  selector:
+    app: vista3d-frontend
+  ports:
+    - protocol: TCP
+      port: 8501
+      targetPort: 8501
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: vista3d-frontend-virtualservice
+  namespace: test
+spec:
+  hosts:
+    - "vista3d-frontend.ingress.pcai0108.sv11.hpecolo.net"
+  gateways:
+    - istio-system/ezaf-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      rewrite:
+        uri: /
+      route:
+        - destination:
+            host: vista3d-frontend-service.test.svc.cluster.local
+            port:
+              number: 8501
+---
+# 7. Job to download and install sample data
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sample-data-installer
+  namespace: test
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: data-installer
+          image: alpine:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting sample data installation..."
+              
+              # Install required tools
+              apk add --no-cache curl tar
+              
+              # The PVCs are mounted at /data/dicom and /data/output
+              # We will download and extract into a temporary location first
+              echo "Downloading sample data..."
+              curl -L -o /tmp/sample_data.tgz "https://media.githubusercontent.com/media/dw-flyingw/HPE-Nvidia-Vista-3D/main/sample_data.tgz"
+              
+              echo "Extracting sample data..."
+              mkdir -p /tmp/sample
+              tar -xzf /tmp/sample_data.tgz -C /tmp/sample
+              echo "Installing DICOM files..."
+              if [ -d "/tmp/sample/dicom" ]; then
+                # The 'cp -r' command will copy the contents of the dicom directory
+                cp -r /tmp/sample/dicom/* /app/dicom/
+                echo "DICOM files installed successfully."
+              else
+                echo "Warning: No 'dicom' directory found in extracted data."
+              fi
+              
+              echo "Installing output files..."
+              if [ -d "/tmp/sample/output" ]; then
+                cp -r /tmp/sample/output/* /app/output/
+                echo "Output files installed successfully."
+              else
+                echo "Warning: No 'output' directory found in extracted data."
+              fi
+              
+              echo "Cleaning up temporary files..."
+              rm -rf /tmp/sample /tmp/sample_data.tgz
+              
+              echo "Sample data installation completed successfully!"
+          volumeMounts:
+            - name: dicom-data-volume
+              mountPath: /app/dicom
+            - name: output-data-volume
+              mountPath: /app/output
+      volumes:
+        - name: dicom-data-volume
+          persistentVolumeClaim:
+            claimName: vista3d-dicom-pvc
+        - name: output-data-volume
+          persistentVolumeClaim:
+            claimName: vista3d-output-pvc
+  backoffLimit: 2 # Number of retries before marking the job as failed
+# # vista3d-full-deployment.yaml
+
+# # 1. PersistentVolumeClaims to store your data
+# # These are unchanged from your file.
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: vista3d-output-pvc
+#   namespace: test # Ensure namespace is consistent
+# spec:
+#   accessModes:
+#     - ReadWriteMany
+#   resources:
+#     requests:
+#       storage: 100Gi
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: vista3d-dicom-pvc
+#   namespace: test # Ensure namespace is consistent
+# spec:
+#   accessModes:
+#     - ReadWriteMany
+#   resources:
+#     requests:
+#       storage: 50Gi
+# ---
+# # 2. The new simple Python fileserver, configured as the Image Server
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: vista3d-fileserver-deployment
+#   namespace: test # Deploying into the 'test' namespace
+#   labels:
+#     app: vista3d-image-server # Use a label the service can select
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: vista3d-image-server
+#   template:
+#     metadata:
+#       labels:
+#         app: vista3d-image-server
+#       annotations:
+#         sidecar.istio.io/inject: "false" # Keep this to run without an Istio proxy
+#     spec:
+#       containers:
+#         - name: fileserver
+#           image: python:3.12-alpine
+#           # Serve from the /data directory on port 8888, which the frontend expects.
+#           command: ["python", "-m", "http.server", "8888", "--directory", "/data"]
+#           ports:
+#             - containerPort: 8888
+#           # Mount both PVCs into the /data directory
+#           volumeMounts:
+#             - name: output-data-volume
+#               mountPath: /data/output
+#             - name: dicom-data-volume
+#               mountPath: /data/dicom
+#       # Define the volumes using the PVCs
+#       volumes:
+#         - name: output-data-volume
+#           persistentVolumeClaim:
+#             claimName: vista3d-output-pvc
+#         - name: dicom-data-volume
+#           persistentVolumeClaim:
+#             claimName: vista3d-dicom-pvc
+# ---
+# # 3. The Service for the fileserver
+# # This service is named exactly what the frontend pod expects.
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: vista3d-image-server-service # Matches the name expected by the frontend's env vars
+#   namespace: test
+#   labels:
+#     app: vista3d-image-server
+# spec:
+#   selector:
+#     app: vista3d-image-server
+#   ports:
+#     - name: http
+#       port: 8888
+#       targetPort: 8888 # Matches the containerPort
+#   type: ClusterIP
+# ---
+# # 4. The VirtualService to expose the fileserver externally (optional but included)
+# apiVersion: networking.istio.io/v1beta1
+# kind: VirtualService
+# metadata:
+#   name: fileserver-vs
+#   namespace: test
+# spec:
+#   hosts:
+#     # Use the hostname you provided for the fileserver
+#     - fileserver.ingress.pcai0108.sv11.hpecolo.net
+#   gateways:
+#     - istio-system/ezaf-gateway
+#   http:
+#     - match:
+#         - uri:
+#             prefix: /
+#       route:
+#         - destination:
+#             # Point to the correct service and port
+#             host: vista3d-image-server-service.test.svc.cluster.local
+#             port:
+#               number: 8888
+# ---
+# # 5. The Frontend Pod definition
+# # This is unchanged because we named the fileserver service to match its expectations.
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: vista3d-frontend
+#   namespace: test
+#   labels:
+#     app: vista3d-frontend
+# spec:
+#   containers:
+#     - name: vista3d-frontend
+#       image: mendeza/vista3d-frontend:v1.0.7
+#       imagePullPolicy: Always
+#       ports:
+#         - containerPort: 8501
+#       env:
+#         - name: VISTA3D_SERVER
+#           value: "https://vista-predictor-andrew-mendez-fa786398.ingress.pcai0108.sv11.hpecolo.net"
+#         - name: IMAGE_SERVER
+#           value: "https://fileserver.ingress.pcai0108.sv11.hpecolo.net"
+#         - name: VISTA3D_IMAGE_SERVER_URL
+#           value: "https://fileserver.ingress.pcai0108.sv11.hpecolo.net"
+#         - name: VISTA3D_API_KEY
+#           value: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjI1MzYxOTIsImlzcyI6ImFpb2xpQGhwZS5jb20iLCJzdWIiOiJlYzI1MTg5YS1mOTMyLTQ3Y2ItYjE5Yy1jNTUzMWI5ZWQ4MjEiLCJ1c2VyIjoiYWRtaW4ifQ.FY8FsrB5GcsodS3EEJTHmrvVlDDqWCu_u09H6Xh5leCb8jtcRp-Zb2Eg1pdhjnQ6hdZlimMNAghrZPldXsHnxCG6eNmIYJjy_e0Hs7RLwUDpUKfhE4Z3SdCiDIZd3sOkfkT6hw-D42hSFY9ZbOMOuKnQEy5ngvr9Tlml37qLhUn_l2dXCmZOYrQDXlNRkI5Fj8IzrP7jpP2MjTU3qv123bux2F-oxiMy7KKJEI2ieJ04d7oCZNpp9mNpXWvhHRSmk7dfCefXhlBSBsQgZglfXYFl-QfVEHdy5aY-JYriWXBx4ZWMOb5ibFGib6aj5u3ZsPKDNIx03sG5KF0xnXeabg"
+#         - name: OUTPUT_FOLDER
+#           value: "/app/output"
+#         - name: DICOM_FOLDER
+#           value: "/app/dicom"
+#         - name: DOCKER_CONTAINER
+#           value: "true"
+#         - name: STREAMLIT_SERVER_RUN_ON_SAVE
+#           value: "true"
+#         - name: STREAML-IT_SERVER_FILE_WATCHER_TYPE
+#           value: "auto"
+#       resources:
+#         requests:
+#           cpu: "1"
+#           memory: "2Gi"
+#         limits:
+#           cpu: "2"
+#           memory: "4Gi"
+#       volumeMounts:
+#         - name: output-data
+#           mountPath: /app/output
+#         - name: dicom-data
+#           mountPath: /app/dicom
+#   volumes:
+#     - name: output-data
+#       persistentVolumeClaim:
+#         claimName: vista3d-output-pvc
+#     - name: dicom-data
+#       persistentVolumeClaim:
+#         claimName: vista3d-dicom-pvc
+# ---
+# # 6. The Frontend Service and VirtualService
+# # These are unchanged from your file.
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: vista3d-frontend-service
+#   namespace: test
+# spec:
+#   selector:
+#     app: vista3d-frontend
+#   ports:
+#     - protocol: TCP
+#       port: 8501
+#       targetPort: 8501
+# ---
+# apiVersion: networking.istio.io/v1beta1
+# kind: VirtualService
+# metadata:
+#   name: vista3d-frontend-virtualservice
+#   namespace: test
+# spec:
+#   hosts:
+#     - "vista3d-frontend.ingress.pcai0108.sv11.hpecolo.net"
+#   gateways:
+#     - istio-system/ezaf-gateway
+#   http:
+#     - match:
+#         - uri:
+#             prefix: /
+#       rewrite:
+#         uri: /
+#       route:
+#         - destination:
+#             host: vista3d-frontend-service.test.svc.cluster.local
+#             port:
+#               number: 8501

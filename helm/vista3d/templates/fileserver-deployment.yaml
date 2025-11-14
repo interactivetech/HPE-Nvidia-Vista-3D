@@ -1,0 +1,70 @@
+{{- if .Values.imageServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.imageServer.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.imageServer.name }}
+    {{- include "vista3d.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.imageServer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.imageServer.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.imageServer.name }}
+    spec:
+      {{- if .Values.imageServer.initContainer.enabled }}
+      initContainers:
+        - name: data-downloader
+          image: {{ .Values.imageServer.initContainer.image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -ex;
+              apk add --no-cache curl tar;
+              
+              BASE_PATH="/data/{{ .Values.persistence.shared.baseSubPath }}"
+              DICOM_PATH="/data/{{ .Values.persistence.shared.dicomSubPath }}"
+              OUTPUT_PATH="/data/{{ .Values.persistence.shared.outputSubPath }}"
+              MARKER_FILE="$BASE_PATH/.initialized"
+              
+              mkdir -p "$DICOM_PATH" "$OUTPUT_PATH";
+              
+              if [ ! -f "$MARKER_FILE" ]; then
+                echo "Sample data not found. Downloading and extracting...";
+                curl -L -o /tmp/sample_data.tgz "{{ .Values.imageServer.initContainer.sampleDataUrl }}";
+                tar -xzf /tmp/sample_data.tgz -C /tmp;
+                
+                cp -r /tmp/sample_data/dicom/* "$DICOM_PATH"/;
+                cp -r /tmp/sample_data/output/* "$OUTPUT_PATH"/;
+                
+                touch "$MARKER_FILE";
+                echo "Sample data successfully installed.";
+              else
+                echo "Sample data already initialized. Skipping download.";
+              fi
+          volumeMounts:
+            - name: shared-data
+              mountPath: /data
+      {{- end }}
+      containers:
+        - name: {{ .Values.imageServer.name }}
+          image: "{{ .Values.imageServer.image.repository }}:{{ .Values.imageServer.image.tag }}"
+          imagePullPolicy: {{ .Values.imageServer.image.pullPolicy }}
+          command: ["python", "-m", "http.server", "{{ .Values.imageServer.service.port }}", "--directory", "/data/{{ .Values.imageServer.serveDirectory }}"]
+          ports:
+            - containerPort: {{ .Values.imageServer.service.port }}
+          volumeMounts:
+            - name: shared-data
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.shared.existingClaim }}
+{{- end }}

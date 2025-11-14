@@ -21,6 +21,8 @@ frontend:
     port: 8501
     targetPort: 8501
   env:
+    VISTA3D_SERVER: "http://vista3d-image-server:8888"
+    VISTA3D_API_KEY: "<UPDATE>"
     IMAGE_SERVER: "http://vista3d-image-server:8888"
     EXTERNAL_IMAGE_SERVER: "http://vista3d-image-server:8888"
     VISTA3D_IMAGE_SERVER_URL: "http://vista3d-image-server:8888"
@@ -37,32 +39,27 @@ frontend:
 
 imageServer:
   enabled: true
-  name: vista3d-image-server
+  name: fileserver # Changed from vista3d-image-server to match your preference
   replicaCount: 1
   image:
-    repository: dwtwp/vista3d-image-server
-    tag: latest
-    pullPolicy: Always
+    repository: python
+    tag: 3.12-alpine # Your desired image
+    pullPolicy: IfNotPresent
+  # New section for the Init Container that will download the data
+  initContainer:
+    image: alpine:latest
+    sampleDataUrl: "https://media.githubusercontent.com/media/dw-flyingw/HPE-Nvidia-Vista-3D/main/sample_data.tgz"
   service:
     type: ClusterIP
-    port: 8888
+    port: 8888       # Your fileserver port
     targetPort: 8888
-  env:
-    OUTPUT_FOLDER: "/data/output"
-    DICOM_FOLDER: "/data/dicom"
-    IMAGE_SERVER: "http://localhost:8888"
-    PYTHONUNBUFFERED: "1"
-    PYTHONDONTWRITEBYTECODE: "1"
+  # This volume mount will be shared between the init container and main container
   volumeMounts:
-    - name: output-data
-      mountPath: /data/output
-      readOnly: true
-    - name: dicom-data
-      mountPath: /data/dicom
-      readOnly: true
+    - name: shared-data
+      mountPath: /mnt # Mount path for the python http.server
 
 backend:
-  enabled: true
+  enabled: false
   name: vista3d-backend
   # WARNING: For development/testing only. Do not commit this file with the key to a public repository.
   ngcApiKey: "nvapi-YOUR_NGC_API_KEY_HERE" # <-- PASTE YOUR KEY HERE
@@ -84,17 +81,16 @@ backend:
 
 persistence:
   enabled: true
-  output:
-    enabled: true
-    accessMode: ReadWriteOnce
-    size: 100Gi
-  dicom:
-    enabled: true
-    accessMode: ReadOnlyMany
-    size: 50Gi
+  # This new 'shared' section allows specifying your existing PVC
+  shared:
+    # IMPORTANT: Set the name of your existing PVC here.
+    existingClaim: "kubeflow-shared-pvc"
+    # The subPath allows you to use specific folders within your PVC
+    dicomSubPath: "vista3d/dicom"
+    outputSubPath: "vista3d/output"
 
 sampleData:
-  enabled: true
+  enabled: false
   url: "https://media.githubusercontent.com/media/dw-flyingw/HPE-Nvidia-Vista-3D/main/sample_data.tgz"
   extractToDicom: true
   extractToOutput: true
